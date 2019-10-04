@@ -1,0 +1,14 @@
+noinst_LIBRARIES = libefield.a
+
+libefield_a_SOURCES = apex_sunloc_empirical.f efield_ipe.f
+
+libefield_a_FFLAGS = $(FC_MODINC) .
+
+EXTRA_DIST = apex_sunloc.f
+
+.PHONY: clean-modules
+
+clean-modules:
+	-test -z "$(FC_MODEXT)" || rm -f *.$(FC_MODEXT)
+
+clean-local: clean-modules

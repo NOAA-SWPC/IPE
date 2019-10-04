@@ -1,0 +1,11 @@
+# build
+config.log
+config.status
+autom4te.cache/
+ipe.mk
+
+# compiler output
+*.o
+*.mod
+*.a
+*.x
