@@ -22,10 +22,10 @@ AM_CONDITIONAL([COUPLED], [test x$enable_coupling = xyes])
 
 # Checks for required libraries
 ext_libs=""
-# - HDF5
-AX_LIB_HDF5
+# - Parallel HDF5
+AX_LIB_HDF5([parallel])
 AS_IF([test "x$with_hdf5" = x],
-  [AC_MSG_ERROR([Unable to find required HDF5 library])],
+  [AC_MSG_ERROR([Unable to find parallel  HDF5 library])],
   [ext_libs="${ext_libs} HDF5"])
 
 # - ESMF

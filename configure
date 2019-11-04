@@ -1405,7 +1405,7 @@ Optional Features:
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
-  --with-hdf5=yes/no/PATH location of h5cc or h5pcc for HDF5 configuration
+  --with-hdf5=yes/no/PATH location of h5pcc for parallel HDF5 configuration
   --with-esmf=yes/no/PATH provide (PATH) or retrieve (yes) location of ESMF
                           makefile fragment (default: $enable_coupling)
 
@@ -2899,7 +2899,7 @@ fi
 
 # Checks for required libraries
 ext_libs=""
-# - HDF5
+# - Parallel HDF5
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for grep that handles long lines and -e" >&5
 $as_echo_n "checking for grep that handles long lines and -e... " >&6; }
 if ${ac_cv_path_GREP+:} false; then :
@@ -4284,11 +4284,11 @@ done
 
 
 
-if   test "" = ""        ; then
+if   test "parallel" = ""        ; then
     : # Recognized value
-elif test "" = "serial"  ; then
+elif test "parallel" = "serial"  ; then
     : # Recognized value
-elif test "" = "parallel"; then
+elif test "parallel" = "parallel"; then
     : # Recognized value
 else
     as_fn_error $? "
@@ -4327,7 +4327,7 @@ HDF5_TYPE=""
 
 if test "$with_hdf5" = "yes"; then
     if test -z "$H5CC"; then
-                for ac_prog in h5cc h5pcc
+                for ac_prog in h5pcc
 do
   # Extract the first word of "$ac_prog", so it can be a program name with args.
 set dummy $ac_prog; ac_word=$2
@@ -4396,13 +4396,13 @@ $as_echo_n "checking for HDF5 libraries... " >&6; }
         { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
         { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING:
-Unable to locate HDF5 compilation helper scripts 'h5cc' or 'h5pcc'.
-Please specify --with-hdf5=<LOCATION> as the full path to h5cc or h5pcc.
+Unable to locate parallel HDF5 compilation helper script 'h5pcc'.
+Please specify --with-hdf5=<LOCATION> as the full path to h5pcc.
 HDF5 support is being disabled (equivalent to --with-hdf5=no).
 " >&5
 $as_echo "$as_me: WARNING:
-Unable to locate HDF5 compilation helper scripts 'h5cc' or 'h5pcc'.
-Please specify --with-hdf5=<LOCATION> as the full path to h5cc or h5pcc.
+Unable to locate parallel HDF5 compilation helper script 'h5pcc'.
+Please specify --with-hdf5=<LOCATION> as the full path to h5pcc.
 HDF5 support is being disabled (equivalent to --with-hdf5=no).
 " >&2;}
         with_hdf5="no"
@@ -4619,7 +4619,7 @@ $as_echo "#define HAVE_HDF5 1" >>confdefs.h
 fi
 
 if test "x$with_hdf5" = x; then :
-  as_fn_error $? "Unable to find required HDF5 library" "$LINENO" 5
+  as_fn_error $? "Unable to find parallel  HDF5 library" "$LINENO" 5
 else
   ext_libs="${ext_libs} HDF5"
 fi
