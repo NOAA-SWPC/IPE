@@ -1132,8 +1132,10 @@ CONTAINS
                   temperature(lpx,mpx) = 0.0_prec
                   e_temperature(lpx,mpx) = 0.0_prec
 
-                  isouth = ii
-                  inorth = ii
+                  ! We assume by default the last flux tube point should be used
+                  ! and we setup weights that prolong the last flux tube value
+                  isouth = grid % flux_tube_max(lp_t0(lpx))
+                  inorth = isouth
                   i_comp_weight(1) = 1.0_prec
                   i_comp_weight(2) = 0.0_prec
                   ! Search for the nearest q_factor
@@ -1151,14 +1153,6 @@ CONTAINS
 
                     ENDIF
                   ENDDO
-
-                  ! In this case, no interior flux tube point was found
-                  ! We assume the last flux tube point should be used and
-                  ! we setup weights that prolong the last flux tube value
-                  IF( isouth == inorth )THEN
-                    isouth = grid % flux_tube_max(lp_t0(lpx))
-                    inorth = isouth
-                  ENDIF
 
                   B(lpx,mpx) = grid % magnetic_field_strength(isouth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(1) +&
                                grid % magnetic_field_strength(inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
