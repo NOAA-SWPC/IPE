@@ -105,12 +105,14 @@ class Plasma:
     self.ion_densities[6] = f.variables['n2_plus_density'][:]
     self.ion_densities[7] = f.variables['o_plus_2D_density'][:]
     self.ion_densities[8] = f.variables['o_plus_2P_density'][:]
+    self.tec              = np.sum(self.ion_densities,axis=0)
     self.electron_temperature = f.variables['electron_temperature'][:]
     self.ion_temperature      = f.variables['ion_temperature'][:]
 
 class Neutral:
   def __init__(self, filename, nlp, nmp, nfluxtube):
     self.velocity_apex = np.zeros( (3, nmp, nlp, nfluxtube) )
+    self.velocity_geo  = np.zeros( (3, nmp, nlp, nfluxtube) )
 
     f = Dataset(filename).groups['apex']
 
@@ -124,6 +126,12 @@ class Neutral:
     self.velocity_apex[0]    = f.variables['neutral_apex1_velocity'][:]
     self.velocity_apex[1]    = f.variables['neutral_apex2_velocity'][:]
     self.velocity_apex[2]    = f.variables['neutral_apex3_velocity'][:]
+    try:
+      self.velocity_geo[0]     = f.variables['neutral_geographic_velocity1'][:]
+      self.velocity_geo[1]     = f.variables['neutral_geographic_velocity2'][:]
+      self.velocity_geo[2]     = f.variables['neutral_geographic_velocity3'][:]
+    except:
+      pass
 
 class IPE:
   def __init__(self, grid_filename):
@@ -192,6 +200,10 @@ class IPE:
     op2p_var.long_name = "O+(2P) number density"
     op2p_var.units     = "m^{-3}"
 
+    tec_var = o.createVariable('TEC',                   'f4', ('latitude','longitude',))
+    tec_var.long_name = "Total Electron Content"
+    tec_var.units     = "TECu"
+
     he_var   = o.createVariable('helium',               'f4', ('altitude','latitude','longitude',))
     he_var.long_name = "Neutral He density"
     he_var.units     = "kg m^{-3}"
@@ -220,17 +232,29 @@ class IPE:
     t_var.long_name = "Neutral temperature"
     t_var.units     = "K"
 
-    u_var    = o.createVariable('u',                    'f4', ('altitude','latitude','longitude',))
-    u_var.long_name = "Apex1 Velocity"
-    u_var.units     = "m s^{-1}"
+    ua_var    = o.createVariable('u_apex',               'f4', ('altitude','latitude','longitude',))
+    ua_var.long_name = "Apex1 Velocity"
+    ua_var.units     = "m s^{-1}"
 
-    v_var    = o.createVariable('v',                    'f4', ('altitude','latitude','longitude',))
-    v_var.long_name = "Apex2 Velocity"
-    v_var.units     = "m s^{-1}"
+    va_var    = o.createVariable('v_apex',               'f4', ('altitude','latitude','longitude',))
+    va_var.long_name = "Apex2 Velocity"
+    va_var.units     = "m s^{-1}"
 
-    w_var    = o.createVariable('w',                    'f4', ('altitude','latitude','longitude',))
-    w_var.long_name = "Apex3 Velocity"
-    w_var.units     = "m s^{-1}"
+    wa_var    = o.createVariable('w_apex',               'f4', ('altitude','latitude','longitude',))
+    wa_var.long_name = "Apex3 Velocity"
+    wa_var.units     = "m s^{-1}"
+
+    ug_var    = o.createVariable('u_geo',                'f4', ('altitude','latitude','longitude',))
+    ug_var.long_name = "Geographic Velocity1"
+    ug_var.units     = "m s^{-1}"
+
+    vg_var    = o.createVariable('v_geo',                'f4', ('altitude','latitude','longitude',))
+    vg_var.long_name = "Geographic Velocity2"
+    vg_var.units     = "m s^{-1}"
+
+    wg_var    = o.createVariable('w_geo',                'f4', ('altitude','latitude','longitude',))
+    wg_var.long_name = "Geographic Velocity3"
+    wg_var.units     = "m s^{-1}"
 
     it_var   = o.createVariable('ion_temperature',      'f4', ('altitude','latitude','longitude',))
     it_var.long_name = "Ion temperature"
@@ -253,6 +277,7 @@ class IPE:
     n2p_var[:]  = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[6])
     op2d_var[:] = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[7])
     op2p_var[:] = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[8])
+    tec_var[:]  = np.sum(self.grid.interpolate_to_geogrid(self.plasma.tec),axis=0)*5000*1.0e-16
     he_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.helium)
     o_var[:]    = self.grid.interpolate_to_geogrid(self.neutral.oxygen)
     o2_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.molecular_oxygen)
@@ -260,9 +285,15 @@ class IPE:
     n_var[:]    = self.grid.interpolate_to_geogrid(self.neutral.nitrogen)
     h_var[:]    = self.grid.interpolate_to_geogrid(self.neutral.hydrogen)
     t_var[:]    = self.grid.interpolate_to_geogrid(self.neutral.neutral_temperature)
-    u_var[:]    = self.grid.interpolate_to_geogrid(self.neutral.velocity_apex[0])
-    v_var[:]    = self.grid.interpolate_to_geogrid(self.neutral.velocity_apex[1])
-    w_var[:]    = self.grid.interpolate_to_geogrid(self.neutral.velocity_apex[2])
+    ua_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.velocity_apex[0])
+    va_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.velocity_apex[1])
+    wa_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.velocity_apex[2])
+    try:
+       ug_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.velocity_geo[0])
+       vg_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.velocity_geo[1])
+       wg_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.velocity_geo[2])
+    except:
+       pass
     it_var[:]   = self.grid.interpolate_to_geogrid(self.plasma.ion_temperature)
     et_var[:]   = self.grid.interpolate_to_geogrid(self.plasma.electron_temperature)
 
@@ -288,3 +319,4 @@ ipe = IPE(args.gridfile)
 files = glob.glob(path.join(args.indir,"IPE_State.apex.*.h5"))
 p = Pool(min([len(files),MAX_PROCS]))
 p.map(load_and_write,range(len(files)))
+#load_and_write(0)
