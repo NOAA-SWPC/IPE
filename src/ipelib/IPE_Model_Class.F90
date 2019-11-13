@@ -280,9 +280,6 @@ CONTAINS
     INTEGER,            INTENT(out)   :: error
 
     ! Local
-    INTEGER, PARAMETER :: num_groups = 2
-    CHARACTER(LEN=*), DIMENSION(num_groups),   PARAMETER :: groups = (/ "apex", "geo " /)
-
     INTEGER, PARAMETER :: num_ion_densities = 9
     CHARACTER(LEN=*), DIMENSION(num_ion_densities), PARAMETER :: ion_densities = &
       (/ &
@@ -324,9 +321,9 @@ CONTAINS
     INTEGER, PARAMETER :: num_geo_datasets = 3
     CHARACTER(LEN=*), DIMENSION(num_geo_datasets), PARAMETER :: geo_datasets = &
       (/ &
-        "/geo/neutral_velocity_1", &
-        "/geo/neutral_velocity_2", &
-        "/geo/neutral_velocity_3"  &
+        "/apex/neutral_geographic_velocity1", &
+        "/apex/neutral_geographic_velocity2", &
+        "/apex/neutral_geographic_velocity3"  &
       /)
 
     INTEGER :: item
@@ -465,8 +462,8 @@ CONTAINS
     INTEGER,            INTENT(out)   :: error
 
     ! Local
-    INTEGER, PARAMETER :: num_groups = 2
-    CHARACTER(LEN=*), DIMENSION(num_groups),   PARAMETER :: groups = (/ "apex", "geo " /)
+    INTEGER, PARAMETER :: num_groups = 1
+    CHARACTER(LEN=*), DIMENSION(num_groups),   PARAMETER :: groups = (/ "apex" /)
 
     INTEGER, PARAMETER :: num_ion_densities = 9
     CHARACTER(LEN=*), DIMENSION(num_ion_densities), PARAMETER :: ion_densities = &
@@ -508,9 +505,9 @@ CONTAINS
     INTEGER, PARAMETER :: num_geo_datasets = 3
     CHARACTER(LEN=*), DIMENSION(num_geo_datasets), PARAMETER :: geo_datasets = &
       (/ &
-        "/geo/neutral_velocity_1", &
-        "/geo/neutral_velocity_2", &
-        "/geo/neutral_velocity_3"  &
+        "/apex/neutral_geographic_velocity1", &
+        "/apex/neutral_geographic_velocity2", &
+        "/apex/neutral_geographic_velocity3"  &
       /)
 
     INTEGER :: item
