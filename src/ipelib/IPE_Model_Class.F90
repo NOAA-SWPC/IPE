@@ -12,8 +12,9 @@ USE IPE_Plasma_Class
 USE IPE_Electrodynamics_Class
 USE IPE_MPI_Layer_Class
 USE IPE_IO_Class
-
+#ifdef HAVE_NETCDF
 USE netcdf
+#endif
 USE HDF5
 
 
