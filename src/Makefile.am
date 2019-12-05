@@ -1,17 +1,5 @@
 SUBDIRS = ipelib .
 
-bin_PROGRAMS = ipe.x
-
-ipe_x_SOURCES = IPE_Driver.F90
-
-ipe_x_FCFLAGS = $(FC_MODINC) ipelib \
-	$(FC_MODINC) ipelib/dynamo \
-        $(FC_MODINC) ipelib/empirical_efield \
-        $(FC_MODINC) ipelib/flip \
-        $(FC_MODINC) ipelib/msise00
-
-ipe_x_LDADD = $(builddir)/ipelib/libipe.a
-
 if COUPLED
 lib_LIBRARIES = libipm.a
 
@@ -31,6 +19,18 @@ libipm_a_SOURCES = ipeCap.F90 IPE_Wrapper.F90
 
 libipm_a-ipeCap.$(OBJEXT): libipm_a-IPE_Wrapper.$(OBJEXT)
 libipm_a-IPE_Wrapper.$(OBJEXT): $(builddir)/ipelib/libipe.a
+else
+bin_PROGRAMS = ipe.x
+
+ipe_x_SOURCES = IPE_Driver.F90
+
+ipe_x_FCFLAGS = $(FC_MODINC) ipelib \
+	$(FC_MODINC) ipelib/dynamo \
+        $(FC_MODINC) ipelib/empirical_efield \
+        $(FC_MODINC) ipelib/flip \
+        $(FC_MODINC) ipelib/msise00
+
+ipe_x_LDADD = $(builddir)/ipelib/libipe.a
 endif
 
 .PHONY: clean-modules
