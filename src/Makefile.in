@@ -77,7 +77,7 @@ POST_INSTALL = :
 NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
-bin_PROGRAMS = ipe.x$(EXEEXT)
+@COUPLED_FALSE@bin_PROGRAMS = ipe.x$(EXEEXT)
 subdir = src
 DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -136,9 +136,10 @@ am__libipm_a_SOURCES_DIST = ipeCap.F90 IPE_Wrapper.F90
 @COUPLED_TRUE@	libipm_a-IPE_Wrapper.$(OBJEXT)
 libipm_a_OBJECTS = $(am_libipm_a_OBJECTS)
 PROGRAMS = $(bin_PROGRAMS)
-am_ipe_x_OBJECTS = ipe_x-IPE_Driver.$(OBJEXT)
+am__ipe_x_SOURCES_DIST = IPE_Driver.F90
+@COUPLED_FALSE@am_ipe_x_OBJECTS = ipe_x-IPE_Driver.$(OBJEXT)
 ipe_x_OBJECTS = $(am_ipe_x_OBJECTS)
-ipe_x_DEPENDENCIES = $(builddir)/ipelib/libipe.a
+@COUPLED_FALSE@ipe_x_DEPENDENCIES = $(builddir)/ipelib/libipe.a
 ipe_x_LINK = $(FCLD) $(ipe_x_FCFLAGS) $(FCFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
@@ -172,7 +173,7 @@ am__v_FCLD_ = $(am__v_FCLD_@AM_DEFAULT_V@)
 am__v_FCLD_0 = @echo "  FCLD    " $@;
 am__v_FCLD_1 = 
 SOURCES = $(libipm_a_SOURCES) $(ipe_x_SOURCES)
-DIST_SOURCES = $(am__libipm_a_SOURCES_DIST) $(ipe_x_SOURCES)
+DIST_SOURCES = $(am__libipm_a_SOURCES_DIST) $(am__ipe_x_SOURCES_DIST)
 RECURSIVE_TARGETS = all-recursive check-recursive cscopelist-recursive \
 	ctags-recursive dvi-recursive html-recursive info-recursive \
 	install-data-recursive install-dvi-recursive \
@@ -363,14 +364,6 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 SUBDIRS = ipelib .
-ipe_x_SOURCES = IPE_Driver.F90
-ipe_x_FCFLAGS = $(FC_MODINC) ipelib \
-	$(FC_MODINC) ipelib/dynamo \
-        $(FC_MODINC) ipelib/empirical_efield \
-        $(FC_MODINC) ipelib/flip \
-        $(FC_MODINC) ipelib/msise00
-
-ipe_x_LDADD = $(builddir)/ipelib/libipe.a
 @COUPLED_TRUE@lib_LIBRARIES = libipm.a
 @COUPLED_TRUE@libipm_a_LIBADD = ipelib/*.$(OBJEXT) \
 @COUPLED_TRUE@	ipelib/dynamo/*.$(OBJEXT) \
@@ -385,6 +378,14 @@ ipe_x_LDADD = $(builddir)/ipelib/libipe.a
 @COUPLED_TRUE@        $(FC_MODINC) ipelib/msise00
 
 @COUPLED_TRUE@libipm_a_SOURCES = ipeCap.F90 IPE_Wrapper.F90
+@COUPLED_FALSE@ipe_x_SOURCES = IPE_Driver.F90
+@COUPLED_FALSE@ipe_x_FCFLAGS = $(FC_MODINC) ipelib \
+@COUPLED_FALSE@	$(FC_MODINC) ipelib/dynamo \
+@COUPLED_FALSE@        $(FC_MODINC) ipelib/empirical_efield \
+@COUPLED_FALSE@        $(FC_MODINC) ipelib/flip \
+@COUPLED_FALSE@        $(FC_MODINC) ipelib/msise00
+
+@COUPLED_FALSE@ipe_x_LDADD = $(builddir)/ipelib/libipe.a
 all: all-recursive
 
 .SUFFIXES:
