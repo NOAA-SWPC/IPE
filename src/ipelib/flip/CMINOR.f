@@ -49,6 +49,7 @@ C....... Sep 1989
       TOP2PI=SUMION(1,9,J)
       TOP2DI=SUMION(1,8,J)
       TOTO2I=SUMION(2,7,J)
+      if(isnan(toto2i)) write(6,*) 'GHGM TOTO2I' , j, mp,lp
       DISNP=SUMION(3,4,J)+SUMION(3,5,J)+SUMION(3,6,J)
       DISN4S=SUMEXC(3,5,J)+DISNP*0.5
       DISN2D=SUMEXC(3,6,J)+DISNP*0.5
@@ -80,19 +81,22 @@ C....... Sep 1989
       IF(I.EQ.1.OR.I.EQ.-1.OR.I.GT.2) GO TO 12
 
       !.. . First guess for [e] using previous stored values
-! GHGM just O+ and H+ here also.....
       ZNE=XIONN(1,J)+XIONN(2,J)+XIONN(3,J)+XIONN(4,J)+XIONN(5,J)+
      >  XIONN(6,J)+XIONN(7,J)
-! GHGM
-!     ZNE=XIONN(1,J)+XIONN(2,J)
       ZNESAV=ZNE
+
+      !.. .... o2+
       CALL CO2P(J,0,0,Z(J),RTS,ON(J),O2N(J),N2N(J),ZNE,PO2P,DO2P
      > ,TOTO2I,N(1,J),OP2D,N2PLUS,NPLUS,N4S(J),NNO(J),OP2P,mp,lp)
+      if(isnan(do2p)) write(6,*) 'GHGM do2p NaN ', j,mp,lp,
+     >  J,0,0,Z(J),RTS,ON(J),O2N(J),N2N(J),ZNE,PO2P,DO2P
+     > ,TOTO2I,N(1,J),OP2D,N2PLUS,NPLUS,N4S(J),NNO(J),OP2P,mp,lp
 
       !.. .... no+
       CALL CNOP(J,0,0,Z(J),RTS,ON(J),O2N(J),N2N(J),ZNE,PNOP
      > ,DNOP,N(1,J),N2PLUS,O2PLUS,N4S(J),NNO(J),NPLUS,N2P(J)
      >  ,PLYNOP,N2D(J),OP2D,mp,lp)
+      if(isnan(dnop)) write(6,*) 'GHGM dnop NaN ', j,mp,lp
 
       !.. calculation of [e] analytically for first guess in Newton
       B=N(1,J)+N(2,J)+N2PLUS
@@ -117,16 +121,19 @@ C....... Sep 1989
      > ,PEPION(3,1,J)+PAUION(3,1,J),PEPION(3,2,J)+PAUION(3,2,J)
      > ,PEPION(3,3,J)+PAUION(3,3,J),OP2D,OP2P,HEPLUS
      > ,NPLUS,NNO(J),N4S(J))
+      if(isnan(n2plus)) write(6,*) 'GHGM n2plus NaN ', its,j,mp,lp
 
       !...... o2+
       CALL CO2P(J,0,0,Z(J),RTS,ON(J),O2N(J),N2N(J),ZNE,PO2P
      > ,O2PLUS,TOTO2I,N(1,J),OP2D,N2PLUS,NPLUS,N4S(J)
      > ,NNO(J),OP2P,mp,lp)
+      if(isnan(o2plus)) write(6,*) 'GHGM o2plus NaN ', its,j,mp,lp
 
       !...... no+
       CALL CNOP(J,0,0,Z(J),RTS,ON(J),O2N(J),N2N(J),ZNE,PNOP
      > ,NOPLUS,N(1,J),N2PLUS,O2PLUS,N4S(J),NNO(J),NPLUS,N2P(J)
      > ,PLYNOP,N2D(J),OP2D,mp,lp)
+      if(isnan(noplus)) write(6,*) 'GHGM noplus NaN ', its,j,mp,lp
 
       FEX(ITS)=ZNE-N(1,J)-N(2,J)-NOPLUS-O2PLUS-N2PLUS-
      >  OP2D-OP2P-NPLUS-HEPLUS
