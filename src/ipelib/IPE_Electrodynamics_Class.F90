@@ -910,7 +910,7 @@ CONTAINS
     use cons_module
     use dynamo_module
     use heelis_module, only:ctpoten
-    use module_magfield,only: sunlons
+    use module_magfield
 !!     use module_update_fli,ONLY:update_fli
 
     CLASS( IPE_Electrodynamics ), INTENT(inout) :: eldyn
@@ -937,6 +937,13 @@ CONTAINS
     REAL(prec) :: ed2dy_map(82,kmlat)
 
     CALL init_cons
+
+    sangle= forcing % solarwind_angle ( forcing % current_index )
+    bt= forcing % solarwind_Bt (forcing % current_index )
+    stilt= forcing % solarwind_angle ( forcing % current_index )
+    swvel= forcing % solarwind_velocity (forcing % current_index )
+    swden= forcing % solarwind_density (forcing % current_index )
+
 
     fkp= forcing % kp ( forcing % current_index )
     ctpoten= 15.+15.*fkp+0.8*fkp**2

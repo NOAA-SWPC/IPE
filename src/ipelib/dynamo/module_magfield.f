@@ -20,5 +20,6 @@
 ! (this was dlons in earlier versions)
 !
       real :: sunlons
+      real(8) :: sangle,bt,stilt,swvel,swden
 !-----------------------------------------------------------------------
       end module module_magfield

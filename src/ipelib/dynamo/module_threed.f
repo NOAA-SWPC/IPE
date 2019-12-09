@@ -110,10 +110,9 @@
      |    -3.*phim(i,kmlath-1))/(2.*dlatm)/(R0*1.e-2)
       enddo ! i = 1,kmlonp1
 !
-      fname = 'ed1'
-      labl = 'ed1'
-      units = 'V/m'
 !
+      write(unit=4022,FMT='(20E12.4)') ed1dy
+      write(unit=4023,FMT='(20E12.4)') ed2dy
 
       end subroutine threed
 !-----------------------------------------------------------------------

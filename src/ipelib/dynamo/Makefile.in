@@ -124,6 +124,7 @@ am_libdynamo_a_OBJECTS = libdynamo_a-cons_module.$(OBJEXT) \
 	libdynamo_a-module_sub_heelis.$(OBJEXT) \
 	libdynamo_a-module_threed.$(OBJEXT) \
 	libdynamo_a-module_transf.$(OBJEXT) \
+	libdynamo_a-module_weimer2005Ipe.$(OBJEXT) \
 	libdynamo_a-mudcom.$(OBJEXT) libdynamo_a-mud.$(OBJEXT) \
 	libdynamo_a-mudmod.$(OBJEXT) libdynamo_a-muh2cr.$(OBJEXT) \
 	libdynamo_a-params.$(OBJEXT) libdynamo_a-readin.$(OBJEXT) \
@@ -313,7 +314,7 @@ libdynamo_a_SOURCES = cons_module.f dynamo_module.f heelis_module.f module_ceee.
 	module_highlat.f module_htrpex.f module_init_cons.f module_init_heelis.f module_magfield.f \
 	module_potm.f module_readin_ascii.f module_rhspde.f module_stencil.f module_stencmd.f \
 	module_stenmd.f module_stenmod.f module_sub_dynamo.f module_sub_heelis.f module_threed.f \
-	module_transf.f mudcom.f mud.f mudmod.f muh2cr.f params.f readin.f util.f
+	module_transf.f module_weimer2005Ipe.f mudcom.f mud.f mudmod.f muh2cr.f params.f readin.f util.f
 
 libdynamo_a_FFLAGS = $(FC_MODINC) .
 EXTRA_DIST = apex_sunloc.f module_cal_monthday.f module_check_err.f module_eldyn.f module_nc_close.f \
@@ -536,6 +537,12 @@ libdynamo_a-module_transf.o: module_transf.f
 
 libdynamo_a-module_transf.obj: module_transf.f
 	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_transf.obj `if test -f 'module_transf.f'; then $(CYGPATH_W) 'module_transf.f'; else $(CYGPATH_W) '$(srcdir)/module_transf.f'; fi`
+
+libdynamo_a-module_weimer2005Ipe.o: module_weimer2005Ipe.f
+	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_weimer2005Ipe.o `test -f 'module_weimer2005Ipe.f' || echo '$(srcdir)/'`module_weimer2005Ipe.f
+
+libdynamo_a-module_weimer2005Ipe.obj: module_weimer2005Ipe.f
+	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_weimer2005Ipe.obj `if test -f 'module_weimer2005Ipe.f'; then $(CYGPATH_W) 'module_weimer2005Ipe.f'; else $(CYGPATH_W) '$(srcdir)/module_weimer2005Ipe.f'; fi`
 
 libdynamo_a-mudcom.o: mudcom.f
 	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-mudcom.o `test -f 'mudcom.f' || echo '$(srcdir)/'`mudcom.f
@@ -797,7 +804,7 @@ libdynamo_a-module_divide.$(OBJEXT): libdynamo_a-dynamo_module.$(OBJEXT)
 libdynamo_a-module_edges.$(OBJEXT): libdynamo_a-dynamo_module.$(OBJEXT)
 libdynamo_a-module_flwv32.$(OBJEXT): libdynamo_a-cons_module.$(OBJEXT) libdynamo_a-heelis_module.$(OBJEXT)
 libdynamo_a-module_highlat.$(OBJEXT): libdynamo_a-dynamo_module.$(OBJEXT) libdynamo_a-module_colath.$(OBJEXT) \
-	libdynamo_a-module_sub_heelis.$(OBJEXT) libdynamo_a-params.$(OBJEXT)
+	libdynamo_a-module_sub_heelis.$(OBJEXT) libdynamo_a-module_weimer2005Ipe.$(OBJEXT) libdynamo_a-params.$(OBJEXT)
 libdynamo_a-module_htrpex.$(OBJEXT): libdynamo_a-dynamo_module.$(OBJEXT)
 libdynamo_a-module_init_cons.$(OBJEXT): libdynamo_a-cons_module.$(OBJEXT)
 libdynamo_a-module_init_heelis.$(OBJEXT): libdynamo_a-cons_module.$(OBJEXT) libdynamo_a-heelis_module.$(OBJEXT)

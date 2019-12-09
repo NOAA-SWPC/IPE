@@ -21,7 +21,7 @@
      &,isolve,ncee,cee,nc,nc0,nc1,nc2,nc3,nc4,cofum,rhs,c0,c1,c2,c3,c4  &
      &,kmlon0,kmlon1,kmlon2,kmlon3,kmlon4,kmlat0,kmlat1,kmlat2,kmlat3   &
      &,kmlat4,pfrac,jn,jp
-      use cons_module,only: dlatm,dlonm,pi_dyn,xlatm,rtd,jsecs      
+      use cons_module,only: dlatm,dlonm,pi_dyn,xlatm,rtd
       use module_transf,ONLY:transf
       use module_rhspde,ONLY:rhspde
       use module_clearcee,ONLY:clearcee
@@ -337,6 +337,7 @@
         enddo ! i=1,kmlonp1
       enddo ! j=1,kmlat 
 
+       write(unit=4024,FMT='(20E12.4)')phim
 !
 ! Call threed to calculate 2-d electric potential array in geomagnetic coordinates
 !   from 2-d solver output phim, corrected for the SH potential
