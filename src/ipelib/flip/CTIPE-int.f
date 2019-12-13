@@ -485,9 +485,11 @@ C.... Written by P. Richards June-September 2010.
         XIONN(I,J)=XIONNX(I,J)*M3_to_CM3
         XIONV(I,J)=XIONVX(I,J)*M_to_CM
       ENDDO
-! GHGM - set N+ to zero^M
-!       XIONN(4,J)=0.0^M
-!       XIONV(4,J)=0.0^M
+! GHGM - set N+ and He+ to zero
+        XIONN(3,J)=0.0
+        XIONV(3,J)=0.0
+        XIONN(4,J)=0.0
+        XIONV(4,J)=0.0
 ! GHGM^M
       ENDDO
 
@@ -624,6 +626,12 @@ C.... Written by P. Richards June-September 2010.
       n_save = n
       ti_save = ti
       CALL TLOOPS(JMIN,JMAX,CTIPDIM,Z,N,TI,DT,DTMIN,EFLAG,mp,lp,nflag_t) 
+! GHGM - simple attempt to stop Te climbing above 10,000K
+      DO J=JMIN,JMAX
+        if(ti(3,j).ge.10000.) ti(3,j) = 10000.
+        if(ti(1,j).ge.10000.) ti(1,j) = 10000.
+      ENDDO
+! GHGM - simple attempt to stop Te climbing above 10,000K
       if((mp.eq.22).and.(lp.eq.25)) then
         write(6799,*) 'ghgm tloops'
       DO J=JMIN,JMAX
@@ -656,16 +664,18 @@ C.... Written by P. Richards June-September 2010.
        ENDIF
       ENDDO
 
-      !.. He+ solution
-      IF(EFLAG(2,1).EQ.0.AND.IHEPLS.GT.0) THEN
-        i_which_call = 1
-        CALL XION(TI,DT,DTMIN,9,EFLAG,mp,lp,i_which_call)
-      ENDIF
-      !.. N+ solution
-      IF(EFLAG(2,1).EQ.0.AND.INPLS.GT.0) THEN
-        i_which_call = 2
-        CALL XION(TI,DT,DTMIN,11,EFLAG,mp,lp,i_which_call)
-      ENDIF
+! ghgm - don't solve for N+ and He+ ....
+!     !.. He+ solution
+!     IF(EFLAG(2,1).EQ.0.AND.IHEPLS.GT.0) THEN
+!       i_which_call = 1
+!       CALL XION(TI,DT,DTMIN,9,EFLAG,mp,lp,i_which_call)
+!     ENDIF
+!     !.. N+ solution
+!     IF(EFLAG(2,1).EQ.0.AND.INPLS.GT.0) THEN
+!       i_which_call = 2
+!       CALL XION(TI,DT,DTMIN,11,EFLAG,mp,lp,i_which_call)
+!     ENDIF
+! ghgm - don't solve for N+ and He+ ....
 
         !.. transfer densities from FLIP to CTIP variable
       DO J=JMIN,JMAX
