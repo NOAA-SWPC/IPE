@@ -34,13 +34,11 @@
       else if (potential_model == 'weimer2005') then
         call heelis
 !        sangle = 180.  !deg
-         sangle = mod(360.0-180., 360.0)
-         print *,'sangle',sangle
-         bt = 5.     !nT
-!        stilt = -0.1503E-02  !unit?
-         stilt =  0.1503E-02  !unit?
-         swvel = 500. !km/s
-         swden = 0.01 !unit?
+!        bt = 5.     !nT
+!        stilt = -0.1503E-02  !deg?
+!        swvel = 500. !km/s
+!        swden = 0.01 !unit?
+         print *,'solar wind',sangle,bt,swvel,swden
 
         call setmodel2005Ipe(sangle,bt,stilt,swvel,swden
      &,fileLocation,'epot')
@@ -56,7 +54,7 @@
 
             else  !if ( abs(mlat) > pi/6. ) then
 
-               print*,'mlat[deg]=',mlat,'sunlons',sunlons
+!              print*,'mlat[deg]=',mlat,'sunlons',sunlons
           mlonLoop: do i=1,kmlon
 !mltrad = mlonRad - sunlons + pi !mlt(rad)
 !here sunlons must be time dependent!
@@ -65,10 +63,10 @@
                  if (mlt<0.) mlt=mlt+24.
 
 !note:mlat<0 is outside of the boundary(fill in value)!
-                 call epotval2005Ipe(mlat,mlt,fill,epot)
+                 call epotval2005Ipe(abs(mlat),mlt,fill,epot)
 
-      print"('mlt[hr]=',f6.1,f7.0,'epot[kV]=',e12.4)",mlt,xlonm_deg(i)
-     & ,epot
+!     print"('mlt[hr]=',f6.1,f7.0,'epot[kV]=',e12.4)",mlt,xlonm_deg(i)
+!    & ,epot
                  if ( epot == fill ) then
                     phihm(i,j) = 0.
                  else
