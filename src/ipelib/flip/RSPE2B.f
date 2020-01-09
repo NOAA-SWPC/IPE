@@ -213,20 +213,20 @@ C... FRPAS= fraction of flux lost in plasmasphere
       !.. Initial energy index set for highest energy
       I_energy=IEMAX
 
-      if((mp.eq.23).and.(lp.eq.27)) then
-      write(6,*) 'GHGM TUBE ',jmin,jmax,j_apex,j1000N,j120N,
-     >  j120S,j1000S,ipas,ipasc
-      write(6,*) '120  N ', z(j120N)
-      write(6,*) '1000 N ', z(j1000N)
-      write(6,*) 'APEX   ', z(j_apex)
-      write(6,*) '1000 S ', z(j1000S)
-      write(6,*) '120  S ', z(j120S)
-        do j = jmin,jmax
-          write(6,2435) j,z(j)
-        enddo
- 2435   format(i6,f10.1)
+!     if((mp.eq.23).and.(lp.eq.27)) then
+!     write(6,*) 'GHGM TUBE ',jmin,jmax,j_apex,j1000N,j120N,
+!    >  j120S,j1000S,ipas,ipasc
+!     write(6,*) '120  N ', z(j120N)
+!     write(6,*) '1000 N ', z(j1000N)
+!     write(6,*) 'APEX   ', z(j_apex)
+!     write(6,*) '1000 S ', z(j1000S)
+!     write(6,*) '120  S ', z(j120S)
+!       do j = jmin,jmax
+!         write(6,2435) j,z(j)
+!       enddo
+!2435   format(i6,f10.1)
 !     stop
-      endif
+!     endif
 
 C////////////main calculations  begin here ////////////
  23   CONTINUE
@@ -251,6 +251,10 @@ C////////////main calculations  begin here ////////////
         IF(Z(J).LE.ZPROD) THEN
           CALL PEPRIM(FLDIM,I_energy,J,XN,HE(J),PRED,E(I_energy),
      >      DELTE(I_energy),COLUM,RJOX,RJN2,RJO2,RJHE)
+            if(isnan(PRED(J))) then
+              write(6,*) 'GHGM PRED 1 ',mp,lp,j
+              stop
+            endif
           !.. add electron quenching of N(2D) to primary prod
           IF(E(I_energy).LE.3.AND.E(I_energy).GT.2) THEN
             !.. Needed for updated electron heating in CTIPe
@@ -314,7 +318,12 @@ C////////////main calculations  begin here ////////////
      >                 (T2(j_low_S)-T1(j_low_S))
        PHIUP(j_low_N)=PHIDWN(j_low_N)
        PHIUP(j_low_S)=PHIDWN(j_low_S)
-       if(isnan(PHIUP(j_low_N))) write(6,*) 'YAGA 1 ', mp,lp,j_low_n
+       if(isnan(PHIUP(j_low_N))) then
+         write(6,*) 'YAGA 1 ', mp,lp,j_low_n
+         write(6,*) j_low_N,I_energy,PRED(j_low_N),
+     >              PRODWN(I_energy,j_low_N),
+     >              T2(j_low_N),T1(j_low_N)               
+       endif
        if(isnan(PHIUP(j_low_S))) write(6,*) 'YAGA 2 ', mp,lp,j_low_n
 
        if(phidwn(j_low_N).lt.0.0) write(6,255) mp,lp,j_low_n,z(j_low_n),
@@ -727,6 +736,12 @@ C...... al for O2, and N2, and He
 	!.. primary production rates
       PRED(J)=(RJOX(IE)*XN(1,J)+RJN2(IE)*XN(3,J)+RJO2(IE)*XN(2,J)
      > +1.0*RJHE(IE)*HE)*1.0E-9*AFAC*FLXFAC
+      if(isnan(PRED(J))) then
+        write(6,*) 'GHGM bugger ',j , ie , RJOX(IE),XN(1,J),
+     >             RJN2(IE),XN(3,J),RJO2(IE),XN(2,J),
+     >             RJHE(IE),HE,AFAC,FLXFAC
+        stop
+      endif
 
       RETURN
       END

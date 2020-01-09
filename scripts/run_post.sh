@@ -2,7 +2,7 @@
 
 ## USER SETUP
 # IPE_State.apex.*.h5 location
-IPE_INPUT_DIRECTORY=/gpfs/dell2/ptmp/George.Millward/tzu-wei-test
+IPE_INPUT_DIRECTORY=/gpfs/dell2/ptmp/George.Millward/IPEstandalone_test/
 # where you want the IPE_Params.geo.*.nc4 files
 IPE_OUTPUT_DIRECTORY=${IPE_INPUT_DIRECTORY}/netcdf
 ###### USUALLY NO NEED TO CHANGE ANYTHING BELOW THIS LINE ######
