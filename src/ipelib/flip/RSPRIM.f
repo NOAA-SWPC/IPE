@@ -227,12 +227,11 @@ C.... P. Richards March 2011
       END
 C:::::::::::::::::::::::::: SUMPRD :::::::::::::::::::::::::
 C..... Sum the EUV, PE, and AUR production
-      SUBROUTINE SUMPRD(JMIN,JMAX
-     &,qiont !units number/m3/s
-     &)
+      SUBROUTINE SUMPRD(JMIN,JMAX,qiont,mp,lp)
+
       !..EUVION PEXCIT PEPION OTHPR1 OTHPR2 SUMION SUMEXC PAUION PAUEXC NPLSPRD
       USE PRODUCTION !.. EUV, photoelectron, and auroral production
-      INTEGER,INTENT(IN) :: JMIN,JMAX
+      INTEGER,INTENT(IN) :: JMIN,JMAX,mp,lp
       REAL*8,dimension(3,JMIN:JMAX),INTENT(IN) :: qiont !1:O,2:O2,3:N2 !units number/m3/s
       INTEGER :: J,IS,IK
       !--- Branching ratios for ion states were updated Sep 91 by P. Richards
@@ -253,19 +252,19 @@ C..... Sum the EUV, PE, and AUR production
           PAUION(IS,IK,J)=PAUION(IS,IK,J)+qiont(IS,J)*ASPRD(IS,IK)*1.E-6 !convert from m-3 to cm-3
          END DO                  !IK
         END DO                    !IS
-!d      if (j==16) then
-!d      print *,'PAUION1',pauion(1,1:6,j)
-!d      print *,'PAUION2',pauion(2,1:6,j)
-!d      print *,'PAUION3',pauion(3,1:6,j)
-!d      endif
 
       !..    add contributions from 2 highest O+ metastables to 3 lowest
          EUVION(1,7,J) = EUVION(1,1,J) + EUVION(1,4,J)
          EUVION(1,8,J) = EUVION(1,2,J) + EUVION(1,5,J)/1.3
          EUVION(1,9,J) = EUVION(1,3,J) + EUVION(1,5,J)/4.3
 
+         if(isnan(pepion(1,4,j))) write(6,*) 'GHGM PEP 1 ',mp,lp,j
+         if(isnan(pepion(1,1,j))) write(6,*) 'GHGM PEP 2 ',mp,lp,j
          PEPION(1,7,J) = PEPION(1,1,J) + PEPION(1,4,J)
+         if(isnan(pepion(1,2,j))) write(6,*) 'GHGM PEP 3 ',mp,lp,j
+         if(isnan(pepion(1,5,j))) write(6,*) 'GHGM PEP 4 ',mp,lp,j
          PEPION(1,8,J) = PEPION(1,2,J) + PEPION(1,5,J)/1.3
+         if(isnan(pepion(1,3,j))) write(6,*) 'GHGM PEP 5 ',mp,lp,j
          PEPION(1,9,J) = PEPION(1,3,J) + PEPION(1,5,J)/4.3
 
          PAUION(1,7,J) = PAUION(1,1,J) + PAUION(1,4,J)
@@ -274,10 +273,16 @@ C..... Sum the EUV, PE, and AUR production
  
       !..- SUM non-diss. states to get total O2+ and N2+ production
          EUVION(2,7,J)= EUVION(2,1,J)+EUVION(2,2,J)+EUVION(2,3,J)
+         if(isnan(pepion(2,1,j))) write(6,*) 'GHGM PEP 6 ',mp,lp,j
+         if(isnan(pepion(2,2,j))) write(6,*) 'GHGM PEP 7 ',mp,lp,j
+         if(isnan(pepion(2,3,j))) write(6,*) 'GHGM PEP 8 ',mp,lp,j
          PEPION(2,7,J)= PEPION(2,1,J)+PEPION(2,2,J)+PEPION(2,3,J)
          PAUION(2,7,J)= PAUION(2,1,J)+PAUION(2,2,J)+PAUION(2,3,J)
 
          EUVION(3,7,J)= EUVION(3,1,J)+EUVION(3,2,J)+EUVION(3,3,J)
+         if(isnan(pepion(3,1,j))) write(6,*) 'GHGM PEP 9 ',mp,lp,j
+         if(isnan(pepion(3,2,j))) write(6,*) 'GHGM PEP 10 ',mp,lp,j
+         if(isnan(pepion(3,3,j))) write(6,*) 'GHGM PEP 11 ',mp,lp,j
          PEPION(3,7,J)= PEPION(3,1,J)+PEPION(3,2,J)+PEPION(3,3,J)
          PAUION(3,7,J)= PAUION(3,1,J)+PAUION(3,2,J)+PAUION(3,3,J)
  30   CONTINUE
@@ -286,6 +291,8 @@ C..... Sum the EUV, PE, and AUR production
       DO 50 K=1,12
       DO 50 J=JMIN,JMAX
         SUMION(I,K,J)=EUVION(I,K,J)+PEPION(I,K,J)+PAUION(I,K,J)
+        if(isnan(SUMION(I,K,J))) write(6,*) 'GHGM SUMION ',i,k,j,
+     >    PEPION(I,K,J)
         SUMEXC(I,K,J)=PEXCIT(I,K,J)+PAUEXC(I,K,J)
  50   CONTINUE
 
