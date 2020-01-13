@@ -334,7 +334,7 @@ C.... Written by P. Richards June-September 2010.
       USE PRODUCTION
 
       IMPLICIT NONE
-      integer mp,lp,i_which_call,nflag_t,nflag_d,tube_nan
+      integer mp,lp,i_which_call,nflag_t,nflag_d,tube_nan,test_te
       INTEGER IHEPLS, INPLS, INNO
       INTEGER CTIPDIM         !.. CTIPe array dimension, must equal to FLDIM
       INTEGER JTI             !.. Dummy variable to count the number of calls to this routine
@@ -485,12 +485,11 @@ C.... Written by P. Richards June-September 2010.
         XIONN(I,J)=XIONNX(I,J)*M3_to_CM3
         XIONV(I,J)=XIONVX(I,J)*M_to_CM
       ENDDO
-! GHGM - set N+ and He+ to zero
-        XIONN(3,J)=0.0
-        XIONV(3,J)=0.0
-        XIONN(4,J)=0.0
-        XIONV(4,J)=0.0
-! GHGM^M
+!       XIONN(3,J)=0.0
+!       XIONV(3,J)=0.0
+!       XIONN(4,J)=0.0
+!       XIONV(4,J)=0.0
+! GHGM
       ENDDO
 
       !.. Transfer Te and Ti to FLIP variable TI
@@ -504,6 +503,14 @@ C.... Written by P. Richards June-September 2010.
       !.. Upload thermosphere parameters to THERMOSPHERE module
       COLFAC=COLFACX  !.. O+ - O collision frequency Burnside factor 1-1.7 
       DO J=JMIN,JMAX
+! GHGM - set N+ and He+ to zero
+!       if(uthrs.lt.2.0E-2) then
+!       XIONN(3,J)=0.0
+!       XIONV(3,J)=0.0
+!       XIONN(4,J)=0.0
+!       XIONV(4,J)=0.0
+!       endif
+! GHGM
         ON(J)=OX(J)*M3_to_CM3
         HN(J)=HX(J)*M3_to_CM3
 ! GHGM
@@ -524,13 +531,12 @@ C.... Written by P. Richards June-September 2010.
         NHEAT(J)=0.0
         O2DISF(J)=0.0
 ! GHGM - intialize ti and te ......
-
-        if(uthrs.lt.2.0E-2) then
-        TI(3,J)=904.0*DLOG(z(j))-3329.0
-        IF(TI(3,J).GT.3000.) TI(3,J)=3000.
-        TI(1,J)=0.5*(TN(J)+TI(3,J))
-        endif
-
+!       if(uthrs.lt.2.0E-2) then
+!       TI(3,J)=904.0*DLOG(z(j))-3329.0
+!       IF(TI(3,J).GT.3000.) TI(3,J)=3000.
+!       TI(1,J)=0.5*(TN(J)+TI(3,J))
+!       endif
+! GHGM
 ! GHGM
       ENDDO
 
@@ -626,12 +632,24 @@ C.... Written by P. Richards June-September 2010.
       n_save = n
       ti_save = ti
       CALL TLOOPS(JMIN,JMAX,CTIPDIM,Z,N,TI,DT,DTMIN,EFLAG,mp,lp,nflag_t) 
-! GHGM - simple attempt to stop Te climbing above 10,000K
+! GHGM - simple attempt to stop Te climbing above 5,000K
+      test_te = 0
       DO J=JMIN,JMAX
-        if(ti(3,j).ge.10000.) ti(3,j) = 10000.
-        if(ti(1,j).ge.10000.) ti(1,j) = 10000.
+        if(ti(3,j).ge.5000.) then
+          test_te = 1
+          goto 2345
+        endif
       ENDDO
-! GHGM - simple attempt to stop Te climbing above 10,000K
+ 2345 continue
+      if(test_te.eq.1) then
+      write(6,*) 'GHGM TE greater than 5000K, resetting ',mp,lp
+      DO J=JMIN,JMAX
+        TI(3,J)=904.0*DLOG(z(j))-3329.0
+        IF(TI(3,J).GT.3000.) TI(3,J)=3000.
+        TI(1,J)=0.5*(TN(J)+TI(3,J))
+      ENDDO
+      endif
+! GHGM - simple attempt to stop Te climbing above 5,000K
       if((mp.eq.22).and.(lp.eq.25)) then
         write(6799,*) 'ghgm tloops'
       DO J=JMIN,JMAX
@@ -666,17 +684,18 @@ C.... Written by P. Richards June-September 2010.
 
 ! ghgm - don't solve for N+ and He+ ....
 !     !.. He+ solution
-!     IF(EFLAG(2,1).EQ.0.AND.IHEPLS.GT.0) THEN
-!       i_which_call = 1
-!       CALL XION(TI,DT,DTMIN,9,EFLAG,mp,lp,i_which_call)
-!     ENDIF
+      IF(IHEPLS.GT.0) THEN
+        i_which_call = 1
+!       write(6,*) 'ghgm calling he+ ', mp,lp
+        CALL XION(TI,DT,DTMIN,9,EFLAG,mp,lp,i_which_call)
+      ENDIF
 !     !.. N+ solution
-!     IF(EFLAG(2,1).EQ.0.AND.INPLS.GT.0) THEN
-!       i_which_call = 2
-!       CALL XION(TI,DT,DTMIN,11,EFLAG,mp,lp,i_which_call)
-!     ENDIF
+      IF(INPLS.GT.0) THEN
+        i_which_call = 2
+!       write(6,*) 'ghgm calling n+ ', mp,lp
+        CALL XION(TI,DT,DTMIN,11,EFLAG,mp,lp,i_which_call)
+      ENDIF
 ! ghgm - don't solve for N+ and He+ ....
-
         !.. transfer densities from FLIP to CTIP variable
       DO J=JMIN,JMAX
         NNOX(J)=NNO(J)/M3_to_CM3

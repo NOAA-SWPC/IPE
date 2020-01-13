@@ -129,8 +129,8 @@ MODULE IPE_Plasma_Class
   REAL(dp), PARAMETER, PRIVATE :: COLFACX  = 1.7D0
   REAL(dp), PARAMETER, PRIVATE :: HPEQ     = 0.0D0
   ! IHEPLS,INPLS turn on diffusive solutions if > 0. no solution if 0, chemical equilibrium if < 0
-  INTEGER, PARAMETER, PRIVATE  :: IHEPLS   = 0
-  INTEGER, PARAMETER, PRIVATE  :: INPLS    = 0
+  INTEGER, PARAMETER, PRIVATE  :: IHEPLS   = -1
+  INTEGER, PARAMETER, PRIVATE  :: INPLS    = -1
   INTEGER, PARAMETER, PRIVATE  :: INNO     = 0
   integer :: istop
   ! :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: !
@@ -330,10 +330,10 @@ CONTAINS
 !      CALL plasma % Cross_Flux_Tube_Transport2( grid, v_ExB, transport_time_step, mpi_layer, time_tracker, forcing )
 ! GHGM moved precipitation to here
 
-!     CALL plasma % Auroral_Precipitation( grid, &
-!                                          neutrals, &
-!                                          forcing, &
-!                                          time_tracker )
+      CALL plasma % Auroral_Precipitation( grid, &
+                                           neutrals, &
+                                           forcing, &
+                                           time_tracker )
 
       CALL plasma % FLIP_Wrapper( grid,         &
                                   neutrals,     &
@@ -3158,7 +3158,7 @@ end SUBROUTINE interpolate_in_q
         DO lp = 1, plasma % NLP
           if((mp.eq.1).and.(lp.eq.1)) then
             write(6,*) '*************************'
-            write(6,*) 'GHGM TIME TRACKER ', uthr
+            write(6,*) 'GHGM TIME TRACKER ', uthr, time_tracker % hour, time_tracker % minute                                                      
             write(6,*) '*************************'
           endif
 

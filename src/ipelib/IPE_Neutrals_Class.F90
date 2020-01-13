@@ -294,6 +294,12 @@ CONTAINS
     hwm_f107d = REAL(forcing % f107( forcing % current_index ),           KIND=4)
 
     msis_ap      = REAL(AP,    KIND=msis_dp)
+
+    if(msis_ap(1).ge.300.0) then
+      msis_ap(:) = 300.0
+      write(6,*) 'GHGM, AP > 300,setting to 300'
+    endif
+
     msis_f107a   = REAL(forcing % f107_81day_avg( forcing % current_index ), KIND=msis_dp)
     msis_f107d   = REAL(forcing % f107( forcing % current_index ),           KIND=msis_dp)
     densities    = 0.0_msis_dp
@@ -368,6 +374,9 @@ CONTAINS
 
           ENDIF
 
+          if(isnan(densities(1))) then
+            write(6,*) 'GHGM HELIUM ', kp,lp,mp,msis_ap
+          endif
           neutrals % helium(kp,lp,mp)   = cm_3_to_m_3 * densities(1)
           neutrals % hydrogen(kp,lp,mp) = cm_3_to_m_3 * densities(7)
           neutrals % nitrogen(kp,lp,mp) = cm_3_to_m_3 * densities(8)
