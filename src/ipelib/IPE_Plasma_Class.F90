@@ -3624,6 +3624,10 @@ end SUBROUTINE interpolate_in_q
 
             apex_D = grid % d1xd2_magnitude(i,lp,mp)
             apex_BMAG = grid % magnetic_field_strength(i,lp,mp)
+!         if (lp.gt.135.and.lp.le.138.and.mp.eq.78.and.ihem.eq.1) then
+!          print *,'p1',lp,Ue(1),Ue(2),apex_d1d1,apex_d2d2,apex_d1d2
+!          print *,'p1',apex_D,apex_BMAG
+!         endif
 
       !      ni_oplus_1d(i1d)=plasma_3d(i,lp_plas,mp,1)
       !      ni_hplus_1d(i1d)=plasma_3d(i,lp_plas,mp,2)
@@ -3673,6 +3677,10 @@ end SUBROUTINE interpolate_in_q
 !                                 plasma % ion_densities(7,i,lp,mp)
                electron_charge_Coulombs=1.6022E-19
 !
+          if (lp.gt.134.and.lp.le.139.and.mp.eq.78.and.ihem.eq.1) then
+              print *,'e den',i,electron_density
+              print *,'e den2',i,plasma % ion_densities(1,i,lp,mp),plasma %ion_densities(5,i,lp,mp),plasma % ion_densities(6,i,lp,mp)
+          endif
                if (electron_density.gt.1.e-10) then
 !
                r_factor  = ion_mass_amu*ion_neutral_collisionfrequency/electron_charge_Coulombs/apex_BMAG
@@ -3695,6 +3703,11 @@ end SUBROUTINE interpolate_in_q
 
 ! get integrals
                 abs_ds = ABS(ds)
+
+!         if (lp.gt.134.and.lp.le.139.and.mp.eq.78.and.ihem.eq.1) then
+!           print *,i,lp,electron_density,plasma % ion_densities(1,i,lp,mp),plasma % ion_densities(5,i,lp,mp),plasma % ion_densities(6,i,lp,mp)
+!           print *,i,lp,sigma_ped,sigma_hall
+!         endif
 !g
 !g  The following integrals all come from page 203 and 204 of the paper.  They are numbered
 !g  to match the equations in the paper...
@@ -3717,6 +3730,9 @@ end SUBROUTINE interpolate_in_q
                integral520 = integral520 + ((sigma_hall+sigma_ped*apex_d1d2 &
      &               /apex_D )*Ue(2)- sigma_ped*apex_d2d2*Ue(1)/apex_D)*abs_ds
 
+          if (lp.gt.134.and.lp.le.139.and.mp.eq.78.and.ihem.eq.1) then
+              print *,i,lp,integral513,integral514
+          endif
 ! inputs to the dynamo solver
 !               IF ( sw_3DJ==1 ) THEN
 ! calculation of Je1 and Je2, will be useful later
@@ -3799,7 +3815,7 @@ end SUBROUTINE interpolate_in_q
                        mpi_layer % mpi_prec, &
                        mpi_layer % mpi_communicator, &
                        mpierror)
-
+    WRITE( 5000 + mpi_layer % rank_id,* ) plasma % conductivities
 #endif
 
   END SUBROUTINE Calculate_Field_Line_Integrals

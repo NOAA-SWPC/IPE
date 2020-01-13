@@ -54,7 +54,7 @@
 
             else  !if ( abs(mlat) > pi/6. ) then
 
-!              print*,'mlat[deg]=',mlat,'sunlons',sunlons
+               print*,'mlat[deg]=',mlat,'sunlons',sunlons
           mlonLoop: do i=1,kmlon
 !mltrad = mlonRad - sunlons + pi !mlt(rad)
 !here sunlons must be time dependent!
@@ -65,8 +65,8 @@
 !note:mlat<0 is outside of the boundary(fill in value)!
                  call epotval2005Ipe(abs(mlat),mlt,fill,epot)
 
-!     print"('mlt[hr]=',f6.1,f7.0,'epot[kV]=',e12.4)",mlt,xlonm_deg(i)
-!    & ,epot
+      print"('mlt[hr]=',f6.1,f7.0,'epot[kV]=',e12.4)",mlt,xlonm_deg(i)
+     & ,epot
                  if ( epot == fill ) then
                     phihm(i,j) = 0.
                  else
