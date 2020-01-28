@@ -129,8 +129,8 @@ MODULE IPE_Plasma_Class
   REAL(dp), PARAMETER, PRIVATE :: COLFACX  = 1.7D0
   REAL(dp), PARAMETER, PRIVATE :: HPEQ     = 0.0D0
   ! IHEPLS,INPLS turn on diffusive solutions if > 0. no solution if 0, chemical equilibrium if < 0
-  INTEGER, PARAMETER, PRIVATE  :: IHEPLS   = 0
-  INTEGER, PARAMETER, PRIVATE  :: INPLS    = 0
+  INTEGER, PARAMETER, PRIVATE  :: IHEPLS   = 1
+  INTEGER, PARAMETER, PRIVATE  :: INPLS    = 1
   INTEGER, PARAMETER, PRIVATE  :: INNO     = 0
   integer :: istop
   ! :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: !
