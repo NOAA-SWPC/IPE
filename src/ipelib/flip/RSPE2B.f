@@ -56,7 +56,7 @@ C... FRPAS= fraction of flux lost in plasmasphere
      
       !.. ionization potential and excitation energy losses
       DATA EPOT,ELOSSOX,ELOSSN2,ELOSSO2,distribution_shape
-    >        /17.0,11.0,10.0,9.0,14.0/
+     >        /17.0,11.0,10.0,9.0,14.0/
       !.. Burnett&Rountree O branching ratios. O2. need revision
       !.. Shemansky and Liu N2 cross sections, JGR 2005
       DATA SPRD/.4,.56,.44, .4,.28,.44, .2,.06,.10, 0.,.05,.00, 0.,.05
@@ -84,7 +84,7 @@ C... FRPAS= fraction of flux lost in plasmasphere
            !.. normalize secondary distribution
            FNORM=1.0/ATAN(ELIM/distribution_shape)/distribution_shape   
            AVESEC=FNORM*0.5*distribution_shape**2*
-      >           ALOG(1.0+(ELIM/distribution_shape)**2)
+     >          ALOG(1.0+(ELIM/distribution_shape)**2)
            ELOSS=EPOT+AVESEC
 
            !.. allocate bins for degraded primaries for ionization, and
