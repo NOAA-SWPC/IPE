@@ -7,8 +7,7 @@ C... on <pe2s.for> but this one is accurate enough for most purposes.
 C... N= density of H+, O+, minor ions(O2+ + NO+), and He+. 
 C... TI= temperature of H+, O+, electrons
 C... FRPAS= fraction of flux lost in plasmasphere
-C... ZWR= altitude for printing spectrum.
-      SUBROUTINE PE2S(F107,F107A,N,TI,FRPAS,ZWR,EDEN,UVFAC,COLUM,
+      SUBROUTINE PE2S(F107,F107A,N,TI,FRPAS,EDEN,UVFAC,COLUM,
      > IHEPLS,INPLS,INNO,mp,lp)
       USE FIELD_LINE_GRID    !.. FLDIM JMIN JMAX FLDIM Z BM GR SL GL SZA
       !..EUVION PEXCIT PEPION OTHPR1 OTHPR2 SUMION SUMEXC PAUION PAUEXC NPLSPRD
@@ -21,15 +20,14 @@ C... ZWR= altitude for printing spectrum.
       INTEGER IDGE(201),JOE(201),JN2E(201) !.. indices for degraded electrons
       INTEGER IPAS,IPASC    !.. grid indices for pitch angle trapping
       INTEGER j120S,j1000S,j_apex
-      INTEGER ITS,K  !nm20110923,JTI
-      INTEGER IU8,IU9,IWR,IWRC
+      INTEGER iteration,K  !nm20110923,JTI
       INTEGER IEMAX
       INTEGER j1000N,j120N,M400,j_low_S,j_low_N
       INTEGER EFLAG(11,11) 
       !.. For CMINOR. Turns He+, N+, and NO solutions on and off 
       INTEGER IHEPLS,INPLS,INNO
       integer ret
-      REAL ALT,z_lower_boundary,ZPAS,ZPROD,ZWR
+      REAL ALT,z_lower_boundary,ZPAS,ZPROD
       REAL AVESEC,SHAPE,AVMU,FNORM
       REAL ELOSS,ELOSSN2,ELOSSO2,ELOSSOX
       REAL EMIN,EMAX,ELIM
@@ -49,10 +47,10 @@ C... ZWR= altitude for printing spectrum.
       DOUBLE PRECISION N(4,FLDIM),TI(3,FLDIM),FRPAS,
      >  FD(9),EDEN(FLDIM),COLUM(3,FLDIM)
 
-      DATA z_lower_boundary ,ZPROD,AVMU,EMIN, EMAX,IU9,IU8,ZPAS
-     >  / 120.1, 999.,.577,1.0 , 800.,166,167,1000./
-      DATA IWRC /0/,IEMAX/0/,EBSCX/0.0/
-      DATA IWR/0/,JN2E/201*0/,SIGEX/3*0.0D0/
+      DATA z_lower_boundary ,ZPROD,AVMU,EMIN, EMAX,ZPAS
+     >  / 120.1, 999.,.577,1.0 , 800.,1000./
+      DATA EBSCX/0.0/
+      DATA JN2E/201*0/,SIGEX/3*0.0D0/
       DATA DELTE/201*0.0/
       DATA JOE/201*0/,SIGION/3*0.0D0/,EB/201*0.0/,E/201*0.0/
      
@@ -71,17 +69,15 @@ C... ZWR= altitude for printing spectrum.
 
       !.. Setting up energy cell boundaries first time thru only
       !.. If Printing, go to 1 eV resolution  
-      IF(IEMAX.LE.0)  THEN
-         IF(ZWR.LT.80) THEN
+      
+      IEMAX =0  
 	     !.. can use lower resolution for the FLIP run
            CALL ECELLS(35.0,800.0,1.0,50.0,EMAX,IEMAX,EB,E,DELTE)
            !CALL ECELLS(30.0,800.0,3.0,99.0,EMAX,IEMAX,EB,E,DELTE)
-         ELSE
 	     !.. use high resolution for printing
-           CALL ECELLS(65.0,800.0,1.0,20.0,EMAX,IEMAX,EB,E,DELTE)
-         ENDIF
+           !CALL ECELLS(65.0,800.0,1.0,20.0,EMAX,IEMAX,EB,E,DELTE)
          !.. set up bins for degraded primaries from ionizations
-         DO I_energy=IEMAX,2,-1
+         DO 100 I_energy=IEMAX,2,-1
            !.. Calculate the average energy of the secondaries.
            ELIM=0.5*(E(I_energy)-EPOT)  !.. Maximum secondary energy
            !.. normalize secondary distribution
@@ -100,7 +96,7 @@ C... ZWR= altitude for printing spectrum.
            IF(E(I_energy).GT.ELOSSN2) then
                 CALL FNDBIN(I_energy,IEMAX,ELOSSN2,E,JN2E)
            endif
-         ENDDO
+  100      ENDDO
 
          !.. proportion of total secondary ions in energy bin E(IE). Note that 
 	   !.. a running sum of secondary electrons is kept but only distributed
@@ -110,11 +106,7 @@ C... ZWR= altitude for printing spectrum.
          DO 200 I_energy=1,IEMAX
            PROB(I_energy)=0.2526*EXP(-0.2526*E(I_energy))
  200     CONTINUE
-      ENDIF
 
-!nm20110923      JTI=JTI+1
-
-	!..IF(JTI.EQ.2) ZWR=300
 
       !.. Get production frequencies (RJOX,RJN2,RJO2,RJHE) for the energy cells
       IF(ABS((F107-F107SV)/F107).GE.0.05) THEN
@@ -176,7 +168,6 @@ C... ZWR= altitude for printing spectrum.
       DO J=JMIN,JMAX
         IF(J.GT.1) DS(J)=SL(J)-SL(J-1)
         IF(Z(J).LT.ZPAS.AND.J.LT.j_apex) IPAS=J
-        IF(ZWR.GT.80.AND.Z(J).LE.ZWR.AND.J.LE.j_apex) IWR=J
         IF(Z(J).LE.ZPROD) THEN
           IF(Z(J).LT.400.AND.J.LT.j_apex)  M400=J
           IF(J.LT.j_apex)  j1000N=J
@@ -189,10 +180,7 @@ C... ZWR= altitude for printing spectrum.
       j120S=2*j_apex-j120N     !.. lower boundary in south
       j1000S=JMAX+1-j1000N     !.. upper boundary in south
       IPASC=2*j_apex-IPAS   !.. pitch angle boundary in south
-      IWRC=2*j_apex-IWR     !.. Index for writing conjugate values
 
-      IF(ZWR.GE.Z(1)) WRITE(IU9,319) 
-      IF(ZWR.GE.Z(1)) WRITE(IU8,319) 
  319  FORMAT('  E      SIGEXO  SIGIONO  SIGEXN2  SIGION2  SIGEL'
      > '    PRED     FYSUM    TSIGNE   PHIUP    PHIDWN   PRODUP'
      > '   PRODWN')
@@ -302,7 +290,7 @@ C////////////main calculations  begin here ////////////
 
       !.. calculate interhemispheric fluxes. The iteration is to adjust 
       !.. for interhemispheric fluxes.Used to be 4 times
-      DO ITS=1,2
+      DO iteration=1,2
         CALL TRIS1(FLDIM,1,j120N,j1000N,I_energy,BM,
      >     Z,JMAX,PRED,IPAS,FPAS,PHIDWN,
      >     PHIUP,T1,T2,DS,PRODUP,PRODWN)
@@ -372,16 +360,6 @@ c        IF(IABS(J-j_apex).LT.Z(IPAS)) EHT(3,J)=EHT(3,J)+EHPAS
           ENDDO
         ENDIF
       ENDDO
-
-      !.. printing fluxes
-!     IF(ZWR.GT.80) THEN
-!       WRITE(IU9,313) E(IE),SIGEX(1),SIGION(1),SIGEX(3),SIGION(3)
-!    >    ,SIGEL(1),PRED(IWR),FYSUM(IWR),TSIGNE(IWR),PHIUP(IWR)
-!    >    ,PHIDWN(IWR),PRODUP(IE,IWR),PRODWN(IE,IWR)
-!       WRITE(IU8,313) E(IE),SIGEX(1),SIGION(1),SIGEX(3),SIGION(3)
-!    >    ,SIGEL(1),PRED(IWRC),FYSUM(IWRC),TSIGNE(IWRC),PHIUP(IWRC)
-!    >    ,PHIDWN(IWRC),PRODUP(IE,IWRC),PRODWN(IE,IWRC)
-!     ENDIF
 
       !.. Calculate Cascade production ....
       DO J=JMIN,JMAX
