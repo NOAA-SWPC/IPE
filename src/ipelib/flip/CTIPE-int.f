@@ -544,7 +544,7 @@ C.... Written by P. Richards June-September 2010.
 
       !.. 2-stream photoelectron routine to get electron heating 
       !.. rate and secondary ion production
-      CALL PE2S(F107,F107A,N,TI,FPAS,-1.0E22,EDEN,UVFAC,COLUM,
+      CALL PE2S(F107,F107A,N,TI,FPAS,EDEN,UVFAC,COLUM,
      > IHEPLS,INPLS,INNO,mp,lp)
 
       !-- Sum the EUV, photoelectron, and auroral production rate

@@ -20,7 +20,7 @@ C... FRPAS= fraction of flux lost in plasmasphere
       INTEGER IDGE(201),JOE(201),JN2E(201) !.. indices for degraded electrons
       INTEGER IPAS,IPASC    !.. grid indices for pitch angle trapping
       INTEGER j120S,j1000S,j_apex
-      INTEGER iteration,K  !nm20110923,JTI
+      INTEGER iteration,K  
       INTEGER IEMAX
       INTEGER j1000N,j120N,M400,j_low_S,j_low_N
       INTEGER EFLAG(11,11) 
@@ -28,7 +28,7 @@ C... FRPAS= fraction of flux lost in plasmasphere
       INTEGER IHEPLS,INPLS,INNO
       integer ret
       REAL ALT,z_lower_boundary,ZPAS,ZPROD
-      REAL AVESEC,SHAPE,AVMU,FNORM
+      REAL AVESEC,distribution_shape,AVMU,FNORM
       REAL ELOSS,ELOSSN2,ELOSSO2,ELOSSOX
       REAL EMIN,EMAX,ELIM
       REAL EPOT,EBSCX,DE,EHPAS,ELEFT,ET
@@ -55,7 +55,8 @@ C... FRPAS= fraction of flux lost in plasmasphere
       DATA JOE/201*0/,SIGION/3*0.0D0/,EB/201*0.0/,E/201*0.0/
      
       !.. ionization potential and excitation energy losses
-      DATA EPOT,ELOSSOX,ELOSSN2,ELOSSO2,SHAPE/17.0,11.0,10.0,9.0,14.0/
+      DATA EPOT,ELOSSOX,ELOSSN2,ELOSSO2,distribution_shape
+    >        /17.0,11.0,10.0,9.0,14.0/
       !.. Burnett&Rountree O branching ratios. O2. need revision
       !.. Shemansky and Liu N2 cross sections, JGR 2005
       DATA SPRD/.4,.56,.44, .4,.28,.44, .2,.06,.10, 0.,.05,.00, 0.,.05
@@ -81,8 +82,9 @@ C... FRPAS= fraction of flux lost in plasmasphere
            !.. Calculate the average energy of the secondaries.
            ELIM=0.5*(E(I_energy)-EPOT)  !.. Maximum secondary energy
            !.. normalize secondary distribution
-           FNORM=1.0/ATAN(ELIM/SHAPE)/SHAPE     
-           AVESEC=FNORM*0.5*SHAPE**2*ALOG(1.0+(ELIM/SHAPE)**2)
+           FNORM=1.0/ATAN(ELIM/distribution_shape)/distribution_shape   
+           AVESEC=FNORM*0.5*distribution_shape**2*
+      >           ALOG(1.0+(ELIM/distribution_shape)**2)
            ELOSS=EPOT+AVESEC
 
            !.. allocate bins for degraded primaries for ionization, and
@@ -155,8 +157,8 @@ C... FRPAS= fraction of flux lost in plasmasphere
       DO J=JMIN,JMAX
         SECSAV(1,J)=0.0
         SECSAV(2,J)=0.0
-        PHIUP(J)=0
-        PHIDWN(J)=0
+        PHIUP(J)=0.0
+        PHIDWN(J)=0.0
         ALTA(J)=Z(J)
         XN(1,J)=ON(J)
         XN(2,J)=O2N(J)
@@ -180,10 +182,6 @@ C... FRPAS= fraction of flux lost in plasmasphere
       j120S=2*j_apex-j120N     !.. lower boundary in south
       j1000S=JMAX+1-j1000N     !.. upper boundary in south
       IPASC=2*j_apex-IPAS   !.. pitch angle boundary in south
-
- 319  FORMAT('  E      SIGEXO  SIGIONO  SIGEXN2  SIGION2  SIGEL'
-     > '    PRED     FYSUM    TSIGNE   PHIUP    PHIDWN   PRODUP'
-     > '   PRODWN')
 
       !.. Determine tube volume for heating due to pitch angle trapping
       VTOT=0.0
@@ -229,6 +227,7 @@ C////////////main calculations  begin here ////////////
           ENDIF
           !.. Total energy deposition to photoelectrons
        EUVION(1,11,J)=EUVION(1,11,J)+PRED(J)*E(I_energy)*DELTE(I_energy)
+
         ENDIF
       ENDDO
 
@@ -306,7 +305,7 @@ C////////////main calculations  begin here ////////////
       !.. protonosphere to electrons. Modification made 1/29/1996 ->
       !.. EHPAS= Energy * (FPAS/VOL) * flux * delta E * area at PAS alt.
 
-      EHPAS=E(I_energy)*PASK*(PHIUP(IPAS)+PHIDWN(IPASC))*DELTE(I_energy) 
+      EHPAS=E(I_energy)*PASK*(PHIUP(IPAS)+PHIDWN(IPASC))*DELTE(I_energy)
      >      *BM(j120N)/BM(IPAS)
       IF(DE.GT.E(I_energy).OR.NINT(FRPAS).EQ.2) EHPAS=0.0
 
@@ -366,11 +365,11 @@ c        IF(IABS(J-j_apex).LT.Z(IPAS)) EHT(3,J)=EHT(3,J)+EHPAS
         !.. Cascade from thermal electron collisions
         TSIGNE(J)=TSIGNE(J)*DELTE(I_energy)/DELTE(I_energy-1)
         PRODUP(I_energy-1,J)=PRODUP(I_energy-1,J)+
-     >                       PHIUP(J)*TSIGNE(J)*(1-EBSCX)
-     >                       +PHIDWN(J)*TSIGNE(J)*EBSCX
+     >                       PHIUP(J)*TSIGNE(J)*(1-EBSCX)+
+     >                       PHIDWN(J)*TSIGNE(J)*EBSCX
         PRODWN(I_energy-1,J)=PRODWN(I_energy-1,J)+
-     >                       PHIDWN(J)*TSIGNE(J)*(1-EBSCX)
-     >                      +PHIUP(J)*TSIGNE(J)*EBSCX
+     >                       PHIDWN(J)*TSIGNE(J)*(1-EBSCX)+
+     >                       PHIUP(J)*TSIGNE(J)*EBSCX
 
         IF(Z(J).LE.ZPROD) THEN
           !.. calculate secondary and cascade production from ionization
@@ -699,7 +698,7 @@ C..... of Nagy and Banks. This is for the Northern Hemisphere
       a(:) = 0.0
       b(:) = 0.0
       c(:) = 0.0
-      d(:) = 0.0 
+      d(:) = 0.0
 
       !.. Do loop for iterating the solutions... PHIDWN is solved using
       !.. TRIDAG solver for one hemisphere, PHIUP is solved analytically to upper
@@ -716,13 +715,13 @@ C..... of Nagy and Banks. This is for the Northern Hemisphere
         DPR2=(PRODWN(IE,J+1)-PRODWN(IE,J-1))/DELZ       ! (dq-)/(ds)
         PHI = 1.
         ALPHA = -(DLT1 + 2.*DLB)         ! -[(dT1)/(T1*ds)+2(dB)/(B*ds)]
-        BETA = IDIR*(T2(J)*DLT1-DTS2-DSLB)-T2(J)**2+T1(J)**2-
+        BETA = real(IDIR)*(T2(J)*DLT1-DTS2-DSLB)-T2(J)**2+T1(J)**2-
      >    ALPHA*DLB
         A(J) = (2.*PHI/DS(J)-ALPHA)/DELZ
         B(J) = BETA-2.*PHI/(DS(J)*DS(J+1))
         C(J) = (2.*PHI/DS(J+1)+ALPHA)/DELZ
-        D(J) = (.5*PRED(J)+PRODWN(IE,J))*(IDIR*(DLT1+DLB)-T2(J))
-     &         -IDIR*(DPR1+DPR2)-T1(J)*(.5*PRED(J)+PRODUP(IE,J))
+        D(J) = (.5*PRED(J)+PRODWN(IE,J))*(real(IDIR)*(DLT1+DLB)-T2(J))
+     &         -real(IDIR)*(DPR1+DPR2)-T1(J)*(.5*PRED(J)+PRODUP(IE,J))
         !!!  where PRED = q, PRODUP = q+ and PRODWN = q-
       ENDDO
        
@@ -783,13 +782,13 @@ C..... of Nagy and Banks. This is for the Southern Hemisphere
         DPR2=(PRODUP(IE,J+1)-PRODUP(IE,J-1))/DELZ       ! (dq+)/(ds)
         PHI = 1.
         ALPHA = -(DLT1 + 2.*DLB)         ! -[(dT1)/(T1*ds)+2(dB)/(B*ds)]
-        BETA = IDIR*(T2(J)*DLT1-DTS2-DSLB)-T2(J)**2+T1(J)**2-
+        BETA = real(IDIR)*(T2(J)*DLT1-DTS2-DSLB)-T2(J)**2+T1(J)**2-
      >    ALPHA*DLB
         A(J) = (2.*PHI/DS(J)-ALPHA)/DELZ
         B(J) = BETA-2.*PHI/(DS(J)*DS(J+1))
         C(J) = (2.*PHI/DS(J+1)+ALPHA)/DELZ
-        D(J) = (.5*PRED(J)+PRODUP(IE,J))*(IDIR*(DLT1+DLB)-T2(J))
-     &         -IDIR*(DPR1+DPR2)-T1(J)*(.5*PRED(J)+PRODWN(IE,J))
+        D(J) = (.5*PRED(J)+PRODUP(IE,J))*(real(IDIR)*(DLT1+DLB)-T2(J))
+     &         -real(IDIR)*(DPR1+DPR2)-T1(J)*(.5*PRED(J)+PRODWN(IE,J))
       ENDDO
 
       !.. END OF D.E. COEFFS - CONJUGATE SOLUTIONS 
