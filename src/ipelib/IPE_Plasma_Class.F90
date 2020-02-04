@@ -110,7 +110,7 @@ MODULE IPE_Plasma_Class
 
   INTEGER, PARAMETER, PRIVATE    :: n_transport_species    = 4
   REAL(prec), PARAMETER, PRIVATE :: transport_min_altitude = 150000.0_prec
-  INTEGER, PARAMETER , PRIVATE   :: transport_highlat_lp   = 17
+  INTEGER, PARAMETER , PRIVATE   :: transport_highlat_lp   = 30
   INTEGER, PARAMETER , PRIVATE   :: perp_transport_max_lp  = 151
 
   ! :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: !

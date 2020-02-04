@@ -612,22 +612,22 @@ C.... Written by P. Richards June-September 2010.
       ti_save = ti
       CALL TLOOPS(JMIN,JMAX,CTIPDIM,Z,N,TI,DT,DTMIN,EFLAG,mp,lp,nflag_t) 
 ! GHGM - simple attempt to stop Te climbing above 5,000K
-      test_te = 0
-      DO J=JMIN,JMAX
-        if(ti(3,j).ge.5000.) then
-          test_te = 1
-          goto 2345
-        endif
-      ENDDO
- 2345 continue
-      if(test_te.eq.1) then
-!     write(6,*) 'GHGM TE greater than 5000K, resetting ',mp,lp
-      DO J=JMIN,JMAX
-        TI(3,J)=904.0*DLOG(z(j))-3329.0
-        IF(TI(3,J).GT.3000.) TI(3,J)=3000.
-        TI(1,J)=0.5*(TN(J)+TI(3,J))
-      ENDDO
-      endif
+!     test_te = 0
+!     DO J=JMIN,JMAX
+!       if(ti(3,j).ge.5000.) then
+!         test_te = 1
+!         goto 2345
+!       endif
+!     ENDDO
+!2345 continue
+!     if(test_te.eq.1) then
+!!     write(6,*) 'GHGM TE greater than 5000K, resetting ',mp,lp
+!     DO J=JMIN,JMAX
+!       TI(3,J)=904.0*DLOG(z(j))-3329.0
+!       IF(TI(3,J).GT.3000.) TI(3,J)=3000.
+!       TI(1,J)=0.5*(TN(J)+TI(3,J))
+!     ENDDO
+!     endif
 ! GHGM - simple attempt to stop Te climbing above 5,000K
 !     if((mp.eq.2).and.(lp.eq.27)) then
 !       do j = jmin,jmax
