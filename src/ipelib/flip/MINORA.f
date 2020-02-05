@@ -17,7 +17,6 @@ C.... Cleaned up and commented by P. Richards in April 2000
       integer mp,lp,i_which_call
       INTEGER NION,IHEPNP,J,ITER,IRHS,IBW,I
       INTEGER EFLAG(11,11),NFLAG                  !.. solution procedure error flags
-      INTEGER EFLAG_11_11
       INTEGER JBNN,JBNS,JEQ,JC                    !.. boundary indices
       INTEGER IDIV,KR,ION,IEQ,MIT                 !.. solution variables
       DOUBLE PRECISION N(4,FLDIM),NMSAVE(2,FLDIM) !.. Solution and saved densities 
@@ -35,7 +34,6 @@ C.... Cleaned up and commented by P. Richards in April 2000
       IF(IABS(IHEPNP).EQ.9)  XMAS=XMASS(3)  !.. FOR He+
       IF(IABS(IHEPNP).EQ.11) XMAS=XMASS(1)  !.. FOR N+
 
-      EFLAG_11_11 = 0
       ZLBHE=200         !.. set He+ lower boundary
       ZLBNP=115         !.. set N+ lower boundary
       DT=DTIN           !.. Set time step for dN/dt
@@ -161,8 +159,8 @@ C- OUTER LOOP Return here on Non-Convergence with reduced time step
           EFLAG(3,2)=0     
           EFLAG(4,2)=0     
           IF(NFLAG.NE.0) THEN
-            IF(EFLAG_11_11.EQ.1) WRITE(6,*) ' '
-            IF(EFLAG_11_11.EQ.1) WRITE(6,*) 
+            IF(EFLAG(11,11).EQ.1) WRITE(6,*) ' '
+            IF(EFLAG(11,11).EQ.1) WRITE(6,*) 
      >        ' *** Problem in band solver ****'
             IF(IABS(IHEPNP).EQ.9) EFLAG(3,2)=-1    !.. Report problem to calling routine
             IF(IABS(IHEPNP).EQ.11) EFLAG(4,2)=-1   !.. Report problem to calling routine
@@ -211,7 +209,7 @@ C- OUTER LOOP Return here on Non-Convergence with reduced time step
           EFLAG(3,1)=0     
           EFLAG(4,1)=0     
           DTINC=DTINC+DT   !.. Used for reduced timestep
-          IF(EFLAG_11_11.EQ.1) WRITE(6,'(A,I5,9F14.2)')  
+          IF(EFLAG(11,11).EQ.1) WRITE(6,'(A,I5,9F14.2)')  
      >       ' He+ N+ ',ITER,DTINC,DTIN,DT
           IF(DTINC.GE.DTIN-1) THEN
             DO J=JMIN,JMAX
@@ -235,7 +233,7 @@ C- OUTER LOOP Return here on Non-Convergence with reduced time step
           !.. Raise lower boundary to maximum of 300 km
           IF(IHEPNP.EQ.9.AND.DT.LT.DTIN/3.0)  ZLBHE=(ZLBHE+350)/2   
           IF(IHEPNP.EQ.11.AND.DT.LT.DTIN/3.0)  ZLBNP=(ZLBNP+350)/2   
-          IF(EFLAG_11_11.EQ.1) WRITE(6,'(A,2I5,9F14.2)')  
+          IF(EFLAG(11,11).EQ.1) WRITE(6,'(A,2I5,9F14.2)')  
      >       ' He+ N+ 2nd ',-IHEPNP,ITER,DTINC,DTIN,DT,ZLBHE,ZLBNP
           DO J=JMIN,JMAX
             N(1,J)=NMSAVE(1,J)
@@ -245,7 +243,7 @@ C- OUTER LOOP Return here on Non-Convergence with reduced time step
           IF(DT.LT.DTMIN) THEN
             IF(IABS(IHEPNP).EQ.9) EFLAG(3,1)=-1    !.. Report problem to calling routine
             IF(IABS(IHEPNP).EQ.11) EFLAG(4,1)=-1   !.. Report problem to calling routine
-            IF(EFLAG_11_11.EQ.1) WRITE(6,'(A,9I5)') 
+            IF(EFLAG(11,11).EQ.1) WRITE(6,'(A,9I5)') 
      >        '  ERR FLAGS MINA',IHEPNP
             !.. Restore density to original input value
             DO J=JMIN,JMAX

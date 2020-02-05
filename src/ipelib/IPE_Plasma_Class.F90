@@ -129,8 +129,8 @@ MODULE IPE_Plasma_Class
   REAL(dp), PARAMETER, PRIVATE :: COLFACX  = 1.7D0
   REAL(dp), PARAMETER, PRIVATE :: HPEQ     = 0.0D0
   ! IHEPLS,INPLS turn on diffusive solutions if > 0. no solution if 0, chemical equilibrium if < 0
-  INTEGER, PARAMETER, PRIVATE  :: IHEPLS   = -1
-  INTEGER, PARAMETER, PRIVATE  :: INPLS    = -1
+  INTEGER, PARAMETER, PRIVATE  :: IHEPLS   = 0
+  INTEGER, PARAMETER, PRIVATE  :: INPLS    = 0
   INTEGER, PARAMETER, PRIVATE  :: INNO     = 0
   integer :: istop
   ! :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: !
@@ -249,6 +249,62 @@ CONTAINS
 
   END SUBROUTINE Trash_IPE_Plasma
 !
+  SUBROUTINE Update_IPE_Plasma_no_convection( plasma, grid, neutrals, forcing, time_tracker, mpi_layer, v_ExB, time_step, transport_time_step )
+    IMPLICIT NONE
+    CLASS( IPE_Plasma ), INTENT(inout) :: plasma
+    TYPE( IPE_Grid ), INTENT(in)       :: grid
+    TYPE( IPE_Neutrals ), INTENT(in)   :: neutrals
+    TYPE( IPE_Forcing ), INTENT(in)    :: forcing
+    TYPE( IPE_Time ), INTENT(in)       :: time_tracker
+    TYPE( IPE_MPI_Layer ), INTENT(in)  :: mpi_layer
+    REAL(prec), INTENT(in)             :: v_ExB(1:3,1:grid % NLP,grid % mp_low:grid % mp_high)
+    REAL(prec), INTENT(in)             :: time_step
+    REAL(prec), INTENT(in)             :: transport_time_step
+    INTEGER  :: nflag_t(1 : plasma % NLP,plasma % mp_low : plasma % mp_high)
+    INTEGER  :: nflag_d(1 : plasma % NLP,plasma % mp_low : plasma % mp_high)
+    ! Local
+    INTEGER    :: n_transport_timesteps
+    INTEGER    :: i, lp, mp, j
+    REAL(prec) :: max_transport_convection_ratio_local
+    REAL(prec) :: max_transport_convection_ratio
+    REAL(prec) :: transport_time_step2
+#ifdef HAVE_MPI
+    INTEGER :: mpiError
+#endif
+
+        CALL plasma % Buffer_Old_State( grid )
+        CALL plasma % Update_Halos( grid, mpi_layer )
+
+#ifdef HAVE_MPI
+
+        CALL MPI_WAITALL( 16, &
+                         ion_requestHandle, &
+                         ion_requestStats, &
+                         mpiError)
+
+
+#endif
+
+!       CALL plasma % Cross_Flux_Tube_Transport( grid, v_ExB, transport_time_step2, mpi_layer )
+
+
+      ! GHGM moved precipitation to here
+      CALL plasma % FLIP_Wrapper( grid,         &
+                                  neutrals,     &
+                                  forcing,      &
+                                  time_tracker, &
+                                  time_step,nflag_t,nflag_d )
+
+      !TWFANG, calculate field line integrals for dynamo solver
+      CALL plasma % Calculate_Field_Line_Integrals(grid, neutrals, mpi_layer)
+
+! GHGM
+!     CALL plasma % Write_Electron_Density_to_HDF5( grid, mpi_layer, "IPE_Electron_Density."//time_tracker % DateStamp( )//".h5" )
+
+
+  END SUBROUTINE Update_IPE_Plasma_no_convection
+
+
   SUBROUTINE Update_IPE_Plasma( plasma, grid, neutrals, forcing, time_tracker, mpi_layer, v_ExB, time_step )
     IMPLICIT NONE
     CLASS( IPE_Plasma ), INTENT(inout) :: plasma
@@ -330,10 +386,10 @@ CONTAINS
 !      CALL plasma % Cross_Flux_Tube_Transport2( grid, v_ExB, transport_time_step, mpi_layer, time_tracker, forcing )
 ! GHGM moved precipitation to here
 
-      CALL plasma % Auroral_Precipitation( grid, &
-                                           neutrals, &
-                                           forcing, &
-                                           time_tracker )
+!     CALL plasma % Auroral_Precipitation( grid, &
+!                                          neutrals, &
+!                                          forcing, &
+!                                          time_tracker )
 
       CALL plasma % FLIP_Wrapper( grid,         &
                                   neutrals,     &
@@ -3114,7 +3170,7 @@ end SUBROUTINE interpolate_in_q
     TYPE( IPE_Time ), INTENT(in)       :: time_tracker
     REAL(prec), INTENT(in)             :: flip_time_step
     ! Local
-    INTEGER  :: i, lp, mp, iprint, ii, tube_nan
+    INTEGER  :: i, lp, mp, iprint, ii
     INTEGER  :: JMINX, JMAXX
     INTEGER  :: EFLAG(11,11)
     INTEGER  :: nflag_t(1 : plasma % NLP,plasma % mp_low : plasma % mp_high)
@@ -3145,8 +3201,6 @@ end SUBROUTINE interpolate_in_q
     REAL(dp) :: dotprod, sini
     REAL(sp) :: F107D, F107A
 
-      tube_nan = 0
-
       F107D = forcing % f107( forcing % current_index )
       F107A = forcing % f107_81day_avg( forcing % current_index )
       UTHR  = time_tracker % hour + (time_tracker % minute) / 60.0
@@ -3156,11 +3210,6 @@ end SUBROUTINE interpolate_in_q
 
       DO mp = plasma % mp_low, plasma % mp_high
         DO lp = 1, plasma % NLP
-          if((mp.eq.1).and.(lp.eq.1)) then
-            write(6,*) '*************************'
-            write(6,*) 'GHGM TIME TRACKER ', uthr, time_tracker % hour, time_tracker % minute                                                      
-            write(6,*) '*************************'
-          endif
 
           ! Copy over the grid information (for now)
           ZX(1:grid % flux_tube_max(lp))  = grid % altitude(1:grid % flux_tube_max(lp),lp)/1000.0_prec !convert from m to km
@@ -3275,9 +3324,8 @@ end SUBROUTINE interpolate_in_q
                         XIONNX(1:9,1:JMAXX), &
                         XIONVX(1:9,1:JMAXX), & !.. IN/OUT: 2D array, Storage for ion densities and velocities
                         NHEAT(1:JMAXX), & !.. OUT: array, Neutral heating rate (eV/cm^3/s)
-                        EFLAG,mp,lp,nflag_t(lp,mp),nflag_d(lp,mp),tube_nan) !..  OUT: 2D array, Error Flags
+                        EFLAG,mp,lp,nflag_t(lp,mp),nflag_d(lp,mp) ) !.. OUT: 2D array, Error Flags
 
-          if (tube_nan.eq.0) then
 
           DO i=1, grid % flux_tube_max(lp)
 
@@ -3297,11 +3345,6 @@ end SUBROUTINE interpolate_in_q
 
           ENDDO
 
-          else
-
-          write(6,*) 'GHGM tube nan at: ', UTHR , mp , lp, tube_nan
-
-          endif
 
       ENDDO
     ENDDO

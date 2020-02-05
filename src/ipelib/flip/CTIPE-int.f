@@ -322,7 +322,7 @@ C.... Written by P. Richards June-September 2010.
      >            TE_TIX,  !.. IN/OUT: 2D array, Electron and ion temperatures (K) (see below)
      >     XIONNX,XIONVX,  !.. IN/OUT: 2D array, Storage for ion densities and velocities 
      >             NHEAT,  !.. OUT: array, Neutral heating rate (eV/cm^3/s) 
-     >             EFLAG,mp,lp,nflag_t,nflag_d,tube_nan)  !.. OUT: 2D array, Error Flags^M
+     >             EFLAG,mp,lp,nflag_t,nflag_d)  !.. OUT: 2D array, Error Flags
       USE THERMOSPHERE       !.. ON HN N2N O2N HE TN UN EHT COLFAC
       USE MINORNEUT          !.. N4S N2D NNO N2P N2A O1D O1S
       USE FIELD_LINE_GRID    !.. FLDIM JMIN JMAX FLDIM Z BM GR SL GL SZA
@@ -334,7 +334,7 @@ C.... Written by P. Richards June-September 2010.
       USE PRODUCTION
 
       IMPLICIT NONE
-      integer mp,lp,i_which_call,nflag_t,nflag_d,tube_nan,test_te
+      integer mp,lp,i_which_call,nflag_t,nflag_d
       INTEGER IHEPLS, INPLS, INNO
       INTEGER CTIPDIM         !.. CTIPe array dimension, must equal to FLDIM
       INTEGER JTI             !.. Dummy variable to count the number of calls to this routine
@@ -377,7 +377,6 @@ C.... Written by P. Richards June-September 2010.
       DOUBLE PRECISION RTS(99)           !.. Reaction rates
       DOUBLE PRECISION EDEN(CTIPDIM)     !.. electron density
       DOUBLE PRECISION O2DISF(CTIPDIM)   !.. O2 dissociation frequency
-      DOUBLE PRECISION sza_north, sza_south !solar zenith angles at the north and south end of a tube
       INTEGER IWR         !$$$  for writing in files
       integer istop
 
@@ -387,8 +386,6 @@ C.... Written by P. Richards June-September 2010.
       DATA JTI/0/
 
       JTI=JTI+1
-
-        tube_nan = 0
 
         nflag_t = 0
         nflag_d = 0
@@ -485,11 +482,6 @@ C.... Written by P. Richards June-September 2010.
         XIONN(I,J)=XIONNX(I,J)*M3_to_CM3
         XIONV(I,J)=XIONVX(I,J)*M_to_CM
       ENDDO
-!       XIONN(3,J)=0.0
-!       XIONV(3,J)=0.0
-!       XIONN(4,J)=0.0
-!       XIONV(4,J)=0.0
-! GHGM
       ENDDO
 
       !.. Transfer Te and Ti to FLIP variable TI
@@ -503,14 +495,6 @@ C.... Written by P. Richards June-September 2010.
       !.. Upload thermosphere parameters to THERMOSPHERE module
       COLFAC=COLFACX  !.. O+ - O collision frequency Burnside factor 1-1.7 
       DO J=JMIN,JMAX
-! GHGM - set N+ and He+ to zero
-!       if(uthrs.lt.2.0E-2) then
-!       XIONN(3,J)=0.0
-!       XIONV(3,J)=0.0
-!       XIONN(4,J)=0.0
-!       XIONV(4,J)=0.0
-!       endif
-! GHGM
         ON(J)=OX(J)*M3_to_CM3
         HN(J)=HX(J)*M3_to_CM3
 ! GHGM
@@ -530,14 +514,6 @@ C.... Written by P. Richards June-September 2010.
         N(4,J)=XIONN(3,J)
         NHEAT(J)=0.0
         O2DISF(J)=0.0
-! GHGM - intialize ti and te ......
-!       if(uthrs.lt.2.0E-2) then
-!       TI(3,J)=904.0*DLOG(z(j))-3329.0
-!       IF(TI(3,J).GT.3000.) TI(3,J)=3000.
-!       TI(1,J)=0.5*(TN(J)+TI(3,J))
-!       endif
-! GHGM
-! GHGM
       ENDDO
 
       !.. Set up initial temperature and density profiles.
@@ -568,21 +544,11 @@ C.... Written by P. Richards June-September 2010.
 
       !.. 2-stream photoelectron routine to get electron heating 
       !.. rate and secondary ion production
-
-      sza_north = sza(5) * 180.0 / 3.14159
-      sza_south = sza(jmax - 4) * 180.0 / 3.14159
-
-      IF(sza_north.LT.103.0.OR.sza_south.LT.103.0) then
-
-      CALL PE2S(F107,F107A,N,TI,FPAS,EDEN,UVFAC,COLUM,
-     > IHEPLS,INPLS,INNO,mp,lp,tube_nan)
-
-      if(tube_nan.ne.0) return
-
-      ENDIF
+      CALL PE2S(F107,F107A,N,TI,FPAS,-1.0E22,EDEN,UVFAC,COLUM,
+     > IHEPLS,INPLS,INNO,mp,lp)
 
       !-- Sum the EUV, photoelectron, and auroral production rate
-      CALL SUMPRD(JMIN,JMAX,AUR_PROD,mp,lp)
+      CALL SUMPRD(JMIN,JMAX,AUR_PROD)
 
       !.. Loop to calculate O+(4S) total ionization rate
       !.. PHION=total O+(4S) prod, including EUV, e*, dissoc of O2 and
@@ -619,44 +585,22 @@ C.... Written by P. Richards June-September 2010.
          ENDIF
          !.. Sum minor ions N+, NO+, O2+, N2+ for electron density at low altitudes
          N(3,J)=XIONN(4,J)+XIONN(5,J)+XIONN(6,J)+XIONN(7,J)+XIONN(8,J)
-         if ( isnan(N(3,J))) then
-          tube_nan = 1
-          write(6,2557) j,mp,lp,XIONN(4,J),XIONN(5,J),XIONN(6,J),
-     >                  XIONN(7,J),XIONN(8,J)
- 2557     format('GHGM tube nan ',3i6,5e12.4)
-          return
-         endif
       ENDDO
 
       !..  electron and ion temperature solution
       n_save = n
       ti_save = ti
       CALL TLOOPS(JMIN,JMAX,CTIPDIM,Z,N,TI,DT,DTMIN,EFLAG,mp,lp,nflag_t) 
-! GHGM - simple attempt to stop Te climbing above 5,000K
-      test_te = 0
-      DO J=JMIN,JMAX
-        if(ti(3,j).ge.5000.) then
-          test_te = 1
-          goto 2345
-        endif
-      ENDDO
- 2345 continue
-      if(test_te.eq.1) then
-      write(6,*) 'GHGM TE greater than 5000K, resetting ',mp,lp
-      DO J=JMIN,JMAX
-        TI(3,J)=904.0*DLOG(z(j))-3329.0
-        IF(TI(3,J).GT.3000.) TI(3,J)=3000.
-        TI(1,J)=0.5*(TN(J)+TI(3,J))
-      ENDDO
-      endif
-! GHGM - simple attempt to stop Te climbing above 5,000K
-      if((mp.eq.22).and.(lp.eq.25)) then
-        write(6799,*) 'ghgm tloops'
-      DO J=JMIN,JMAX
-        write(6799,444) j,z(j),ti(1,j),ti(3,j)
-      ENDDO
- 444  format(i6,f10.1,2e12.4)
-      endif
+!     if((mp.eq.2).and.(lp.eq.27)) then
+!       do j = jmin,jmax
+!         write(6,11) j,z(j),n(1,j),n(2,j),n(3,j),n(4,j),
+!    >    ti(1,j),ti(2,j),ti(3,j)           
+!         write(6,11) j,z(j),XIONN(4,J),XIONN(5,J),XIONN(6,J), 
+!    >                XIONN(7,J),XIONN(8,J)    
+!         write(6,*) '*******************************'
+!11       format(i6,f10.0,7e12.4)
+!       enddo
+!     endif
 !     if(nflag_t.ne.0) then
 !       write(6,*) 'GHGM flagged Temperature ', mp,lp,nflag_t
 !       n = n_save
@@ -682,20 +626,17 @@ C.... Written by P. Richards June-September 2010.
        ENDIF
       ENDDO
 
-! ghgm - don't solve for N+ and He+ ....
-!     !.. He+ solution
-      IF(IHEPLS.GT.0) THEN
+      !.. He+ solution
+      IF(EFLAG(2,1).EQ.0.AND.IHEPLS.GT.0) THEN
         i_which_call = 1
-!       write(6,*) 'ghgm calling he+ ', mp,lp
         CALL XION(TI,DT,DTMIN,9,EFLAG,mp,lp,i_which_call)
       ENDIF
-!     !.. N+ solution
-      IF(INPLS.GT.0) THEN
+      !.. N+ solution
+      IF(EFLAG(2,1).EQ.0.AND.INPLS.GT.0) THEN
         i_which_call = 2
-!       write(6,*) 'ghgm calling n+ ', mp,lp
         CALL XION(TI,DT,DTMIN,11,EFLAG,mp,lp,i_which_call)
       ENDIF
-! ghgm - don't solve for N+ and He+ ....
+
         !.. transfer densities from FLIP to CTIP variable
       DO J=JMIN,JMAX
         NNOX(J)=NNO(J)/M3_to_CM3
