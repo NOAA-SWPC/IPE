@@ -2,7 +2,7 @@
 
 ## USER SETUP
 # IPE_State.apex.*.h5 location
-IPE_INPUT_DIRECTORY=/scratch1/NCEPDEV/stmp2/Tzu-Wei.Fang/GSMWAM-IPE_dynamo
+IPE_INPUT_DIRECTORY=/scratch1/NCEPDEV/stmp2/Zhuxiao.Li/IPE_weimer2005_20130316
 # where you want the IPE_Params.geo.*.nc4 files
 IPE_OUTPUT_DIRECTORY=$IPE_INPUT_DIRECTORY/netcdf
 ###### USUALLY NO NEED TO CHANGE ANYTHING BELOW THIS LINE ######
