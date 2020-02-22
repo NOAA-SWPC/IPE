@@ -45,6 +45,10 @@ module ipeCap
       "N2_Density            "  &
       /)
   
+  integer, parameter :: exportFieldCount = importFieldCount
+  character(len=*), dimension(exportFieldCount), parameter :: &
+    exportFieldNames = importFieldNames
+  
   integer,                   parameter :: iHemiStart  = 0  ! Use Northern (0) and
   integer,                   parameter :: iHemiEnd    = 1  ! Southern (1) hemisphere (for debug only)
 
@@ -211,6 +215,15 @@ module ipeCap
       ESMF_CONTEXT)) &
       return  ! bail out
 
+    ! export fields from WAM
+    if (exportFieldCount > 0) then
+      call NUOPC_Advertise(exportState, StandardNames=exportFieldNames, &
+        SharePolicyField="share", TransferOfferGeomObject="will provide", rc=rc)
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+        ESMF_CONTEXT)) &
+        return  ! bail out
+    end if
+
   end subroutine InitializeAdvertise
   
   !-----------------------------------------------------------------------------
@@ -230,7 +243,6 @@ module ipeCap
 
     integer          :: item
     logical          :: isConnected
-    real(ESMF_KIND_R8), dimension(:), pointer :: fptr
 
     rc = ESMF_SUCCESS
     
@@ -286,17 +298,40 @@ module ipeCap
         line=__LINE__, &
         file=__FILE__)) &
         return  ! bail out
-      call ESMF_FieldGet(field, farrayPtr=fptr, rc=rc)
+      call ESMF_FieldFill(field, dataFillScheme="const", &
+        const1=0._ESMF_KIND_R8, rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
         line=__LINE__, &
         file=__FILE__)) &
         return  ! bail out
-      fptr = 0._ESMF_KIND_R8
       call NUOPC_Realize(importState, field=field, rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
         line=__LINE__, &
         file=__FILE__)) &
         return  ! bail out
+    end do
+
+    ! realize connected Fields in the exportState
+    do item = 1, exportFieldCount
+      isConnected = NUOPC_IsConnected(exportState, &
+        fieldName=trim(exportFieldNames(item)), rc=rc)
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+        line=__LINE__, &
+        file=__FILE__)) &
+        return  ! bail out
+      if (isConnected) then
+        field = ESMF_FieldCreate(mesh, ESMF_TYPEKIND_R8, &
+          name=trim(exportFieldNames(item)), rc=rc)
+        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+          line=__LINE__, &
+          file=__FILE__)) &
+          return  ! bail out
+        call NUOPC_Realize(exportState, field=field, rc=rc)
+        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+          line=__LINE__, &
+          file=__FILE__)) &
+          return  ! bail out
+      end if
     end do
 
   contains  !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1183,8 +1218,8 @@ module ipeCap
     
     ! local variables
     type(ESMF_Clock)   :: clock
-    type(ESMF_State)   :: importState
-    type(ESMF_Field)   :: field
+    type(ESMF_State)   :: importState, exportState
+    type(ESMF_Field)   :: field, efield
     type(ESMF_Mesh)    :: mesh
     type(ESMF_VM)      :: vm
 
@@ -1206,7 +1241,7 @@ module ipeCap
 
     ! query the Component for its clock and importState
     call ESMF_GridCompGet(gcomp, clock=clock, importState=importState, &
-      rc=rc)
+      exportState=exportState, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       ESMF_CONTEXT)) &
       return  ! bail out
@@ -1444,6 +1479,27 @@ module ipeCap
     end if
 
     nullify(dataPtr)
+
+    ! -- copy import field data to export fields for I/O purposes
+    do item = 1, exportFieldCount
+      ! --- retrieve import field
+      call ESMF_StateGet(importState, field=field, &
+        itemName=trim(exportFieldNames(item)), rc=rc)
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+        ESMF_CONTEXT)) &
+        return  ! bail out
+      ! --- retrieve export field
+      call ESMF_StateGet(exportState, field=efield, &
+        itemName=trim(exportFieldNames(item)), rc=rc)
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+        ESMF_CONTEXT)) &
+        return  ! bail out
+      ! -- copy content
+      call ESMF_FieldCopy(efield, field, rc=rc)
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+        ESMF_CONTEXT)) &
+        return  ! bail out
+    end do
 
     ! -- advance IPE model
     call Update_IPE(clock, rc)
