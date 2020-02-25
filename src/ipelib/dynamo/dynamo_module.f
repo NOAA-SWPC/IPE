@@ -156,9 +156,9 @@
       real,parameter :: unitvm(kmlon)=1.
 !
 ! am 10/04 define potential model : NONE or HEELIS - first test NONE
-        character(len=*),parameter :: potential_model='NONE'
+!       character(len=*),parameter :: potential_model='NONE'
 !      character(len=*),parameter :: potential_model='HEELIS'
-!      character(len=*),parameter :: potential_model='weimer2005'
+       character(len=*),parameter :: potential_model='weimer2005'
 !
 ! Electric potential from heelis or weimer:
       real,dimension(kmlonp1,kmlat0) :: pfrac  ! NH fraction of potential

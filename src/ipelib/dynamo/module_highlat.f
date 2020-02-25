@@ -38,7 +38,7 @@
 !        stilt = -0.1503E-02  !deg?
 !        swvel = 500. !km/s
 !        swden = 0.01 !unit?
-         print *,'solar wind',sangle,bt,swvel,swden
+!        print *,'solar wind',sangle,bt,swvel,swden
 
         call setmodel2005Ipe(sangle,bt,stilt,swvel,swden
      &,fileLocation,'epot')
@@ -54,7 +54,7 @@
 
             else  !if ( abs(mlat) > pi/6. ) then
 
-               print*,'mlat[deg]=',mlat,'sunlons',sunlons
+!              print*,'mlat[deg]=',mlat,'sunlons',sunlons
           mlonLoop: do i=1,kmlon
 !mltrad = mlonRad - sunlons + pi !mlt(rad)
 !here sunlons must be time dependent!
@@ -65,8 +65,8 @@
 !note:mlat<0 is outside of the boundary(fill in value)!
                  call epotval2005Ipe(abs(mlat),mlt,fill,epot)
 
-      print"('mlt[hr]=',f6.1,f7.0,'epot[kV]=',e12.4)",mlt,xlonm_deg(i)
-     & ,epot
+!     print"('mlt[hr]=',f6.1,f7.0,'epot[kV]=',e12.4)",mlt,xlonm_deg(i)
+!    & ,epot
                  if ( epot == fill ) then
                     phihm(i,j) = 0.
                  else
@@ -79,8 +79,8 @@
 
            end if               !abs(mlat)
          end do mlatLoop      !j=1,kmlat
-           print*,'MAX phihm',maxval(phihm),' MIN=',minval(phihm)
-           print*,'MAX LOC phihm',maxLOC(phihm)
+!          print*,'MAX phihm',maxval(phihm),' MIN=',minval(phihm)
+!          print*,'MAX LOC phihm',maxLOC(phihm)
 
           write(unit=4025,FMT='(20E12.4)') phihm
 
