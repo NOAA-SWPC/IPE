@@ -1,6 +1,5 @@
 !-----------------------------------------------------------------------
       module weimer2005_ipe
-!      use IDEA_IO_UNITS, only : iulog
 
       implicit none
 !

@@ -162,7 +162,7 @@ CONTAINS
 
       dynamo_efield = dynamo
       IF ( .not. dynamo ) THEN
-        CALL efield_init
+        CALL efield_init_ipe
         ! Maps latitude from 130km to 90km along flux tube.
         DO j=0,nmlat
           theta130_rad   = ( 180.0_prec - ylatm(j) ) * dtr
@@ -468,7 +468,7 @@ CONTAINS
 
     iyear = 1999
 
-    call get_efield(mpi_layer%rank_id)
+    call get_efield_ipe(mpi_layer%rank_id)
 
     ! Interpolate the potential to the IPE grid
     potent_local = potent

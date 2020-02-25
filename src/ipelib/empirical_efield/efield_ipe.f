@@ -50,14 +50,13 @@
 
 !------------------------------------------------------------------------------ 
 
-!      use IDEA_IO_UNITS, only: iulog  
       use weimer2005_ipe, only: EpotVal_new, SetModel_new, read_bndy,
      &                         read_potential, read_schatable, model
  
       implicit none
 
-      public :: efield_init,   ! interface routine                     
-     &          get_efield     ! interface routine
+      public :: efield_init_ipe,   ! interface routine                     
+     &          get_efield_ipe     ! interface routine
       public :: ed1,           ! zonal electric field Ed1  [V/m] 
      &          ed2,           ! meridional electric field Ed2 [V/m] 
      &          potent,        ! electric potential [V]
@@ -212,7 +211,7 @@
 !
       contains
 
-      subroutine efield_init
+      subroutine efield_init_ipe
 !--------------------------------------------------------------------
 ! Purpose: read in and set up coefficients needed for electric field
 !          calculation (independent of time & geog. location)
@@ -221,8 +220,6 @@
 !
 ! Author: A. Maute Dec 2003  am 12/17/03 
 !-------------------------------------------------------------------
-
-!      character(len=4), intent(in) :: my_model
 
       character(len=*), parameter :: 
      &                  efield_lflux_file='global_idea_coeff_lflux.dat',
@@ -241,7 +238,7 @@
 !-----------------------------------------------------------------------
 !following part should be independent of time & location if IMF constant
 !-----------------------------------------------------------------------
-      call ReadCoef
+      call readcoef_ipe
 
       if (trim(model) == 'epot') then
         call read_potential('global_idea_coeff_W05scEpot.dat')
@@ -253,9 +250,9 @@
 
       call read_bndy('global_idea_coeff_W05scBndy.dat')
 
-      end subroutine efield_init
+      end subroutine efield_init_ipe
 
-      subroutine get_efield(i_rank)
+      subroutine get_efield_ipe(i_rank)
 !-----------------------------------------------------------------------
 ! Purpose: calculates the global electric potential field on the
 !          geomagnetic grid (MLT in deg) and derives the electric field 
@@ -269,7 +266,6 @@
       integer :: idum1, idum2, tod ! time of day [s] 
       real kp
 
-!      write(2000+i_rank,*) bz 
 
 !-----------------------------------------------------------------------
 ! get current calendar day of year & date components 
@@ -298,9 +294,14 @@
 ! calculate derivative of global electric potential 
 !-----------------------------------------------------------------------
       call DerivPotential
-!     print*,'ed2_efield',ed2(149,65),potent(149,66),potent(149,64)
 
-      end subroutine get_efield
+      if(i_rank.eq.0) then
+           write(2000+i_rank, *) potent
+           write(2000+i_rank, *) ed1 
+           write(2000+i_rank, *) ed2
+      end if 
+
+      end subroutine get_efield_ipe
 
       subroutine GlobalElPotential
 !-----------------------------------------------------------------------
@@ -1003,7 +1004,7 @@
 !-----------------------------------------------------------------
 ! function declarations
 !-----------------------------------------------------------------
-      real, external :: get_tilt	 ! in wei96.f
+      real, external :: get_tilt_ipe	 ! in wei96.f
 
 !------by Zhuxiao-----
 !!       swden = 5.
@@ -1013,28 +1014,16 @@
 !!         angle = atan2( by,bz )
 !!      end if
 !!      angle = angle*rtd
-!!      call adjust( angle )
+!!      call adjust_ipe( angle )
 !!      bt = sqrt( by*by + bz*bz )
 
-!!      if(debug) then
-!!       write(iulog,"(/,'efield prep_weimer:')")
-!!       write(iulog,"(/,'by reading:')")
-!!       write(iulog,*)  '  Bz   =',bz
-!!       write(iulog,*)  '  By   =',by
-!!       write(iulog,*)  '  Bt   =',bt
-!!       write(iulog,*)  '  angle=',angle
-!!       write(iulog,*)  '  VSW  =',v_sw
-!!       write(iulog,*)  '  tilt =',tilt
-!!       write(iulog,*)  '  swden =',swden
-!!      end if
-
-        print *, angle,bt,tilt,v_sw,swden
+!!        print *, angle,bt,tilt,v_sw,swden
 
 !-------------------------------------------------------------------
 ! use month and day of month - calculated with average no.of days per month
 ! as in Weimer
 !-------------------------------------------------------------------
-      tilt = get_tilt( iyear, imo, iday_m, ut )
+      tilt = get_tilt_ipe( iyear, imo, iday_m, ut )
 
       call SetModel_new(angle,bt,tilt,v_sw,swden)
 
@@ -1221,7 +1210,7 @@
         mlt  = ylonm(ilon)*deg2mlt              ! mag.local time ?
         do ilat = nmlat_wei+1,0,-1              ! lat. loop moving torwards pole
 	  mlat = 90. - ylatm(ilat)           ! mag. latitude pole = 90 equator = 0
-          call gecmp( mlat, mlt, es, ez )	! get electric field
+          call gecmp_ipe( mlat, mlt, es, ez )	! get electric field
           e_tot = sqrt( es**2 + ez**2 )
           if( abs(e_tot) >= ef_max ) then                        ! e-filed > limit -> boundary
             ihlat_bnd(ilon) = ilat - (ilat - ilat_sft_rvs)/2     ! shift boundary to lat_sft (54deg)
@@ -1257,9 +1246,6 @@
 !    trans_width(phi)=8.-2.*cos(phi) 
 !
 ! Author: A. Maute Nov 2003  am 11/20/03
-!------------------------------------------------------------------
-
-!     use sv_decomp, only : svdcmp, svbksb
      
 !----------------------------------------------------------------------------                                                                   
 !	... dummy arguments
@@ -1305,9 +1291,9 @@
       end do
 
 !     if (debug) write(iulog,*) ' Single Value Decomposition'
-      call svdcmp( u, nmax_a, nmax_a, nmax_a, nmax_a, w, v )
+      call svdcmp_ipe(u, nmax_a, nmax_a, nmax_a, nmax_a, w, v )
 
-      call svbksb( u, w, v, nmax_a, nmax_a, nmax_a, nmax_a, rhs, lsg )
+      call svbksb_ipe(u,w,v, nmax_a, nmax_a, nmax_a, nmax_a, rhs, lsg)
 !      
       do ilon = 0,nmlon  ! long.
 !       sum = 0.
@@ -1613,7 +1599,7 @@
 !
 ! Method:
 !
-! To use, first call subroutine ReadCoef once.
+! To use, first call subroutine readcoef_ipe once.
 ! Next, call SetModel with the specified input parameters.
 ! The function EpotVal(gLAT,gMLT) can then be used repeatively to get the
 ! electric potential at the desired location in geomagnetic coordinates.
@@ -1629,7 +1615,7 @@
 !*********************** Copyright 1996, Dan Weimer/MRC ***********************
 !==================================================================
 
-	SUBROUTINE ReadCoef ()
+	SUBROUTINE readcoef_ipe ()
 !
 !-----------------------------------------------------------------------
 !
@@ -1679,7 +1665,7 @@
       ALAMX = 90. - STPD
       ALAMR = ALAMN*D2R
       RETURN
-      END SUBROUTINE ReadCoef
+      END SUBROUTINE readcoef_ipe
 
 !================================================================================================
 
@@ -1694,7 +1680,7 @@
 
 ! COORDINATE TRANSFORMATION UTILITIES
 !**********************************************************************        
-	FUNCTION GET_TILT(YEAR,MONTH,DAY,HOUR)
+	FUNCTION get_tilt_ipe(YEAR,MONTH,DAY,HOUR)
 !
 !-----------------------------------------------------------------------
 !CC NCAR MODIFIED (3/96) CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
@@ -1750,7 +1736,7 @@
 !
 !-----------------------------Return Value--------------------------
 !
-        real get_tilt
+        real get_tilt_ipe
 !
 !-------------------------------Commons---------------------------------
 !
@@ -1791,8 +1777,8 @@
 !
 !-------------------------External Functions----------------------------
 !
-        integer julday_wam
-        external julday_wam
+        integer julday_ipe
+        external julday_ipe
 !
 !-----------------------------------------------------------------------
 !
@@ -1813,22 +1799,22 @@
 	  IYR=YEAR
 	ENDIF
 	UT=HOUR
-	JD=JULDAY_WAM(MONTH,DAY,IYR)
+	JD=julday_ipe(MONTH,DAY,IYR)
 	MJD=JD-2400001
 !       T0=(real(MJD,r8)-51544.5)/36525.0
 	T0=(float(MJD)-51544.5)/36525.0
 	GMSTD=100.4606184 +36000.770*T0 +3.87933E-4*T0*T0 + 
      &       15.0410686*UT
-	CALL ADJUST(GMSTD)
+	CALL adjust_ipe(GMSTD)
 	GMSTH=GMSTD*24./360.
 	ECLIP=23.439 - 0.013*T0
         MA=357.528 + 35999.050*T0 + 0.041066678*UT
-        CALL ADJUST(MA)
+        CALL adjust_ipe(MA)
         LAMD=280.460 + 36000.772*T0 + 0.041068642*UT
-        CALL ADJUST(LAMD)
+        CALL adjust_ipe(LAMD)
         SUNLON=LAMD + (1.915-0.0048*T0)*SIN(MA*pi/180.) + 0.020* 
      &     SIN(2.*MA*pi/180.)
-        CALL ADJUST(SUNLON)
+        CALL adjust_ipe(SUNLON)
 !         IF(IDBUG.NE.0)THEN
 !         WRITE(IDBUG,*) YEAR,MONTH,DAY,HOUR
 !         WRITE(IDBUG,*) 'MJD=',MJD
@@ -1988,175 +1974,17 @@
 
 !CC NCAR MODIFICATION (3/96) CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 !  The next line was added to return the dipole tilt from this function call.  C
-      GET_TILT = CX(6)
+      get_tilt_ipe = CX(6)
 !CC NCAR MODIFICATION (3/96) CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 
       RETURN
-      END FUNCTION GET_TILT
+      END FUNCTION get_tilt_ipe
 
 !======================================================================
 
-      SUBROUTINE ROTATE (X,Y,Z,I)       
-!
-!-----------------------------------------------------------------------
-!     THIS SUBROUTINE APPLIES TO THE VECTOR (X,Y,Z) THE ITH ROTATION  
-!     MATRIX AM(N,M,I) GENERATED BY SUBROUTINE TRANS
-!     IF I IS NEGATIVE, THEN THE INVERSE ROTATION IS APPLIED
-!-----------------------------------------------------------------------
-!
-!     use shr_kind_mod, only: r8 => shr_kind_r8
-      implicit none 
-!
-!------------------------------Arguments--------------------------------
-!
-      integer i
-      REAL X,Y,Z
-!
-!---------------------------Local variables-----------------------------
-!
-      REAL A(3)
-!
-!-----------------------------------------------------------------------
-!
-      A(1)=X
-      A(2)=Y
-      A(3)=Z
-      CALL ROTATEV(A,A,I)
-      X=A(1)
-      Y=A(2)
-      Z=A(3)
-    
-      RETURN        
-      END SUBROUTINE ROTATE
-
-!======================================================================
-
-      SUBROUTINE ROTATEV (A,B,I)       
-!         
-!-----------------------------------------------------------------------
-!     THIS SUBROUTINE APPLIES TO THE VECTOR A(3) THE ITH ROTATION  
-!     MATRIX AM(N,M,I) GENERATED BY SUBROUTINE TRANS
-!     AND OUTPUTS THE CONVERTED VECTOR B(3), WITH NO CHANGE TO A.
-!     IF I IS NEGATIVE, THEN THE INVERSE ROTATION IS APPLIED
-!-----------------------------------------------------------------------
-!
-!     use shr_kind_mod, only: r8 => shr_kind_r8
-      use efield_ipe, only:CX=>CX,ST=>ST,CT=>CT,AM=>AM
-
-      implicit none 
-!
-!-------------------------------Commons---------------------------------
-!
-!     real cx, st, ct, am
-!     COMMON/TRANSDAT/CX(9),ST(6),CT(6),AM(3,3,11)
-!
-!------------------------------Arguments--------------------------------
-!
-      integer i
-      REAL A(3),B(3)
-!
-!---------------------------Local variables-----------------------------
-!
-      integer id, j
-      real xa, ya, za
-!
-!-----------------------------------------------------------------------
-!
-!     IF(I.EQ.0 .OR. IABS(I).GT.11)THEN
-!     WRITE(IULOG,*)'ROTATEV CALLED WITH UNDEFINED TRANSFORMATION'
-!     CALL ENDRUN
-!     ENDIF
-
-      XA = A(1)
-      YA = A(2)
-      ZA = A(3)
-      IF(I.GT.0)THEN
-	ID=I
-        DO J=1,3
-          B(J) = XA*AM(J,1,ID) + YA*AM(J,2,ID) + ZA*AM(J,3,ID)
-        ENDDO
-      ELSE
-	ID=-I
-        DO J=1,3
-          B(J) = XA*AM(1,J,ID) + YA*AM(2,J,ID) + ZA*AM(3,J,ID)
-        ENDDO
-      ENDIF
-      RETURN        
-      END SUBROUTINE ROTATEV
-
 !================================================================================================
 
-	SUBROUTINE FROMCART(R,LAT,LONG,POS)
-!
-!-----------------------------------------------------------------------
-! CONVERT CARTESIAN COORDINATES POS(3)
-! TO SPHERICAL COORDINATES R, LATITUDE, AND LONGITUDE (DEGREES)
-!-----------------------------------------------------------------------
-!
-!       use shr_kind_mod, only: r8 => shr_kind_r8
-        implicit none 
-!
-!------------------------------Arguments--------------------------------
-!
-	REAL R, LAT, LONG, POS(3)
-!
-!---------------------------Local variables-----------------------------
-!
-        real pi
-!
-!-----------------------------------------------------------------------
-!
-!       pi=2.*ASIN(1.)
-        pi=3.141592653
-	R=SQRT(POS(1)*POS(1) + POS(2)*POS(2) + POS(3)*POS(3))
-	IF(R.EQ.0.)THEN
-	  LAT=0.
-	  LONG=0.
-	ELSE
-	  LAT=ASIN(POS(3)*pi/180./R)
-	  LONG=ATAN2(POS(2),POS(1))
-	  LONG=LONG*180./pi
-	ENDIF
-	RETURN
-	END SUBROUTINE FROMCART
-
-!================================================================================================
-
-	SUBROUTINE TOCART(R,LAT,LONG,POS)
-!
-!-----------------------------------------------------------------------
-! CONVERT SPHERICAL COORDINATES R, LATITUDE, AND LONGITUDE (DEGREES)
-! TO CARTESIAN COORDINATES POS(3)
-!-----------------------------------------------------------------------
-!
-!       use shr_kind_mod, only: r8 => shr_kind_r8
-        implicit none 
-!
-!------------------------------Arguments--------------------------------
-!
-	REAL R, LAT, LONG, POS(3)
-!
-!---------------------------Local variables-----------------------------
-!
-        real pi, stc, ctc, sf, cf
-!
-!-----------------------------------------------------------------------
-!
-!       pi=2.*ASIN(1.)
-        pi=3.141592653
-        STC = SIN(LAT*pi/180.)    
-        CTC = COS(LAT*pi/180.)    
-        SF = SIN(LONG*pi/180.)     
-        CF = COS(LONG*pi/180.)     
-        POS(1) = R*CTC*CF        
-        POS(2) = R*CTC*SF        
-        POS(3) = R*STC
-	RETURN
-	END SUBROUTINE TOCART
-
-!================================================================================================
-
-	SUBROUTINE ADJUST(ANGLE)
+	SUBROUTINE adjust_ipe(ANGLE)
 !
 !-----------------------------------------------------------------------
 !	ADJUST AN ANGLE IN DEGREES TO BE IN RANGE OF 0 TO 360.
@@ -2182,11 +2010,11 @@
 	  GOTO 20
 	ENDIF
 	RETURN
-	END SUBROUTINE ADJUST
+	END SUBROUTINE adjust_ipe
 
 !================================================================================================
 
-      INTEGER FUNCTION JULDAY_WAM(MM,ID,IYYY)
+      INTEGER FUNCTION julday_ipe(MM,ID,IYYY)
 !
 !-----------------------------------------------------------------------
 !
@@ -2218,141 +2046,24 @@
         JY=IYYY-1
         JM=MM+13
       ENDIF
-      JULDAY_WAM=INT(365.25*JY)+INT(30.6001*JM)+ID+1720995
+      julday_ipe=INT(365.25*JY)+INT(30.6001*JM)+ID+1720995
       IF (ID+31*(MM+12*IYYY).GE.IGREG) THEN
         JA=INT(0.01*JY)
-        JULDAY_WAM=JULDAY_WAM+2-JA+INT(0.25*JA)
+        julday_ipe=julday_ipe+2-JA+INT(0.25*JA)
       ENDIF
       RETURN
-      END FUNCTION JULDAY_WAM
+      END FUNCTION julday_ipe
 
 !================================================================================================
 
-	FUNCTION MLT(MagLong)
-!
-!-----------------------------------------------------------------------
-! given magnetic longitude in degrees, return Magnetic Local Time
-! assuming that TRANS has been called with the date & time to calculate
-! the rotation matrices.
-!
-! btf 11/06/03:
-! Call sub adjust instead of referencing it as a function
-!-----------------------------------------------------------------------
-!
-!       use shr_kind_mod, only: r8 => shr_kind_r8
-      use efield_ipe, only: CX=>CX,ST=>ST,CT=>CT,AM=>AM
-        implicit none 
-!
-!-----------------------------Return Value------------------------------
-!
-        real mlt
-!
-!-------------------------------Commons---------------------------------
-!
-!       real cx, st, ct, am
-!       COMMON/TRANSDAT/CX(9),ST(6),CT(6),AM(3,3,11)
-
-!
-!------------------------------Arguments--------------------------------
-!
-	REAL MagLong
-!
-!---------------------------Local variables-----------------------------
-!
-	REAL angle, rotangle
-!
-!-----------------------------------------------------------------------
-!
-	RotAngle=CX(7)
-!       MLT=ADJUST(Maglong+RotAngle+180.)/15.
-        angle = Maglong+RotAngle+180.
-        call adjust(angle)
-        mlt = angle/15.
-	RETURN
-	END FUNCTION MLT
-
 !================================================================================================
 
-	FUNCTION MagLong(MLT)
-!
-!-----------------------------------------------------------------------
-! return magnetic longitude in degrees, given Magnetic Local Time
-! assuming that TRANS has been called with the date & time to calculate
-! the rotation matrices.
-!
-! btf 11/06/03:
-! Call sub adjust instead of referencing it as a function
-!-----------------------------------------------------------------------
-!
-!       use shr_kind_mod, only: r8 => shr_kind_r8
-      use efield_ipe, only:CX=>CX,ST=>ST,CT=>CT,AM=>AM
-        implicit none 
-!
-!-----------------------------Return Value------------------------------
-!
-        real MagLong
-!
-!-------------------------------Commons---------------------------------
-!
-!       real cx, st, ct, am
-!       COMMON/TRANSDAT/CX(9),ST(6),CT(6),AM(3,3,11)
-!
-!------------------------------Arguments--------------------------------
-!
-	REAL MLT
-!
-!---------------------------Local variables-----------------------------
-!
-	REAL angle, rotangle
-!
-!-----------------------------------------------------------------------
-!
-	RotAngle=CX(7)
-	angle=MLT*15.-RotAngle-180.
-!       MagLong=ADJUST(angle)
-        call adjust(angle)
-        MagLong = angle
-	RETURN
-	END FUNCTION MagLong
-
-!================================================================================================
-
-	SUBROUTINE SunLoc(SunLat,SunLong)
-!
-!-----------------------------------------------------------------------
-! Return latitude and longitude of sub-solar point.
-! Assumes that TRANS has previously been called with the
-! date & time to calculate the rotation matrices.
-!-----------------------------------------------------------------------
-!
-!       use shr_kind_mod, only: r8 => shr_kind_r8
-      use efield_ipe, only:CX=>CX,ST=>ST,CT=>CT,AM=>AM
-        implicit none 
-!
-!-------------------------------Commons---------------------------------
-!
-!       real cx, st, ct, am
-!       COMMON/TRANSDAT/CX(9),ST(6),CT(6),AM(3,3,11)
-!
-!------------------------------Arguments--------------------------------
-!
-	Real SunLat,SunLong
-!
-!-----------------------------------------------------------------------
-!
-	SunLong=CX(9)
-	SunLat=CX(8)
-	RETURN
-	END SUBROUTINE SunLoc
-
-!================================================================================================
-
-      SUBROUTINE GECMP (AMLA,RMLT,ET,EP)
+      SUBROUTINE gecmp_ipe (AMLA,RMLT,ET,EP)
 !
 !-----------------------------------------------------------------------
 !          Get Electric field components for the Weimer electrostatic
 !          potential model.  Before use, first load coefficients (CALL
-!          READCOEF) and initialize model conditions (CALL SETMODEL).
+!          readcoef_ipe) and initialize model conditions (CALL SETMODEL).
 !
 !          INPUTS:
 !            AMLA = Absolute value of magnetic latitude (deg)
@@ -2379,7 +2090,7 @@
 !
 !-------------------------------Commons---------------------------------
 !
-!          CECMP contains constants initialized in READCOEF
+!          CECMP contains constants initialized in readcoef_ipe
 !     real alamn, alamx, alamr, stpd, stp2, cstp, sstp
 !     COMMON /CECMP/ ALAMN,ALAMX,ALAMR,STPD,STP2,CSTP,SSTP
 !
@@ -2417,7 +2128,7 @@
       ENDIF
       call EpotVal_new(AMLA1    , XMLT1, P1 )
       call EpotVal_new(AMLA-STPD, XMLT,  P2 )
-!      print *, "GECMP ", P1, P2, AMLA1, XMLT1, AMLA-STPD, XMLT
+!      print *, "gecmp_ipe ", P1, P2, AMLA1, XMLT1, AMLA-STPD, XMLT
       IF (KPOL .EQ. 1) GO TO 20
       ET = (P1 - P2) / STP2
 
@@ -2448,10 +2159,10 @@
       ENDIF
 
   100 RETURN
-      END SUBROUTINE GECMP
+      END SUBROUTINE gecmp_ipe
 
 !=====================================================================
-      subroutine svdcmp( a, m, n, mp, np, w, v )
+      subroutine svdcmp_ipe( a, m, n, mp, np, w, v )
 !------------------------------------------------------------------------- 
 ! purpose: singular value decomposition
 !
@@ -2464,7 +2175,7 @@
 ! v(1:n,1:n).
 !
 ! author: a. maute dec 2003      
-! (* copyright (c) 1985 numerical recipes software -- svdcmp *!
+! (* copyright (c) 1985 numerical recipes software -- svdcmp_ipe *!
 ! from numerical recipes 1986 pp. 60 or can be find on web-sites
 !------------------------------------------------------------------------- 
       implicit none
@@ -2742,14 +2453,14 @@
    20 continue
       end do
       
-      end subroutine svdcmp
+      end subroutine svdcmp_ipe
 
 !-------------------------------------------------------------------------      
 ! purpose: solves a*x = b
 !
 ! method:     
 ! solves a*x = b for a vector x, where a is specified by the arrays
-! u,w,v as returned by svdcmp. m and n
+! u,w,v as returned by svdcmp_ipe. m and n
 ! are the logical dimensions of a, and will be equal for square matrices.
 ! mp and np are the physical dimensions of a. b(1:m) is the input right-hand 
 ! side. x(1:n) is the output solution vector. no input quantities are 
@@ -2760,7 +2471,7 @@
 ! from numerical recipes 1986 pp. 57 or can be find on web-sites
 !-------------------------------------------------------------------------      
 
-      subroutine svbksb( u, w, v, m, n, mp, np, b, x )
+      subroutine svbksb_ipe( u, w, v, m, n, mp, np, b, x )
 !------------------------------------------------------------------------- 
 !	... dummy arguments
 !------------------------------------------------------------------------- 
@@ -2802,4 +2513,4 @@
         x(j) = s
       end do
 
-      end subroutine svbksb
+      end subroutine svbksb_ipe
