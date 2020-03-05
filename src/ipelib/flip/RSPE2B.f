@@ -7,8 +7,8 @@ C... on <pe2s.for> but this one is accurate enough for most purposes.
 C... N= density of H+, O+, minor ions(O2+ + NO+), and He+. 
 C... TI= temperature of H+, O+, electrons
 C... FRPAS= fraction of flux lost in plasmasphere
-      SUBROUTINE PE2S(F107,F107A,N,TI,FRPAS,EDEN,UVFAC,COLUM,
-     > IHEPLS,INPLS,INNO,mp,lp)
+      SUBROUTINE PE2S(F107,F107A,N,temp_ti_te,FRPAS,electron_density,
+     >                UVFAC,COLUM,IHEPLS,INPLS,INNO,mp,lp)
       USE FIELD_LINE_GRID    !.. FLDIM JMIN JMAX FLDIM Z BM GR SL GL SZA
       !..EUVION PEXCIT PEPION OTHPR1 OTHPR2 SUMION SUMEXC PAUION PAUEXC NPLSPRD
       USE THERMOSPHERE  !.. ON HN N2N O2N HE TN UN EHT COLFAC
@@ -16,17 +16,18 @@ C... FRPAS= fraction of flux lost in plasmasphere
       USE MINORNEUT !.. N4S N2D NNO N2P N2A O1D O1S EQN2D
       IMPLICIT NONE
       INTEGER mp,lp
-      INTEGER J,I_energy,IK,IS  !.. altitude, energy, species loop control variables
+      INTEGER J,j2,I_energy,IK,IS  !.. altitude, energy, species loop control variables
       INTEGER IDGE(201),JOE(201),JN2E(201) !.. indices for degraded electrons
       INTEGER IPAS,IPASC    !.. grid indices for pitch angle trapping
-      INTEGER j120S,j1000S,j_apex
-      INTEGER iteration,K  
+      INTEGER iteration,K
       INTEGER IEMAX
       INTEGER j1000N,j120N,M400,j_low_S,j_low_N
+      INTEGER j120S,j1000S,j_apex
       INTEGER EFLAG(11,11) 
       !.. For CMINOR. Turns He+, N+, and NO solutions on and off 
       INTEGER IHEPLS,INPLS,INNO
       integer ret
+      integer i_index1,i_index2,i_index3
       REAL ALT,z_lower_boundary,ZPAS,ZPROD
       REAL AVESEC,distribution_shape,AVMU,FNORM
       REAL ELOSS,ELOSSN2,ELOSSO2,ELOSSOX
@@ -44,11 +45,13 @@ C... FRPAS= fraction of flux lost in plasmasphere
      > ,PROB(201),PARSIG(22),SIGEL(3),PEBSC(3),UVFAC(59)
       REAL PHIDWN(FLDIM),PHIUP(FLDIM),T1(FLDIM),T2(FLDIM),DS(FLDIM)
       REAL RJOX(201),RJN2(201),RJO2(201),RJHE(201)
-      DOUBLE PRECISION N(4,FLDIM),TI(3,FLDIM),FRPAS,
-     >  FD(9),EDEN(FLDIM),COLUM(3,FLDIM)
-
+      DOUBLE PRECISION N(4,FLDIM),temp_ti_te(3,FLDIM),FRPAS,
+     >  FD(9),electron_density(FLDIM),COLUM(3,FLDIM)
+! GHGM
       DATA z_lower_boundary ,ZPROD,AVMU,EMIN, EMAX,ZPAS
      >  / 120.1, 999.,.577,1.0 , 800.,1000./
+!    >  / 41, 120., 999.,.577,4.0 , 800.,1000./
+! GHGM
       DATA EBSCX/0.0/
       DATA JN2E/201*0/,SIGEX/3*0.0D0/
       DATA DELTE/201*0.0/
@@ -56,12 +59,14 @@ C... FRPAS= fraction of flux lost in plasmasphere
      
       !.. ionization potential and excitation energy losses
       DATA EPOT,ELOSSOX,ELOSSN2,ELOSSO2,distribution_shape
-     >        /17.0,11.0,10.0,9.0,14.0/
+     >    /17.0, 11.0,    10.0,   9.0,    14.0/
       !.. Burnett&Rountree O branching ratios. O2. need revision
       !.. Shemansky and Liu N2 cross sections, JGR 2005
       DATA SPRD/.4,.56,.44, .4,.28,.44, .2,.06,.10, 0.,.05,.00, 0.,.05
      > ,.00, 0.0,0.0,0.02/
       DATA IDGE/201*0/, F107SV/0.0/
+
+      iemax = 0
 
       !.. POSSIBLE speed up options - basic speed is 83 seconds
       !.. 1) lower ZPROD to 600 km - saves 2 seconds 
@@ -70,35 +75,33 @@ C... FRPAS= fraction of flux lost in plasmasphere
 
       !.. Setting up energy cell boundaries first time thru only
       !.. If Printing, go to 1 eV resolution  
-      
-      IEMAX =0  
-	     !.. can use lower resolution for the FLIP run
+
            CALL ECELLS(35.0,800.0,1.0,50.0,EMAX,IEMAX,EB,E,DELTE)
-           !CALL ECELLS(30.0,800.0,3.0,99.0,EMAX,IEMAX,EB,E,DELTE)
-	     !.. use high resolution for printing
-           !CALL ECELLS(65.0,800.0,1.0,20.0,EMAX,IEMAX,EB,E,DELTE)
          !.. set up bins for degraded primaries from ionizations
          DO 100 I_energy=IEMAX,2,-1
            !.. Calculate the average energy of the secondaries.
            ELIM=0.5*(E(I_energy)-EPOT)  !.. Maximum secondary energy
            !.. normalize secondary distribution
-           FNORM=1.0/ATAN(ELIM/distribution_shape)/distribution_shape   
+           FNORM=1.0/ATAN(ELIM/distribution_shape)/distribution_shape
            AVESEC=FNORM*0.5*distribution_shape**2*
-     >          ALOG(1.0+(ELIM/distribution_shape)**2)
+     >            ALOG(1.0+(ELIM/distribution_shape)**2)
            ELOSS=EPOT+AVESEC
 
            !.. allocate bins for degraded primaries for ionization, and
            !.. excitation of O and N2
            IF(E(I_energy).GT.ELOSS) then
-                CALL FNDBIN(I_energy,IEMAX,ELOSS,E,IDGE)
+             CALL FINDBIN(I_energy,ELOSS,E,i_index1)
+             idge(i_energy) = i_index1
            endif
            IF(E(I_energy).GT.ELOSSOX) then
-                CALL FNDBIN(I_energy,IEMAX,ELOSSOX,E,JOE)
+             CALL FINDBIN(I_energy,ELOSSOX,E,i_index2)
+             joe(i_energy) = i_index2
            endif
            IF(E(I_energy).GT.ELOSSN2) then
-                CALL FNDBIN(I_energy,IEMAX,ELOSSN2,E,JN2E)
+             CALL FINDBIN(I_energy,ELOSSN2,E,i_index3)
+             jn2e(i_energy) = i_index3
            endif
-  100      ENDDO
+ 100     CONTINUE
 
          !.. proportion of total secondary ions in energy bin E(IE). Note that 
 	   !.. a running sum of secondary electrons is kept but only distributed
@@ -109,6 +112,23 @@ C... FRPAS= fraction of flux lost in plasmasphere
            PROB(I_energy)=0.2526*EXP(-0.2526*E(I_energy))
  200     CONTINUE
 
+!       write(9000 + mp,*) 'GHGM emax iemax ', emax, iemax
+!       write(9000 + mp,*) 'GHGM ENERGY ', mp,lp
+!       write(9000 + mp,3333) E
+!       write(9000 + mp,*) 'GHGM EB ', mp,lp
+!       write(9000 + mp,3333) EB
+!       write(9000 + mp,*) 'GHGM DELTE ', mp,lp
+!       write(9000 + mp,3333) DELTE
+!       write(9000 + mp,*) 'GHGM idge ', mp,lp
+!       write(9000 + mp,4444) idge
+!       write(9000 + mp,*) 'GHGM joe ', mp,lp
+!       write(9000 + mp,4444) joe
+!       write(9000 + mp,*) 'GHGM jn2e ', mp,lp
+!       write(9000 + mp,4444) jn2e
+!       write(9000 + mp,*) 'GHGM prob ', mp,lp
+!       write(9000 + mp,3333) prob
+!3333   format(10f10.2)
+!4444   format(10i6)
 
       !.. Get production frequencies (RJOX,RJN2,RJO2,RJHE) for the energy cells
       IF(ABS((F107-F107SV)/F107).GE.0.05) THEN
@@ -128,7 +148,7 @@ C... FRPAS= fraction of flux lost in plasmasphere
 	  FPAS=FRPAS
       !.. If FRPAS<0, adjust fraction of trapping according to TEC
       ELSEIF(FRPAS.LT.0) THEN
-	  FPAS=DMIN1(DABS(FRPAS),6.0E-6*DABS(FRPAS)*N(2,j_apex)*
+         FPAS=DMIN1(DABS(FRPAS),6.0E-6*DABS(FRPAS)*N(2,j_apex)*
      >     ((1+Z(j_apex)/6370.)**4-(1+ZPAS/6370.)**4))
       !.. If FRPAS > 1 Stop electrons in plasmasphere but no extra heating
       ELSEIF(FRPAS.GT.1.0) THEN
@@ -171,9 +191,9 @@ C... FRPAS= fraction of flux lost in plasmasphere
         IF(J.GT.1) DS(J)=SL(J)-SL(J-1)
         IF(Z(J).LT.ZPAS.AND.J.LT.j_apex) IPAS=J
         IF(Z(J).LE.ZPROD) THEN
-          IF(Z(J).LT.400.AND.J.LT.j_apex)  M400=J
-          IF(J.LT.j_apex)  j1000N=J
-          IF(Z(J).LT.z_lower_boundary.AND.J.LT.j_apex)  j120N=J
+          IF(Z(J).LT.400.AND.J.LT.j_apex) M400=J
+          IF(J.LT.j_apex) j1000N=J
+          IF(Z(J).LT.z_lower_boundary.AND.J.LT.j_apex) j120N=J
         ENDIF
       ENDDO
       DS(1)=DS(2)
@@ -192,6 +212,21 @@ C... FRPAS= fraction of flux lost in plasmasphere
 
       !.. Initial energy index set for highest energy
       I_energy=IEMAX
+
+!     if((mp.eq.23).and.(lp.eq.27)) then
+!     write(6,*) 'GHGM TUBE ',jmin,jmax,j_apex,j1000N,j120N,
+!    >  j120S,j1000S,ipas,ipasc
+!     write(6,*) '120  N ', z(j120N)
+!     write(6,*) '1000 N ', z(j1000N)
+!     write(6,*) 'APEX   ', z(j_apex)
+!     write(6,*) '1000 S ', z(j1000S)
+!     write(6,*) '120  S ', z(j120S)
+!       do j = jmin,jmax
+!         write(6,2435) j,z(j)
+!       enddo
+!2435   format(i6,f10.1)
+!     stop
+!     endif
 
 C////////////main calculations  begin here ////////////
  23   CONTINUE
@@ -216,18 +251,20 @@ C////////////main calculations  begin here ////////////
         IF(Z(J).LE.ZPROD) THEN
           CALL PEPRIM(FLDIM,I_energy,J,XN,HE(J),PRED,E(I_energy),
      >      DELTE(I_energy),COLUM,RJOX,RJN2,RJO2,RJHE)
+            if(isnan(PRED(J))) then
+              write(6,*) 'GHGM PRED 1 ',mp,lp,j
+              stop
+            endif
           !.. add electron quenching of N(2D) to primary prod
           IF(E(I_energy).LE.3.AND.E(I_energy).GT.2) THEN
             !.. Needed for updated electron heating in CTIPe
-! ghgm comment out for now
-            CALL CMINOR(0,J,0,IHEPLS,INPLS,INNO,FD,7,N,TI,Z,EFLAG,
-     >                  mp,lp)
-!
+            CALL CMINOR(0,J,0,IHEPLS,INPLS,INNO,FD,7,N,temp_ti_te,
+     >                  Z,EFLAG,mp,lp)
             PRED(J)=PRED(J)+EQN2D(J)
           ENDIF
           !.. Total energy deposition to photoelectrons
-       EUVION(1,11,J)=EUVION(1,11,J)+PRED(J)*E(I_energy)*DELTE(I_energy)
-
+          EUVION(1,11,J)=EUVION(1,11,J)+
+     >                   PRED(J)*E(I_energy)*DELTE(I_energy)
         ENDIF
       ENDDO
 
@@ -239,12 +276,9 @@ C////////////main calculations  begin here ////////////
 
       !.. energy loss to thermal electrons by coulomb collisions
       DO J=JMIN,JMAX
-        ET=8.618E-5*TI(3,J)
-!       if((mp.eq.13).and.(lp.eq.29)) then
-!       write(766,17) mp,lp,j,ie,eden(j),e(ie),e(ie-1),ti(3,j),et
-!17     format('GHGM YO ',4i6,5e12.4)
-!       endif
-        TSIGNE(J)=((3.37E-12*EDEN(J)**0.97)/(E(I_energy)**0.94))
+        ET=8.618E-5*temp_ti_te(3,J)
+        TSIGNE(J)=((3.37E-12*electron_density(J)**0.97)
+     >    /(E(I_energy)**0.94))
      >    *((E(I_energy)-ET)/(E(I_energy)
      >    -(0.53*ET)))**2.36/(E(I_energy)-E(I_energy-1))
         T1(J)=0.0
@@ -273,15 +307,44 @@ C////////////main calculations  begin here ////////////
 
 
       !..   fluxes in local equil and set boundary conditions on fluxes
+      ! low here refers to points from 90km to 120km (N and S)
+
       DO j_low_N=JMIN,j120N
+
        j_low_S=2*j_apex-j_low_N
+
        PHIDWN(j_low_N)=(.5*PRED(j_low_N)+PRODWN(I_energy,j_low_N))/
      >                 (T2(j_low_N)-T1(j_low_N))
        PHIDWN(j_low_S)=(.5*PRED(j_low_S)+PRODWN(I_energy,j_low_S))/
      >                 (T2(j_low_S)-T1(j_low_S))
-        PHIUP(j_low_N)=PHIDWN(j_low_N)
-        PHIUP(j_low_S)=PHIDWN(j_low_S)
+       PHIUP(j_low_N)=PHIDWN(j_low_N)
+       PHIUP(j_low_S)=PHIDWN(j_low_S)
+       if(isnan(PHIUP(j_low_N))) then
+         write(6,*) 'YAGA 1 ', mp,lp,j_low_n
+         write(6,*) j_low_N,I_energy,PRED(j_low_N),
+     >              PRODWN(I_energy,j_low_N),
+     >              T2(j_low_N),T1(j_low_N)               
+       endif
+       if(isnan(PHIUP(j_low_S))) write(6,*) 'YAGA 2 ', mp,lp,j_low_n
+
+       if(phidwn(j_low_N).lt.0.0) write(6,255) mp,lp,j_low_n,z(j_low_n),
+     >                            phidwn(j_low_n)
+       if(phidwn(j_low_S).lt.0.0) write(6,256) mp,lp,j_low_s,z(j_low_s),
+     >                            phidwn(j_low_s)
+       if(phiup(j_low_N).lt.0.0) write(6,257) mp,lp,j_low_n,z(j_low_n),
+     >                            phiup(j_low_n)
+       if(phiup(j_low_S).lt.0.0) write(6,258) mp,lp,j_low_s,z(j_low_s),
+     >                            phiup(j_low_s)
+
       ENDDO
+
+ 255  format('GHGM PHIDWN -VE North ',3i6,f10.1,e12.4)
+ 256  format('GHGM PHIDWN -VE South ',3i6,f10.1,e12.4)
+ 257  format('GHGM PHIUP  -VE North ',3i6,f10.1,e12.4)
+ 258  format('GHGM PHIUP  -VE South ',3i6,f10.1,e12.4)
+
+      phidwn(j120N+1:j120S-1) = 0.0
+      phiup(j120N+1:j120S-1) = 0.0
 
       !.. take the adiabatic variation of pitch angle into account
       CALL PITCH(FLDIM,I_energy,0,j1000N,JMIN,JMAX,T1,T2,PRED,
@@ -289,17 +352,31 @@ C////////////main calculations  begin here ////////////
 
       !.. calculate interhemispheric fluxes. The iteration is to adjust 
       !.. for interhemispheric fluxes.Used to be 4 times
+
       DO iteration=1,2
-        CALL TRIS1(FLDIM,1,j120N,j1000N,I_energy,BM,
-     >     Z,JMAX,PRED,IPAS,FPAS,PHIDWN,
-     >     PHIUP,T1,T2,DS,PRODUP,PRODWN)
-      CALL TRISM1(FLDIM,-1,j1000S,j120S,I_energy,j1000N,BM,Z,
-     >            JMAX,PRED,IPASC,FPAS,
-     >            PHIDWN,PHIUP,T1,T2,DS,PRODUP,PRODWN)
+
+        if(isnan(phiup(j120S+1))) write(6,*) 'GHGM its A ', j120S+1,
+     >                            iteration
+
+        CALL TRIS1(FLDIM,1,j120N,j1000N,I_energy,BM,Z,
+     >             JMAX,PRED,IPAS,FPAS,PHIDWN,
+     >             PHIUP,T1,T2,DS,PRODUP,PRODWN,mp,lp)
+
+        if(isnan(phiup(j120S+1))) write(6,*) 'GHGM its B ', j120S+1,
+     >                            iteration, mp,lp
+
+        CALL TRISM1(FLDIM,-1,j1000S,j120S,I_energy,j1000N,BM,Z,
+     >              JMAX,PRED,IPASC,FPAS,
+     >              PHIDWN,PHIUP,T1,T2,DS,PRODUP,PRODWN,mp,lp,iteration)
+
+        if(isnan(phiup(j120S+1))) write(6,*) 'GHGM its C ', j120S+1,
+     >                            iteration
+
       ENDDO
+
       !.. reset the fluxes
-      CALL PITCH(FLDIM,I_energy,1,j1000N,JMIN,JMAX,T1,T2,
-     >           PRED,PRODUP,PRODWN,BM,Z)
+      CALL PITCH(FLDIM,I_energy,1,j1000N,JMIN,JMAX,T1,T2,PRED,
+     >           PRODUP,PRODWN,BM,Z)
 
       !.. EHPAS=heating due to pitch angle trapping: DE= normal loss in the
       !.. protonosphere to electrons. Modification made 1/29/1996 ->
@@ -325,6 +402,9 @@ C////////////main calculations  begin here ////////////
       !.. Save total flux and fluxes for cascade calculation
       DO J=JMIN,JMAX
         FYSUM(J)=(PHIUP(J)+PHIDWN(J))
+        if(isnan(FYSUM(J))) write(6,3777) mp,lp,j,
+     >     z(j),PHIUP(J),PHIDWN(J),i_energy,e(i_energy)
+ 3777   format('GHGM FYSUM NaN ',3i6,f10.0,2e12.4,i6,f10.1)
         !.. electron heating. Add extra heat from pitch angle trapping
         EHT(3,J)=EHT(3,J)+FYSUM(J)*DELTE(I_energy)*TSIGNE(J)
         IF(Z(J).GT.Z(IPAS)) EHT(3,J)=EHT(3,J)+EHPAS
@@ -347,13 +427,17 @@ c        IF(IABS(J-j_apex).LT.Z(IPAS)) EHT(3,J)=EHT(3,J)+EHPAS
           !.. Total excitation rate for O2
           PEXCIT(2,12,J)=PEXCIT(2,12,J)+SIGEX(2)*PHISUM*XN(2,J)
           !.. Get N2 excitation cross sections
-         CALL EPN2XS(J,FLDIM,XN,PHISUM,ALTA(J),E(I_energy),SIGEX,SIGION,
-     >      PEXCIT)
+          CALL EPN2XS(J,FLDIM,XN,PHISUM,ALTA(J),E(I_energy),SIGEX,
+     >      SIGION,PEXCIT)
 
           !.. Calculate secondary ionization rate.
           DO IS=1,3
             PRION=PHISUM*SIGION(IS)*XN(IS,J)
             DO IK=1,6
+              if(isnan(prion)) write(6,*) 'GHGM PRION ',is,ik,
+     >           phisum,sigion(is),xn(is,j),j,fysum(j),
+     >           delte(I_energy),I_energy
+              if(isnan(prion)) write(6,*) 'GHGM SPRD ',is,ik
               PEPION(IS,IK,J)=PEPION(IS,IK,J)+PRION*SPRD(IS,IK)
             ENDDO
           ENDDO
@@ -374,19 +458,21 @@ c        IF(IABS(J-j_apex).LT.Z(IPAS)) EHT(3,J)=EHT(3,J)+EHPAS
         IF(Z(J).LE.ZPROD) THEN
           !.. calculate secondary and cascade production from ionization
           IF(I_energy.GT.0) THEN
-           CALL CASION(FLDIM,I_energy,J,ALT,XN,PRODUP,PHIUP(J),PHIDWN(J)
+            CALL CASION(FLDIM,I_energy,J,ALT,XN,PRODUP,PHIUP(J),
+     >       PHIDWN(J)
      >       ,E,DELTE,1,SECSAV,SIGION,IEMAX,IDGE(I_energy),ELOSS,
      >        PROB(I_energy))
-           CALL CASION(FLDIM,I_energy,J,ALT,XN,PRODWN,PHIDWN(J),PHIUP(J)
+            CALL CASION(FLDIM,I_energy,J,ALT,XN,PRODWN,
+     >        PHIDWN(J),PHIUP(J)
      >       ,E,DELTE,2,SECSAV,SIGION,IEMAX,IDGE(I_energy),
      >        ELOSS,PROB(I_energy))
           ENDIF
           !.. calculate cascade from atomic O - O(1D)
           CALL CASEX(FLDIM,I_energy,1,J,ALTA(J),SIGEX,XN,PRODUP,
-     >       PHIUP,PHIDWN
+     >         PHIUP,PHIDWN
      >      ,E,DELTE,JOE(I_energy),ELOSSOX)
           CALL CASEX(FLDIM,I_energy,1,J,ALTA(J),SIGEX,XN,PRODWN,
-     >       PHIDWN,PHIUP
+     >         PHIDWN,PHIUP
      >      ,E,DELTE,JOE(I_energy),ELOSSOX)
 
           !.. cascade from N2
@@ -399,15 +485,15 @@ c        IF(IABS(J-j_apex).LT.Z(IPAS)) EHT(3,J)=EHT(3,J)+EHPAS
 
           !.. cascade from O2
           CALL CASEX(FLDIM,I_energy,3,J,ALTA(J),SIGEX,XN,PRODUP,
-     >       PHIUP,PHIDWN
+     >         PHIUP,PHIDWN
      >      ,E,DELTE,JN2E(I_energy),ELOSSN2)
-          CALL CASEX(FLDIM,I_energy,3,J,ALTA(J),SIGEX,XN,PRODWN
-     >      ,PHIDWN,PHIUP
+          CALL CASEX(FLDIM,I_energy,3,J,ALTA(J),SIGEX,XN,PRODWN,
+     >         PHIDWN,PHIUP
      >      ,E,DELTE,JN2E(I_energy),ELOSSN2)
 
           !.. Cascade from O(1D) and N2(v)
           CALL CASSIM(FLDIM,I_energy,J,ALTA(J),SIGEX,XN,PRODUP,
-     >        PHIUP,PHIDWN
+     >         PHIUP,PHIDWN
      >       ,E,DELTE,SIGO1D)
           CALL CASSIM(FLDIM,I_energy,J,ALTA(J),SIGEX,XN,PRODWN,
      >         PHIDWN,PHIUP
@@ -651,31 +737,33 @@ C...... al for O2, and N2, and He
 	!.. primary production rates
       PRED(J)=(RJOX(IE)*XN(1,J)+RJN2(IE)*XN(3,J)+RJO2(IE)*XN(2,J)
      > +1.0*RJHE(IE)*HE)*1.0E-9*AFAC*FLXFAC
+      if(isnan(PRED(J))) then
+        write(6,*) 'GHGM bugger ',j , ie , RJOX(IE),XN(1,J),
+     >             RJN2(IE),XN(3,J),RJO2(IE),XN(2,J),
+     >             RJHE(IE),HE,AFAC,FLXFAC
+        stop
+      endif
 
       RETURN
       END
-C::::::::::::::::::::::::::::::::FNDBIN::::::::::::::::::::::::::::
+C::::::::::::::::::::::::::::::::FINDBIN::::::::::::::::::::::::::::
 C...... A program to determine which bin to allocate a degraded electron
 C...... IE= index of the primary of energy EE(IE). IEMAX is the max J, ELOSS=
 C...... energy lost by primary and the index is returned in IE
-      SUBROUTINE FNDBIN(I_energy,IEMAX,ELOSS,EE,IDGE)
+      SUBROUTINE FINDBIN(I_energy,ELOSS,EE,i_index)
       IMPLICIT NONE
-      INTEGER J,I_energy,IEMAX,IDGE(IEMAX)
-      REAL ELOSS,EE(IEMAX),EDPRIM
+      INTEGER J,I_energy,i_index
+      REAL ELOSS,EE(201),E_deg_prim
       !.. Energy of degraded primary
-      EDPRIM=EE(I_energy)-ELOSS
-      !IF(EDPRIM.LT.0.0) WRITE(6,*) '   ELOSS too large in FNDBIN'
-      !IF(EDPRIM.LT.0.0) STOP
+      E_deg_prim=EE(i_energy)-ELOSS
       !.. Test degraded energy against next lowest bin until it fits
-      DO 29 J=I_energy,2,-1
-      IF(EDPRIM.GT.EE(J)) GO TO 30
-      IF(ABS(EDPRIM-EE(J)).LE.ABS(0.5*(EE(J)-EE(J-1)))) GO TO 30
+      DO 29 J=i_energy,2,-1
+      IF(E_deg_prim.GT.EE(J)) GO TO 30
+      IF(ABS(E_deg_prim-EE(J)).LE.ABS(0.5*(EE(J)-EE(J-1)))) GO TO 30
  29   CONTINUE
  30   CONTINUE
       !.. store index for return
-      IDGE(I_energy)=J
-      !IF(ELOSS.LT.0) WRITE(6,'(2I5,9F8.1)') IE,IDGE(IE),EE(IE),
-      !>  EE(IDGE(IE)),ELOSS,EE(IE)-EE(IE-1)
+      i_index = j
       RETURN
       END
 C::::::::::::::::::::::::::::: TRIS1 ::::::::::::::::::::::::::::::
@@ -685,14 +773,15 @@ C..... of Nagy and Banks. This is for the Northern Hemisphere
       !.. where PRED = q, PRODUP = q+ and PRODWN = q-
       SUBROUTINE TRIS1(FLDIM,IDIR,j120N,j1000N,IE,BM,Z,JMAX,
      >  PRED,IPAS,FPAS,
-     >  PHIDWN,PHIUP,T1,T2,DS,PRODUP,PRODWN)
+     >  PHIDWN,PHIUP,T1,T2,DS,PRODUP,PRODWN,mp,lp)
       IMPLICIT NONE
-      INTEGER J,FLDIM,IDIR,j120N,j1000N,IE,IPAS,JMAX
+      INTEGER J,FLDIM,IDIR,j120N,j1000N,IE,IPAS,JMAX,mp,lp
       REAL FPAS,T2DS,PHI,R1
       REAL DELZ,DLB,DSLB,DLT1,DTS2,DPR1,DPR2,ALPHA,BETA
       REAL A(FLDIM),B(FLDIM),C(FLDIM),D(FLDIM),PRED(FLDIM)
      >  ,PRODWN(201,FLDIM),PRODUP(201,FLDIM) 
-      REAL PHIDWN(FLDIM),PHIUP(FLDIM),T1(FLDIM),T2(FLDIM),DS(FLDIM)
+      REAL PHIDWN(FLDIM),PHIUP(FLDIM),T1(FLDIM),T2(FLDIM),
+     >  DS(FLDIM)
       DOUBLE PRECISION Z(FLDIM),BM(FLDIM)
 
       a(:) = 0.0
@@ -701,8 +790,8 @@ C..... of Nagy and Banks. This is for the Northern Hemisphere
       d(:) = 0.0
 
       !.. Do loop for iterating the solutions... PHIDWN is solved using
-      !.. TRIDAG solver for one hemisphere, PHIUP is solved analytically to upper
-      !.. bdy in conjugate h-s, PHIUP for c.h.s is found using TRIDAG, then
+      !.. tridiagonal_solver solver for one hemisphere, PHIUP is solved analytically to upper
+      !.. bdy in conjugate h-s, PHIUP for c.h.s is found using tridiagonal_solver, then
       !.. PHIDWN is solved analytically back along the field line
       DO J=j120N,j1000N
         DELZ=DS(J)+DS(J+1)                            ! ds(i)+ds(i+1)
@@ -727,12 +816,13 @@ C..... of Nagy and Banks. This is for the Northern Hemisphere
        
       !.. END OF D.E. COEFFS --- SOLUTION FOR NEAR H-S ....
       D(j120N)=D(j120N)-A(j120N)*PHIDWN(j120N-1)
-      D(j1000N)=D(j1000N)-C(j1000N)*PHIDWN(j1000N+1)
-      CALL TRIDAG(FLDIM,PHIDWN,j120N,j1000N,A,B,C,D)
+      D(J1000N)=D(J1000N)-C(J1000N)*PHIDWN(J1000N+1)
 
- 
+      CALL tridiagonal_solver(FLDIM,PHIDWN,j120N,j1000N,A,B,C,D,
+     >                        mp,lp,1,ie)
+
       !:::::: PHIUP IS EVALUATED  ANALYTICALLY   ::::
-      DO J=j120N,JMAX-1
+      DO J=j120N,JMAX - 1
         R1=(T1(J)*PHIDWN(J)+(PRED(J)+2.*PRODUP(IE,J))/2.)/
      >     T2(J)/BM(J)
         T2DS=T2(J)*DS(J)
@@ -753,24 +843,27 @@ C..... of Nagy and Banks. This is for the Southern Hemisphere
       !.. where PRED = q, PRODUP = q+ and PRODWN = q-
       SUBROUTINE TRISM1(FLDIM,IDIR,j1000S,j120S,IE,j1000N,BM,Z,JMAX,
      >  PRED,IPASC,FPAS,
-     >  PHIDWN,PHIUP,T1,T2,DS,PRODUP,PRODWN)
+     >  PHIDWN,PHIUP,T1,T2,DS,PRODUP,PRODWN,mp,lp,iteration)
       IMPLICIT NONE
-      INTEGER J,K,FLDIM,IDIR,j1000S,j120S,j1000N,IE,IPASC,JMAX
+      INTEGER J,K,FLDIM,IDIR,j1000S,j120S,j1000N,IE,IPASC,JMAX,
+     >        mp,lp,ii,iteration
       REAL DELZ,DLB,DSLB,DLT1,DTS2,DPR1,DPR2,ALPHA,BETA
       REAL FPAS,T2DS,PHI,R1
       DOUBLE PRECISION Z(FLDIM),BM(FLDIM)
       REAL A(FLDIM),B(FLDIM),C(FLDIM),D(FLDIM),PRED(FLDIM)
      > ,PRODWN(201,FLDIM),PRODUP(201,FLDIM)
-      REAL PHIDWN(FLDIM),PHIUP(FLDIM),T1(FLDIM),T2(FLDIM),DS(FLDIM)
-      !.. Do loop for iterating the solutions... PHIDWN is solved using
-      !.. TRIDAG solver for one hemisphere, PHIUP is solved analytically to upper
-      !.. bdy in conjugate h-s, PHIUP for c.h.s is found using TRIDAG, then
-      !.. PHIDWN is solved analytically back along the field line
+      REAL PHIDWN(FLDIM),PHIUP(FLDIM),T1(FLDIM),T2(FLDIM),
+     >                 DS(FLDIM)
+
       a(:) = 0.0
       b(:) = 0.0
       c(:) = 0.0
       d(:) = 0.0
 
+      !.. Do loop for iterating the solutions... PHIDWN is solved using
+      !.. tridiagonal_solver solver for one hemisphere, PHIUP is solved analytically to upper
+      !.. bdy in conjugate h-s, PHIUP for c.h.s is found using tridiagonal_solver, then
+      !.. PHIDWN is solved analytically back along the field line
       DO J=j1000S,J120S
         DELZ=DS(J)+DS(J+1)                            ! ds(i)+ds(i+1)
         DLB=(BM(J+1)-BM(J-1))/(BM(J)*DELZ)            ! (dB)/(B*ds)
@@ -794,7 +887,11 @@ C..... of Nagy and Banks. This is for the Southern Hemisphere
       !.. END OF D.E. COEFFS - CONJUGATE SOLUTIONS 
       D(j1000S)=D(j1000S)-A(j1000S)*PHIUP(j1000S-1)
       D(j120S)=D(j120S)-C(j120S)*PHIUP(j120S+1)
-      CALL  TRIDAG(FLDIM,PHIUP,j1000S,j120S,A,B,C,D)
+      if(isnan(PHIUP(j1000S-1))) write(6,*) 'GHGM isnan 1000S ',
+     >                           j1000S - 1
+      if(isnan(PHIUP(j120S+1))) write(6,*) 'GHGM isnan 120S ', j120S+1
+      CALL tridiagonal_solver(FLDIM,PHIUP,j1000S,j120S,A,B,C,D,
+     >                        mp,lp,2,ie)
 
       !.. PHIDWN IS EVALUATED ANALYTICALLY   ::::
       DO J=1,JMAX-j1000N-1
@@ -809,7 +906,8 @@ C..... of Nagy and Banks. This is for the Southern Hemisphere
  
       RETURN
       END
-C:::::::::::::::::::::::::: TRIDAG :::::::::::::::::::::::::::::::::::::
+
+C:::::::::::::::::::::::::: tridiagonal_solver :::::::::::::::::::::::::::::::::::::
 C...... For solving a system of linear simultaneous equations with a
 C...... Tridiagonal coeff matrix. The eqns are numbered from FIRST to LAST,
 C...... & their  sub-diag. , diag. ,& super-diag coeffs. Are stored
@@ -817,26 +915,32 @@ C...... In the arrays A, B, C. The right hand side of the vector is
 C...... Stored in D. The computed solution vector is stored
 C......  In the array DELTA. This routine comes from Carnahan, Luther,
 C......  And Wilkes, Applied Numerical Methods, Wiley, 1969, page 446
-      SUBROUTINE TRIDAG(FLDIM,DELTA,FIRST,LAST,A,B,C,D)
+      SUBROUTINE tridiagonal_solver(FLDIM,DELTA,FIRST,LAST,A,B,C,D,
+     >           mp,lp,i_which_call,ie)
       IMPLICIT NONE
-      INTEGER J,FLDIM,K,NUM,LAST,FIRST,FIRSTP1,ret
+      INTEGER J,FLDIM,K,NUM,LAST,FIRST,FIRSTP1,mp,lp,
+     >        i_which_call,ie
       REAL A(FLDIM),B(FLDIM),C(FLDIM),D(FLDIM)
-      REAL ALPHA(FLDIM),DELTA(FLDIM),GAMMA(FLDIM)
+      REAL ALPHA(FLDIM),DELTA(FLDIM),GAMMA1(FLDIM)
       !..  COMPUTE INTERMEDIATE ARRAYS ALPHA & GAMMA
       ALPHA(FIRST)=B(FIRST)
-      GAMMA(FIRST)=D(FIRST)/ALPHA(FIRST)
+      GAMMA1(FIRST)=D(FIRST)/ALPHA(FIRST)
       FIRSTP1=FIRST+1
       DO J=FIRSTP1,LAST
         ALPHA(J)=B(J)-A(J)*C(J-1)/ALPHA(J-1)
-        GAMMA(J)=(D(J)-A(J)*GAMMA(J-1))/ ALPHA(J)
+        GAMMA1(J)=(D(J)-A(J)*GAMMA1(J-1))/ALPHA(J)
       ENDDO
 
       !..  COMPUTE FINAL SOLUTION VECTOR V
-      DELTA(LAST)=GAMMA(LAST)
+      DELTA(LAST)=GAMMA1(LAST)
       NUM=LAST-FIRST
       DO K=1,NUM
         J=LAST-K
-        DELTA(J)=GAMMA(J)-C(J)*DELTA(J+1)/ALPHA(J)
+        DELTA(J)=GAMMA1(J)-C(J)*DELTA(J+1)/ALPHA(J)
+        if(isnan(delta(j))) write(6,7777) mp,lp,k,j,num,
+     >    first,last,i_which_call,
+     >    GAMMA1(J),C(J),DELTA(J+1),ALPHA(J),ie
+ 7777 format('GHGM tridiagonal solver ',8i6,4e12.4,i6)
       ENDDO
         RETURN
         END
