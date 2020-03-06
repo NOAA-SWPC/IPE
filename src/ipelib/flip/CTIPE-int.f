@@ -334,7 +334,7 @@ C.... Written by P. Richards June-September 2010.
       USE PRODUCTION
 
       IMPLICIT NONE
-      integer mp,lp,i_which_call,nflag_t,nflag_d
+      integer mp,lp,i_which_call,nflag_t,nflag_d,test_te
       INTEGER IHEPLS, INPLS, INNO
       INTEGER CTIPDIM         !.. CTIPe array dimension, must equal to FLDIM
       INTEGER JTI             !.. Dummy variable to count the number of calls to this routine
@@ -482,6 +482,11 @@ C.... Written by P. Richards June-September 2010.
         XIONN(I,J)=XIONNX(I,J)*M3_to_CM3
         XIONV(I,J)=XIONVX(I,J)*M_to_CM
       ENDDO
+!       XIONN(3,J)=0.0
+!       XIONV(3,J)=0.0
+!       XIONN(4,J)=0.0
+!       XIONV(4,J)=0.0
+! GHGM
       ENDDO
 
       !.. Transfer Te and Ti to FLIP variable TI
@@ -495,6 +500,14 @@ C.... Written by P. Richards June-September 2010.
       !.. Upload thermosphere parameters to THERMOSPHERE module
       COLFAC=COLFACX  !.. O+ - O collision frequency Burnside factor 1-1.7 
       DO J=JMIN,JMAX
+! GHGM - set N+ and He+ to zero
+!       if(uthrs.lt.2.0E-2) then
+!       XIONN(3,J)=0.0
+!       XIONV(3,J)=0.0
+!       XIONN(4,J)=0.0
+!       XIONV(4,J)=0.0
+!       endif
+! GHGM
         ON(J)=OX(J)*M3_to_CM3
         HN(J)=HX(J)*M3_to_CM3
 ! GHGM
@@ -514,6 +527,13 @@ C.... Written by P. Richards June-September 2010.
         N(4,J)=XIONN(3,J)
         NHEAT(J)=0.0
         O2DISF(J)=0.0
+! GHGM - intialize ti and te ......
+!       if(uthrs.lt.2.0E-2) then
+!       TI(3,J)=904.0*DLOG(z(j))-3329.0
+!       IF(TI(3,J).GT.3000.) TI(3,J)=3000.
+!       TI(1,J)=0.5*(TN(J)+TI(3,J))
+!       endif
+! GHGM
       ENDDO
 
       !.. Set up initial temperature and density profiles.
@@ -544,7 +564,7 @@ C.... Written by P. Richards June-September 2010.
 
       !.. 2-stream photoelectron routine to get electron heating 
       !.. rate and secondary ion production
-      CALL PE2S(F107,F107A,N,TI,FPAS,-1.0E22,EDEN,UVFAC,COLUM,
+      CALL PE2S(F107,F107A,N,TI,FPAS,EDEN,UVFAC,COLUM,
      > IHEPLS,INPLS,INNO,mp,lp)
 
       !-- Sum the EUV, photoelectron, and auroral production rate
@@ -591,6 +611,24 @@ C.... Written by P. Richards June-September 2010.
       n_save = n
       ti_save = ti
       CALL TLOOPS(JMIN,JMAX,CTIPDIM,Z,N,TI,DT,DTMIN,EFLAG,mp,lp,nflag_t) 
+! GHGM - simple attempt to stop Te climbing above 5,000K
+!     test_te = 0
+!     DO J=JMIN,JMAX
+!       if(ti(3,j).ge.5000.) then
+!         test_te = 1
+!         goto 2345
+!       endif
+!     ENDDO
+!2345 continue
+!     if(test_te.eq.1) then
+!!     write(6,*) 'GHGM TE greater than 5000K, resetting ',mp,lp
+!     DO J=JMIN,JMAX
+!       TI(3,J)=904.0*DLOG(z(j))-3329.0
+!       IF(TI(3,J).GT.3000.) TI(3,J)=3000.
+!       TI(1,J)=0.5*(TN(J)+TI(3,J))
+!     ENDDO
+!     endif
+! GHGM - simple attempt to stop Te climbing above 5,000K
 !     if((mp.eq.2).and.(lp.eq.27)) then
 !       do j = jmin,jmax
 !         write(6,11) j,z(j),n(1,j),n(2,j),n(3,j),n(4,j),
