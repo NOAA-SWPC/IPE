@@ -272,12 +272,6 @@
 ! valid at end of current timestep
 !-----------------------------------------------------------------------
 
-!     if( iyear < 1900 ) then
-!       write(iulog,"(/,'>>> get_efield: year < 1900 not possible: 
-!    &year=',i5)") iyear
-!       call endrun
-!     end if
-
       tod=ut*3600.
 !     ut = tod/3600.                   ! UT of day [sec]
 !-----------------------------------------------------------------------
@@ -295,11 +289,11 @@
 !-----------------------------------------------------------------------
       call DerivPotential
 
-      if(i_rank.eq.0) then
-           write(2000+i_rank, *) potent
-           write(2000+i_rank, *) ed1 
-           write(2000+i_rank, *) ed2
-      end if 
+!      if(i_rank.eq.0) then
+!           write(2000+i_rank, *) potent
+!           write(2000+i_rank, *) ed1 
+!           write(2000+i_rank, *) ed2
+!      end if 
 
       end subroutine get_efield_ipe
 
