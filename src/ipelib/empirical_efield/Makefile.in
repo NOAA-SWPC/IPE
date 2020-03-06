@@ -98,7 +98,8 @@ am__v_AR_1 =
 libefield_a_AR = $(AR) $(ARFLAGS)
 libefield_a_LIBADD =
 am_libefield_a_OBJECTS = libefield_a-apex_sunloc_empirical.$(OBJEXT) \
-	libefield_a-efield_ipe.$(OBJEXT)
+	libefield_a-efield_ipe.$(OBJEXT) \
+	libefield_a-weimer2005_ipe.$(OBJEXT)
 libefield_a_OBJECTS = $(am_libefield_a_OBJECTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -279,7 +280,7 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 noinst_LIBRARIES = libefield.a
-libefield_a_SOURCES = apex_sunloc_empirical.f efield_ipe.f
+libefield_a_SOURCES = apex_sunloc_empirical.f efield_ipe.f weimer2005_ipe.f
 libefield_a_FFLAGS = $(FC_MODINC) .
 EXTRA_DIST = apex_sunloc.f
 all: all-am
@@ -348,6 +349,12 @@ libefield_a-efield_ipe.o: efield_ipe.f
 
 libefield_a-efield_ipe.obj: efield_ipe.f
 	$(AM_V_F77)$(F77) $(libefield_a_FFLAGS) $(FFLAGS) -c -o libefield_a-efield_ipe.obj `if test -f 'efield_ipe.f'; then $(CYGPATH_W) 'efield_ipe.f'; else $(CYGPATH_W) '$(srcdir)/efield_ipe.f'; fi`
+
+libefield_a-weimer2005_ipe.o: weimer2005_ipe.f
+	$(AM_V_F77)$(F77) $(libefield_a_FFLAGS) $(FFLAGS) -c -o libefield_a-weimer2005_ipe.o `test -f 'weimer2005_ipe.f' || echo '$(srcdir)/'`weimer2005_ipe.f
+
+libefield_a-weimer2005_ipe.obj: weimer2005_ipe.f
+	$(AM_V_F77)$(F77) $(libefield_a_FFLAGS) $(FFLAGS) -c -o libefield_a-weimer2005_ipe.obj `if test -f 'weimer2005_ipe.f'; then $(CYGPATH_W) 'weimer2005_ipe.f'; else $(CYGPATH_W) '$(srcdir)/weimer2005_ipe.f'; fi`
 
 ID: $(am__tagged_files)
 	$(am__define_uniq_tagged_files); mkid -fID $$unique
@@ -555,6 +562,9 @@ clean-modules:
 	-test -z "$(FC_MODEXT)" || rm -f *.$(FC_MODEXT)
 
 clean-local: clean-modules
+
+# dependencies
+libefield_a-efield_ipe.$(OBJEXT) : libefield_a-weimer2005_ipe.$(OBJEXT)
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
