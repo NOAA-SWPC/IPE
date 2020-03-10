@@ -45,9 +45,31 @@ module ipeCap
       "N2_Density            "  &
       /)
   
-  integer, parameter :: exportFieldCount = importFieldCount
+  integer, parameter :: exportFieldCount = 21
   character(len=*), dimension(exportFieldCount), parameter :: &
-    exportFieldNames = importFieldNames
+    exportFieldNames = (/ &
+      "temp_neutral          ", &
+      "eastward_wind_neutral ", &
+      "northward_wind_neutral", &
+      "upward_wind_neutral   ", &
+      "O_Density             ", &
+      "O2_Density            ", &
+      "N2_Density            ", &
+      "O_plus_density        ", &
+      "H_plus_density        ", &
+      "He_plus_density       ", &
+      "N_plus_density        ", &
+      "NO_plus_density       ", &
+      "O2_plus_density       ", &
+      "N2_plus_density       ", &
+      "O_plus_2D_density     ", &
+      "O_plus_2P_density     ", &
+      "ion_temperature       ", &
+      "electron_temperature  ", &
+      "eastward_exb_velocity ", &
+      "northward_exb_velocity", &
+      "upward_exb_velocity   "  &
+      /)
   
   integer,                   parameter :: iHemiStart  = 0  ! Use Northern (0) and
   integer,                   parameter :: iHemiEnd    = 1  ! Southern (1) hemisphere (for debug only)
@@ -216,13 +238,11 @@ module ipeCap
       return  ! bail out
 
     ! export fields from WAM
-    if (exportFieldCount > 0) then
-      call NUOPC_Advertise(exportState, StandardNames=exportFieldNames, &
-        SharePolicyField="share", TransferOfferGeomObject="will provide", rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-        ESMF_CONTEXT)) &
-        return  ! bail out
-    end if
+    call NUOPC_Advertise(exportState, StandardNames=exportFieldNames, &
+      SharePolicyField="share", TransferOfferGeomObject="will provide", rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      ESMF_CONTEXT)) &
+      return  ! bail out
 
   end subroutine InitializeAdvertise
   
@@ -1223,7 +1243,7 @@ module ipeCap
     type(ESMF_Mesh)    :: mesh
     type(ESMF_VM)      :: vm
 
-    integer :: item
+    integer :: i, item
     integer :: iHemi
     integer :: kp, kpp, kpStart, kpEnd, kpStep, kpOffset
     integer :: lp, mp, mpp
@@ -1480,17 +1500,23 @@ module ipeCap
 
     nullify(dataPtr)
 
-    ! -- copy import field data to export fields for I/O purposes
-    do item = 1, exportFieldCount
+    ! -- advance IPE model
+    call Update_IPE(clock, rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      ESMF_CONTEXT)) &
+      return  ! bail out
+
+    ! -- copy import neutral field data to export fields for I/O purposes
+    do item = 1, importFieldCount
       ! --- retrieve import field
       call ESMF_StateGet(importState, field=field, &
-        itemName=trim(exportFieldNames(item)), rc=rc)
+        itemName=trim(importFieldNames(item)), rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
         ESMF_CONTEXT)) &
         return  ! bail out
       ! --- retrieve export field
       call ESMF_StateGet(exportState, field=efield, &
-        itemName=trim(exportFieldNames(item)), rc=rc)
+        itemName=trim(importFieldNames(item)), rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
         ESMF_CONTEXT)) &
         return  ! bail out
@@ -1501,11 +1527,55 @@ module ipeCap
         return  ! bail out
     end do
 
-    ! -- advance IPE model
-    call Update_IPE(clock, rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      ESMF_CONTEXT)) &
-      return  ! bail out
+    ! -- export ion densities
+    do item = importFieldCount + 1, exportFieldCount
+      ! --- retrieve export field
+      call ESMF_StateGet(exportState, field=efield, &
+        itemName=trim(exportFieldNames(item)), rc=rc)
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+        ESMF_CONTEXT)) &
+        return  ! bail out
+
+      ! --- get field data
+      nullify(dataPtr)
+      call ESMF_FieldGet(efield, farrayPtr=dataPtr, rc=rc)
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+        ESMF_CONTEXT)) &
+        return  ! bail out
+
+      i = item - importFieldCount
+      nCount = 0
+      do iHemi = iHemiStart, iHemiEnd
+        do mp = mps, mpe
+          do lp = lps, lpe
+            kpStep   = numLineNodes(lp,iHemi) - 1
+            kpStart  = iHemi * kpStep + 1
+            kpEnd    = (1 - iHemi) * kpStep + 1
+            kpStep   = 1 - 2 * iHemi
+            kpOffset = (1 - iHemi) * jmin(lp) + iHemi * jSouth(lp) - 1
+            do kpp = kpStart, kpEnd, kpStep
+              nCount = nCount + 1
+              kp = kpp + kpOffset
+              select case (trim(exportFieldNames(item)))
+                case ("ion_temperature")
+                  dataPtr(nCount) = ipe % plasma % ion_temperature(kp,lp,mp)
+                case ("electron_temperature")
+                  dataPtr(nCount) = ipe % plasma % electron_temperature(kp,lp,mp)
+                case ("eastward_exb_velocity")
+                  dataPtr(nCount) = ipe % eldyn % v_exb_geographic(1,kp,lp,mp)
+                case ("northward_exb_velocity")
+                  dataPtr(nCount) = ipe % eldyn % v_exb_geographic(2,kp,lp,mp)
+                case ("upward_exb_velocity")
+                  dataPtr(nCount) = ipe % eldyn % v_exb_geographic(3,kp,lp,mp)
+                case default
+                  dataPtr(nCount) = ipe % plasma % ion_densities(i,kp,lp,mp)
+              end select
+            end do
+          end do
+        end do
+      end do
+
+    end do
 
   end subroutine ModelAdvance
  
