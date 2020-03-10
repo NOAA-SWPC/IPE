@@ -431,8 +431,6 @@ module ipeCap
       ! -- local parameters
       integer, dimension(8), parameter :: iConn       = (/ 0,0,0,1,1,1,1,0 /)  ! connection array for hexahedron face (i,i+1) -> (i+2,i+3)...
       real(ESMF_KIND_R8),    parameter :: rad2deg     = 57.29577951308232087721_ESMF_KIND_R8
-      real(ESMF_KIND_R8),    parameter :: earth_radius_R8 = REAL(earth_radius,ESMF_KIND_R8) ! IPE earth radius converted to R8
-
 
       ! -- begin
       if (present(rc)) rc = ESMF_SUCCESS
@@ -631,7 +629,7 @@ module ipeCap
               kp = kpp + kpOffset
               nodeCoords(i + 1) = rad2deg * local_grid_3d(kp,lp,mpp,1)
               nodeCoords(i + 2) = 90._ESMF_KIND_R8 - rad2deg * local_grid_3d(kp,lp,mpp,2)
-              nodeCoords(i + 3) = (1._ESMF_KIND_R8 + ipe % grid % altitude(kp,lp)/earth_radius_R8)
+              nodeCoords(i + 3) = 1.e-03_ESMF_KIND_R8 * ipe % grid % altitude(kp,lp)
               i = i + 3
             end do
             lpOffset = lpOffset + numLineNodes(lp,iHemi)
@@ -670,7 +668,7 @@ module ipeCap
             kp = kpp + kpOffset
             nodeCoords(i + 1) = rad2deg * poleCoords(kp,1)
             nodeCoords(i + 2) = 90._ESMF_KIND_R8 - rad2deg * poleCoords(kp,2)
-            nodeCoords(i + 3) = (1._ESMF_KIND_R8 + ipe%grid%altitude(kp,lp)/earth_radius_R8)
+            nodeCoords(i + 3) = 1.e-03_ESMF_KIND_R8 * ipe % grid % altitude(kp,lp)
             i = i + 3
           end do
         end do
