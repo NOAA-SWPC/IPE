@@ -81,8 +81,6 @@ module ipeCap
   integer, dimension(:,:), allocatable :: numLineNodes
 
   ! -- debug
-  integer :: logLevel
-  logical :: checkFields
   real(ESMF_KIND_R8), parameter :: BAD_VALUE = -999._ESMF_KIND_R8
 
   private
@@ -99,11 +97,8 @@ module ipeCap
   subroutine SetServices(gcomp, rc)
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
-!---
-!nm20161003: esmf timing lib
-    real(ESMF_KIND_R8) :: beg_time, end_time
-!---
     
+    ! begin
     rc = ESMF_SUCCESS
     
     ! the NUOPC model component will register the generic methods
@@ -121,12 +116,12 @@ module ipeCap
     
     ! set entry point for methods that require specific implementation
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
-      phaseLabelList=(/"IPDv02p1"/), userRoutine=InitializeAdvertise, rc=rc)
+      phaseLabelList=(/"IPDv02p1"/), userRoutine=InitializeP1, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       ESMF_CONTEXT)) &
       return  ! bail out
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
-      phaseLabelList=(/"IPDv02p3"/), userRoutine=InitializeRealize, rc=rc)
+      phaseLabelList=(/"IPDv02p3"/), userRoutine=InitializeP3, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       ESMF_CONTEXT)) &
       return  ! bail out
@@ -165,48 +160,27 @@ module ipeCap
     integer, intent(out)  :: rc
 
     ! local variables
-    character(len=5)           :: value
-    character(len=ESMF_MAXSTR) :: msgString
+    integer                    :: verbosity
+    character(len=ESMF_MAXSTR) :: name
+
+    ! local parameters
+    character(len=*), parameter :: rName = "InitializeP0"
     
+    ! begin
     rc = ESMF_SUCCESS
 
-    ! Get component attributes
-    ! - Verbosity
-    call ESMF_AttributeGet(gcomp, name="Verbosity", value=value, &
-      defaultValue="max", convention="NUOPC", purpose="Instance", rc=rc)
+    ! Get component information
+    call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      ESMF_CONTEXT)) &
+      line=__LINE__,  &
+      file=__FILE__)) &
       return  ! bail out
-    ! convert value to logLevel
-    logLevel = ESMF_UtilString2Int(value, &
-      specialStringList=(/"min","max"/), specialValueList=(/0,255/), rc=rc)
+
+    ! intro
+    call NUOPC_LogIntro(name, rName, verbosity, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      ESMF_CONTEXT)) &
-      return  ! bail out
-    write(msgString,'("IPE: logLevel = ",i0)') logLevel
-    call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      ESMF_CONTEXT)) &
-      return  ! bail out
-    ! - CheckFields (debug: scan coordinates and fields for errors)
-    call ESMF_AttributeGet(gcomp, &
-      name="CheckFields", value=value, defaultvalue="false", &
-      convention="NUOPC", purpose="Instance", &
-      rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      ESMF_CONTEXT)) &
-      return  ! bail out
-    ! convert value to checkfields
-    checkFields = .false.
-    if (trim(value) == "true") checkFields = .true.
-    if (checkFields) then
-      write(msgString,'("IPE: checkFields is ON")')
-    else
-      write(msgString,'("IPE: checkFields is OFF")')
-    end if
-    call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      ESMF_CONTEXT)) &
+      line=__LINE__,  &
+      file=__FILE__)) &
       return  ! bail out
 
     ! Switch to IPDv01 by filtering all other phaseMap entries
@@ -215,20 +189,51 @@ module ipeCap
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       ESMF_CONTEXT)) &
       return  ! bail out
+
+    ! extro
+    call NUOPC_LogExtro(name, rName, verbosity, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
     
   end subroutine InitializeP0
 
   !-----------------------------------------------------------------------------
 
 #undef  ESMF_METHOD
-#define ESMF_METHOD "IPECap::InitializeAdvertise()"
+#define ESMF_METHOD "IPECap::InitializeP1()"
 
-  subroutine InitializeAdvertise(gcomp, importState, exportState, clock, rc)
-    type(ESMF_GridComp)   :: gcomp
+  subroutine InitializeP1(gcomp, importState, exportState, clock, rc)
+    type(ESMF_GridComp)  :: gcomp
     type(ESMF_State)     :: importState, exportState
     type(ESMF_Clock)     :: clock
     integer, intent(out) :: rc
     
+    ! local variables
+    integer                    :: verbosity
+    character(len=ESMF_MAXSTR) :: name
+
+    ! local parameters
+    character(len=*), parameter :: rName = "InitializeP1"
+
+    ! begin
+    rc = ESMF_SUCCESS
+
+    ! Get component information
+    call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
+
+    ! intro
+    call NUOPC_LogIntro(name, rName, verbosity, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
+
     rc = ESMF_SUCCESS
     
     ! import fields from WAM
@@ -244,14 +249,21 @@ module ipeCap
       ESMF_CONTEXT)) &
       return  ! bail out
 
-  end subroutine InitializeAdvertise
+    ! extro
+    call NUOPC_LogExtro(name, rName, verbosity, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
+
+  end subroutine InitializeP1
   
   !-----------------------------------------------------------------------------
 
 #undef  ESMF_METHOD
-#define ESMF_METHOD "IPECap::InitializeRealize()"
+#define ESMF_METHOD "IPECap::InitializeP3()"
 
-  subroutine InitializeRealize(gcomp, importState, exportState, clock, rc)
+  subroutine InitializeP3(gcomp, importState, exportState, clock, rc)
     type(ESMF_GridComp)  :: gcomp
     type(ESMF_State)     :: importState, exportState
     type(ESMF_Clock)     :: clock
@@ -261,11 +273,31 @@ module ipeCap
     type(ESMF_Field) :: field
     type(ESMF_Mesh)  :: mesh
 
-    integer          :: item
-    logical          :: isConnected
+    integer :: item
+    integer :: verbosity
+    logical :: isConnected
+    character(len=ESMF_MAXSTR) :: name
 
-    rc = ESMF_SUCCESS
+    ! local parameters
+    character(len=*), parameter :: rName = "InitializeP3"
     
+    ! begin
+    rc = ESMF_SUCCESS
+
+    ! Get component information
+    call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
+
+    ! intro
+    call NUOPC_LogIntro(name, rName, verbosity, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
+
     ! check if all required fields are connected
     item = 0
     isConnected = .true.
@@ -354,10 +386,17 @@ module ipeCap
       end if
     end do
 
+    ! extro
+    call NUOPC_LogExtro(name, rName, verbosity, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
+
   contains  !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 #undef  ESMF_METHOD
-#define ESMF_METHOD "IPECap::InitializeRealize::IPEMeshCreate()"
+#define ESMF_METHOD "IPECap::InitializeP3::IPEMeshCreate()"
 
     !---------------------------------------------------------------------------
     ! SUBROUTINE: IPEMeshCreate
@@ -391,16 +430,19 @@ module ipeCap
     !! 0 (Northern hemisphere) or 1 (Southern hemisphere).
     !---------------------------------------------------------------------------
 
-    subroutine IPEMeshCreate(gcomp, mesh, fill, rc)
+    subroutine IPEMeshCreate(gcomp, mesh, fill, verbosity, diagnostic, rc)
 
       ! --- input/output variables
       type(ESMF_GridComp)            :: gcomp
       type(ESMF_Mesh)                :: mesh
       logical, optional, intent(in)  :: fill
+      integer, optional, intent(in)  :: verbosity
+      integer, optional, intent(in)  :: diagnostic
       integer, optional, intent(out) :: rc
 
       ! -- local variables
       integer :: localrc
+      integer :: l_verbosity, l_diagnostic
       integer :: localPet, petCount, pet, poleOwnerPet
       integer :: lp, lpp, lpu, mp, mpp, mpu, kp, kpp, kpe
       integer :: lpStart, lpOffset, lHalo, mpStart, mpOffset, mHalo
@@ -434,6 +476,12 @@ module ipeCap
 
       ! -- begin
       if (present(rc)) rc = ESMF_SUCCESS
+
+      l_verbosity = 0
+      if (present(verbosity)) l_verbosity = verbosity
+
+      l_diagnostic = 0
+      if (present(diagnostic)) l_diagnostic = diagnostic
 
       ! -- set local fill flags for equatorial and polar regions if this PET
       ! -- builds adjacent mesh portions
@@ -484,7 +532,7 @@ module ipeCap
         rcToReturn=rc)) return
 
       ! -- debug
-      if (logLevel > 0) then
+      if (btest(l_verbosity,1)) then
         if (localPet == 0) then
           write(6,'("====== IPEMeshCreate: tile bounds ======"/&
                    &"localPET     mps     mpe     lps     lpe"/&
@@ -506,7 +554,8 @@ module ipeCap
         ESMF_CONTEXT, &
         rcToReturn=rc)) return
       call IPEGetGridCoord(vm, local_grid_3d, globalBounds, &
-        ipe % grid % nFluxTube, lps, lpu, lHalo, mps, mpu, mHalo, rc=localrc)
+        ipe % grid % nFluxTube, lps, lpu, lHalo, mps, mpu, mHalo, &
+        diagnostic=l_diagnostic, rc=localrc)
       if (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
         ESMF_CONTEXT, &
         rcToReturn=rc)) return
@@ -893,7 +942,7 @@ module ipeCap
 #define ESMF_METHOD "IPECap::IPEGetGridCoord()"
 
     subroutine IPEGetGridCoord(vm, coord, globalBounds, MaxFluxTube, &
-                               lps, lpu, lHalo, mps, mpu, mHalo, rc)
+                               lps, lpu, lHalo, mps, mpu, mHalo, diagnostic, rc)
       type(ESMF_VM),            intent(in)  :: vm
       real(ESMF_KIND_R4),       intent(out) :: coord(MaxFluxTube, lps:lpu, mps:mpu, 2)
       integer, dimension(:),    intent(in)  :: globalBounds
@@ -902,10 +951,12 @@ module ipeCap
       integer,                  intent(in)  :: lHalo
       integer,                  intent(in)  :: mps, mpu
       integer,                  intent(in)  :: mHalo
+      integer,        optional, intent(in)  :: diagnostic
       integer,        optional, intent(out) :: rc
 
       ! -- local variables
       integer :: localrc
+      integer :: l_diagnostic
       integer :: i, j, region, nCount, localPet
       integer :: lp, lpp, kp
       integer :: mp, mr, ms, mrs, mre, mss, mse, mpp
@@ -916,12 +967,8 @@ module ipeCap
       ! -- begin
       if (present(rc)) rc = ESMF_SUCCESS
 
-      ! -- get local PET if needed
-      if (logLevel > 10) then
-        call ESMF_VMGet(vm, localPet=localPet, rc=localrc)
-        if (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
-          ESMF_CONTEXT, rcToReturn=rc)) return
-      end if
+      l_diagnostic = 0
+      if (present(diagnostic)) l_diagnostic = diagnostic
 
       ! -- perform halo update for horizontal coordinates
       coord = BAD_VALUE
@@ -1094,7 +1141,10 @@ module ipeCap
         region = region + 1
       end do
 
-      if (checkFields) then
+      if (btest(l_diagnostic,8)) then
+        call ESMF_VMGet(vm, localPet=localPet, rc=localrc)
+        if (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+          ESMF_CONTEXT, rcToReturn=rc)) return
         write(6,'(" Checking tile on PET ",i0,":"2(" (",i0,":",i0,") x (",i0,":",i0,")"))') &
           localPet, lps, lpe, mps, mpe, lps, lpu, mps, mpu
         nCount = count(abs(coord-BAD_VALUE) < 0.1_ESMF_KIND_R4)
@@ -1199,7 +1249,7 @@ module ipeCap
 
     end function IPEGetOwnerPet
 
-  end subroutine InitializeRealize
+  end subroutine InitializeP3
   
   !-----------------------------------------------------------------------------
 
@@ -1213,8 +1263,29 @@ module ipeCap
     ! local variables
     type(ESMF_State)     :: importState
 
+    integer :: verbosity
+    character(len=ESMF_MAXSTR) :: name
+
+    ! local parameters
+    character(len=*), parameter :: rName = "DataInitialize"
+
+    ! begin
     rc = ESMF_SUCCESS
-    
+
+    ! Get component information
+    call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
+
+    ! intro
+    call NUOPC_LogIntro(name, rName, verbosity, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
+
     ! -> set InitializeDataComplete Component Attribute to "true", indicating
     ! to the driver that this Component has fully initialized its data
     call NUOPC_CompAttributeSet(gcomp, &
@@ -1223,6 +1294,13 @@ module ipeCap
       ESMF_CONTEXT)) &
       return  ! bail out
         
+    ! extro
+    call NUOPC_LogExtro(name, rName, verbosity, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
+
   end subroutine InitializeData
 
   !-----------------------------------------------------------------------------
@@ -1247,15 +1325,35 @@ module ipeCap
     integer :: lp, mp, mpp
     integer :: nCount, numOwnedNodes, spatialDim
     integer :: localrc, localPet
+    integer :: verbosity, diagnostic
     integer(ESMF_KIND_R8) :: advanceCount
     character(len=ESMF_MAXSTR) :: errmsg
+    character(len=ESMF_MAXSTR) :: name
     real(ESMF_KIND_R8)         :: dataValue
     real(ESMF_KIND_R8), dimension(:),     pointer :: dataPtr, ownedNodeCoords
     real(ESMF_KIND_R8), dimension(:),     pointer :: localMin, localMax, globalMin, globalMax
     real(prec),         dimension(:,:,:), pointer :: neutralsPtr
 
+    ! local parameters
+    character(len=*), parameter :: rName = "Run"
 
+    ! begin
     rc = ESMF_SUCCESS
+
+    ! Get component information
+    call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, &
+      diagnostic=diagnostic, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
+
+    ! intro
+    call NUOPC_LogIntro(name, rName, verbosity, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
 
     ! query the Component for its clock and importState
     call ESMF_GridCompGet(gcomp, clock=clock, importState=importState, &
@@ -1355,7 +1453,7 @@ module ipeCap
     end if
 
     ! -- check values of imported fields, if requested
-    if (checkFields) then
+    if (btest(diagnostic,8)) then
 
       call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -1575,6 +1673,13 @@ module ipeCap
 
     end do
 
+    ! extro
+    call NUOPC_LogExtro(name, rName, verbosity, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
+
   end subroutine ModelAdvance
  
   !-----------------------------------------------------------------------------
@@ -1589,16 +1694,42 @@ module ipeCap
 
     ! -- local variables
     integer :: localrc
+    integer :: verbosity
+    character(len=ESMF_MAXSTR) :: name
 
-    ! -- begin
+    ! local parameters
+    character(len=*), parameter :: rName = "Finalize"
 
-    ! -- free up memory
-!    if (ESMF_LogFoundDeallocError(statusToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
-!      ESMF_CONTEXT, &
-!      rcToReturn=rc)) return
+    ! begin
+    rc = ESMF_SUCCESS
+
+    ! Get component information
+    call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
+
+    ! intro
+    call NUOPC_LogIntro(name, rName, verbosity, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
 
     ! -- finalize IPE model
     call Finalize_IPE(rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
+
+    ! extro
+    call NUOPC_LogExtro(name, rName, verbosity, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
 
   end subroutine Finalize
 
