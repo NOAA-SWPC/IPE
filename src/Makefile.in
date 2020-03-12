@@ -131,8 +131,9 @@ libipm_a_AR = $(AR) $(ARFLAGS)
 @COUPLED_TRUE@	ipelib/empirical_efield/*.$(OBJEXT) \
 @COUPLED_TRUE@	ipelib/flip/*.$(OBJEXT) \
 @COUPLED_TRUE@	ipelib/msise00/*.$(OBJEXT)
-am__libipm_a_SOURCES_DIST = ipeCap.F90 IPE_Wrapper.F90
+am__libipm_a_SOURCES_DIST = ipeCap.F90 ipeMethods.F90 IPE_Wrapper.F90
 @COUPLED_TRUE@am_libipm_a_OBJECTS = libipm_a-ipeCap.$(OBJEXT) \
+@COUPLED_TRUE@	libipm_a-ipeMethods.$(OBJEXT) \
 @COUPLED_TRUE@	libipm_a-IPE_Wrapper.$(OBJEXT)
 libipm_a_OBJECTS = $(am_libipm_a_OBJECTS)
 PROGRAMS = $(bin_PROGRAMS)
@@ -377,7 +378,7 @@ SUBDIRS = ipelib .
 @COUPLED_TRUE@        $(FC_MODINC) ipelib/flip \
 @COUPLED_TRUE@        $(FC_MODINC) ipelib/msise00
 
-@COUPLED_TRUE@libipm_a_SOURCES = ipeCap.F90 IPE_Wrapper.F90
+@COUPLED_TRUE@libipm_a_SOURCES = ipeCap.F90 ipeMethods.F90 IPE_Wrapper.F90
 @COUPLED_FALSE@ipe_x_SOURCES = IPE_Driver.F90
 @COUPLED_FALSE@ipe_x_FCFLAGS = $(FC_MODINC) ipelib \
 @COUPLED_FALSE@	$(FC_MODINC) ipelib/dynamo \
@@ -520,6 +521,12 @@ libipm_a-ipeCap.o: ipeCap.F90
 
 libipm_a-ipeCap.obj: ipeCap.F90
 	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libipm_a_FCFLAGS) $(FCFLAGS) -c -o libipm_a-ipeCap.obj `if test -f 'ipeCap.F90'; then $(CYGPATH_W) 'ipeCap.F90'; else $(CYGPATH_W) '$(srcdir)/ipeCap.F90'; fi`
+
+libipm_a-ipeMethods.o: ipeMethods.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libipm_a_FCFLAGS) $(FCFLAGS) -c -o libipm_a-ipeMethods.o `test -f 'ipeMethods.F90' || echo '$(srcdir)/'`ipeMethods.F90
+
+libipm_a-ipeMethods.obj: ipeMethods.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libipm_a_FCFLAGS) $(FCFLAGS) -c -o libipm_a-ipeMethods.obj `if test -f 'ipeMethods.F90'; then $(CYGPATH_W) 'ipeMethods.F90'; else $(CYGPATH_W) '$(srcdir)/ipeMethods.F90'; fi`
 
 libipm_a-IPE_Wrapper.o: IPE_Wrapper.F90
 	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libipm_a_FCFLAGS) $(FCFLAGS) -c -o libipm_a-IPE_Wrapper.o `test -f 'IPE_Wrapper.F90' || echo '$(srcdir)/'`IPE_Wrapper.F90
@@ -811,7 +818,8 @@ uninstall-am: uninstall-binPROGRAMS uninstall-libLIBRARIES
 	uninstall-am uninstall-binPROGRAMS uninstall-libLIBRARIES
 
 
-@COUPLED_TRUE@libipm_a-ipeCap.$(OBJEXT): libipm_a-IPE_Wrapper.$(OBJEXT)
+@COUPLED_TRUE@libipm_a-ipeCap.$(OBJEXT): libipm_a-ipeMethods.$(OBJEXT) libipm_a-IPE_Wrapper.$(OBJEXT)
+@COUPLED_TRUE@libipm_a-ipeMethods.$(OBJEXT): libipm_a-IPE_Wrapper.$(OBJEXT)
 @COUPLED_TRUE@libipm_a-IPE_Wrapper.$(OBJEXT): $(builddir)/ipelib/libipe.a
 
 .PHONY: clean-modules
