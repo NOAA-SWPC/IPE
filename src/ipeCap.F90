@@ -626,7 +626,7 @@ module ipeCap
     end if
 
     ! -- check values of imported fields, if requested
-    if (btest(diagnostic,8)) then
+    if (btest(diagnostic,17)) then
       call IPEFieldDiagnostics(gcomp, rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
         line=__LINE__,  &

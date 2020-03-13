@@ -880,7 +880,7 @@ contains
         region = region + 1
       end do
   
-      if (btest(l_diagnostic,8)) then
+      if (btest(l_diagnostic,18)) then
         call ESMF_VMGet(vm, localPet=localPet, rc=localrc)
         if (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
           line=__LINE__, &
@@ -1008,16 +1008,11 @@ contains
     type(IPE_Model_Type), pointer :: this
 
     logical :: isConnected
+    integer :: localrc
     integer :: item
-!   integer :: iHemi
-!   integer :: kp, kpp, kpStart, kpEnd, kpStep, kpOffset
-!   integer :: lp, mp, mpp
-!   integer :: nCount, numOwnedNodes, spatialDim
     integer :: id, js, je, kp, lp, mp
     integer :: numLocalNodes, numOwnedNodes, spatialDim
-    integer :: localrc
-    integer :: verbosity, diagnostic
-    integer :: fieldCount
+    integer :: fieldCount, maxLength
     character(len=ESMF_MAXSTR) :: errmsg
     character(len=ESMF_MAXSTR) :: msgString
     character(len=ESMF_MAXSTR) :: name
@@ -1034,8 +1029,7 @@ contains
     rc = ESMF_SUCCESS
 
     ! Get component information
-    call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, &
-      diagnostic=diagnostic, rc=rc)
+    call NUOPC_CompGet(gcomp, name=name, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__,  &
       file=__FILE__)) &
@@ -1068,6 +1062,7 @@ contains
       file=__FILE__)) &
       return  ! bail out
 
+    nullify(fieldNames, connectedList, fieldList)
     call NUOPC_GetStateMemberLists(importState, StandardNameList=fieldNames, &
       ConnectedList=connectedList, fieldList=fieldList, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -1078,8 +1073,7 @@ contains
     isConnected = .false.
     if (associated(fieldNames)) isConnected = any(connectedList == "true")
 
-    nullify(fieldList, fieldNames, connectedList, dataPtr, ownedNodeCoords)
-    nullify(localMin, localMax, globalMin, globalMax)
+    nullify(ownedNodeCoords, localMin, localMax, globalMin, globalMax)
 
     ! -- check values of imported fields, if requested
     if (isConnected) then
@@ -1095,6 +1089,12 @@ contains
 
       localMin = huge(0._ESMF_KIND_R8)
       localMax = -localMin
+
+      ! -- find longest field name for formatting purpose
+      maxLength = 0
+      do item = 1, fieldCount
+        maxLength = max(maxLength, len_trim(fieldNames(item)))
+      end do
 
       do item = 1, fieldCount
         if (connectedList(item) == "true") then
@@ -1153,10 +1153,10 @@ contains
                errmsg = "NaN"
             end if
             if (len_trim(errmsg) > 0) then
-              write(msgString,'("ERROR: ",a,": ",a," found (",g20.8,") at (mp,lp,kp) = (",2(i0,","),i0,")"' &
+              write(msgString,'(a,": ",a," found (",g20.8,") at (kp,lp,mp) = (",2(i0,","),i0,")"' &
                 //'," coord: ",2(f12.6,","),g20.8)') &
-                trim(fieldNames(item)), trim(errmsg), mp, lp, kp, ownedNodeCoords(js:je)
-              call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_WARNING, rc=rc)
+                fieldNames(item)(1:maxLength), trim(errmsg), dataValue, kp, lp, mp, ownedNodeCoords(js:je)
+              call ESMF_LogWrite(trim(name)//": "//rName//": "//trim(msgString), ESMF_LOGMSG_ERROR, rc=rc)
               if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
                 line=__LINE__,  &
                 file=__FILE__)) &
@@ -1169,10 +1169,10 @@ contains
                 if (dataValue <= 0._ESMF_KIND_R8) errmsg = "value <= 0.0"
             end select
             if (len_trim(errmsg) > 0) then
-              write(msgString,'("ERROR: ",a,": ",a," found (",g20.8,") at (mp,lp,kp) = (",2(i0,","),i0,")"' &
+              write(msgString,'(a,": ",a," found (",g20.8,") at (kp,lp,mp) = (",2(i0,","),i0,")"' &
                 //'," coord: ",2(f12.6,","),g20.8)') &
-                trim(fieldNames(item)), trim(errmsg), dataValue, mp, lp, kp, ownedNodeCoords(js:je)
-              call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_WARNING, rc=rc)
+                fieldNames(item)(1:maxLength), trim(errmsg), dataValue, kp, lp, mp, ownedNodeCoords(js:je)
+              call ESMF_LogWrite(trim(name)//": "//rName//": "//trim(msgString), ESMF_LOGMSG_ERROR, rc=rc)
               if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
                 line=__LINE__,  &
                 file=__FILE__)) &
@@ -1211,7 +1211,7 @@ contains
       do item = 1, fieldCount
         if (connectedList(item) == "true") then
           write(msgString,'(a,": ",a,": ",a,"[",i0,"]: min/max =",2g20.8)') &
-            trim(name), rName, trim(fieldNames(item)), globalMin(item), globalMax(item)
+            trim(name), rName, fieldNames(item)(1:maxLength), item, globalMin(item), globalMax(item)
           call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=rc)
           if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__,  &
