@@ -12,8 +12,6 @@
 ! ADDRESS: 325 Broadway, Boulder, CO 80305
 !-------------------------------------------- 
 !
-#define ESMF_CONTEXT  line=__LINE__,file=__FILE__,method=ESMF_METHOD
-
 module ipeCap
 
   !-----------------------------------------------------------------------------
@@ -80,9 +78,6 @@ module ipeCap
   contains
   !-----------------------------------------------------------------------------
 
-#undef  ESMF_METHOD
-#define ESMF_METHOD "IPECap::SetServices()"
-
   subroutine SetServices(gcomp, rc)
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
@@ -93,54 +88,58 @@ module ipeCap
     ! the NUOPC model component will register the generic methods
     call NUOPC_CompDerive(gcomp, model_routine_SS, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      ESMF_CONTEXT)) &
+      line=__LINE__,  &
+      file=__FILE__)) &
       return  ! bail out
 
     ! Provide InitializeP0 to switch from default IPDv00 to IPDv01
     call ESMF_GridCompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
       userRoutine=InitializeP0, phase=0, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      ESMF_CONTEXT)) &
+      line=__LINE__,  &
+      file=__FILE__)) &
       return  ! bail out
     
     ! set entry point for methods that require specific implementation
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
       phaseLabelList=(/"IPDv02p1"/), userRoutine=InitializeP1, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      ESMF_CONTEXT)) &
+      line=__LINE__,  &
+      file=__FILE__)) &
       return  ! bail out
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
       phaseLabelList=(/"IPDv02p3"/), userRoutine=InitializeP3, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      ESMF_CONTEXT)) &
+      line=__LINE__,  &
+      file=__FILE__)) &
       return  ! bail out
     call NUOPC_CompSpecialize(gcomp, &
       specLabel=model_label_DataInitialize, specRoutine=InitializeData, &
       rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      ESMF_CONTEXT)) &
+      line=__LINE__,  &
+      file=__FILE__)) &
       return  ! bail out
     
     ! -- advance method
     call NUOPC_CompSpecialize(gcomp, specLabel=model_label_Advance, &
       specRoutine=ModelAdvance, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      ESMF_CONTEXT)) &
+      line=__LINE__,  &
+      file=__FILE__)) &
       return  ! bail out
 
     ! -- finalize method
     call NUOPC_CompSpecialize(gcomp, specLabel=model_label_Finalize, &
      specRoutine=Finalize, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      ESMF_CONTEXT)) &
+      line=__LINE__,  &
+      file=__FILE__)) &
       return  ! bail out
 
   end subroutine SetServices
   
   !-----------------------------------------------------------------------------
-
-#undef  ESMF_METHOD
-#define ESMF_METHOD "IPECap::InitializeP0()"
 
   subroutine InitializeP0(gcomp, importState, exportState, clock, rc)
     type(ESMF_GridComp)   :: gcomp
@@ -176,7 +175,8 @@ module ipeCap
     call NUOPC_CompFilterPhaseMap(gcomp, ESMF_METHOD_INITIALIZE, &
       acceptStringList=(/"IPDv02p"/), rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      ESMF_CONTEXT)) &
+      line=__LINE__,  &
+      file=__FILE__)) &
       return  ! bail out
 
     ! extro
@@ -189,9 +189,6 @@ module ipeCap
   end subroutine InitializeP0
 
   !-----------------------------------------------------------------------------
-
-#undef  ESMF_METHOD
-#define ESMF_METHOD "IPECap::InitializeP1()"
 
   subroutine InitializeP1(gcomp, importState, exportState, clock, rc)
     type(ESMF_GridComp)  :: gcomp
@@ -226,14 +223,16 @@ module ipeCap
     ! import fields from WAM
     call NUOPC_Advertise(importState, StandardNames=importFieldNames, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      ESMF_CONTEXT)) &
+      line=__LINE__,  &
+      file=__FILE__)) &
       return  ! bail out
 
     ! export fields from WAM
     call NUOPC_Advertise(exportState, StandardNames=exportFieldNames, &
       SharePolicyField="share", TransferOfferGeomObject="will provide", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      ESMF_CONTEXT)) &
+      line=__LINE__,  &
+      file=__FILE__)) &
       return  ! bail out
 
     ! extro
@@ -246,9 +245,6 @@ module ipeCap
   end subroutine InitializeP1
   
   !-----------------------------------------------------------------------------
-
-#undef  ESMF_METHOD
-#define ESMF_METHOD "IPECap::InitializeP3()"
 
   subroutine InitializeP3(gcomp, importState, exportState, clock, rc)
     type(ESMF_GridComp)  :: gcomp
@@ -305,7 +301,8 @@ module ipeCap
     if (item < importFieldCount) then
       call ESMF_LogSetError(ESMF_RC_NOT_FOUND, &
         msg="Not all required fields are connected", &
-        ESMF_CONTEXT, &
+        line=__LINE__, &
+        file=__FILE__, &
         rcToReturn=rc)
       return
     end if
@@ -418,9 +415,6 @@ module ipeCap
   
   !-----------------------------------------------------------------------------
 
-#undef  ESMF_METHOD
-#define ESMF_METHOD "IPECap::InitializeData()"
-
   subroutine InitializeData(gcomp, rc)
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
@@ -456,7 +450,8 @@ module ipeCap
     call NUOPC_CompAttributeSet(gcomp, &
       name="InitializeDataComplete", value="true", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      ESMF_CONTEXT)) &
+      line=__LINE__,  &
+      file=__FILE__)) &
       return  ! bail out
         
     ! extro
@@ -469,9 +464,6 @@ module ipeCap
   end subroutine InitializeData
 
   !-----------------------------------------------------------------------------
-
-#undef  ESMF_METHOD
-#define ESMF_METHOD "IPECap::ModelAdvance()"
 
   subroutine ModelAdvance(gcomp, rc)
     type(ESMF_GridComp)  :: gcomp
@@ -528,7 +520,8 @@ module ipeCap
     call ESMF_GridCompGet(gcomp, clock=clock, importState=importState, &
       exportState=exportState, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      ESMF_CONTEXT)) &
+      line=__LINE__,  &
+      file=__FILE__)) &
       return  ! bail out
 
     ! HERE IPE ADVANCES: currTime -> currTime + timeStep
@@ -541,7 +534,8 @@ module ipeCap
     ! -- do not import fields at startup since they are not available
     call ESMF_ClockGet(clock, advanceCount=advanceCount, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      ESMF_CONTEXT)) &
+      line=__LINE__,  &
+      file=__FILE__)) &
       return  ! bail out
 
     ! -- get internal state
@@ -586,14 +580,16 @@ module ipeCap
         call ESMF_StateGet(importState, field=field, &
           itemName=trim(importFieldNames(item)), rc=rc)
         if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-          ESMF_CONTEXT)) &
+          line=__LINE__,  &
+          file=__FILE__)) &
           return  ! bail out
 
         ! --- get field data
         nullify(dataPtr)
         call ESMF_FieldGet(field, farrayPtr=dataPtr, rc=rc)
         if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-          ESMF_CONTEXT)) &
+          line=__LINE__,  &
+          file=__FILE__)) &
           return  ! bail out
 
         ! -- identify IPE neutral array receiving imported field data
@@ -633,7 +629,8 @@ module ipeCap
     if (btest(diagnostic,8)) then
       call IPEFieldDiagnostics(gcomp, rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-        ESMF_CONTEXT)) &
+        line=__LINE__,  &
+        file=__FILE__)) &
         return  ! bail out
     end if
 
@@ -642,7 +639,8 @@ module ipeCap
     ! -- advance IPE model
     call Update_IPE(ipe, clock, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      ESMF_CONTEXT)) &
+      line=__LINE__,  &
+      file=__FILE__)) &
       return  ! bail out
 
     ! -- copy import neutral field data to export fields for I/O purposes
@@ -651,18 +649,21 @@ module ipeCap
       call ESMF_StateGet(importState, field=field, &
         itemName=trim(importFieldNames(item)), rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-        ESMF_CONTEXT)) &
+        line=__LINE__,  &
+        file=__FILE__)) &
         return  ! bail out
       ! --- retrieve export field
       call ESMF_StateGet(exportState, field=efield, &
         itemName=trim(importFieldNames(item)), rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-        ESMF_CONTEXT)) &
+        line=__LINE__,  &
+        file=__FILE__)) &
         return  ! bail out
       ! -- copy content
       call ESMF_FieldCopy(efield, field, rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-        ESMF_CONTEXT)) &
+        line=__LINE__,  &
+        file=__FILE__)) &
         return  ! bail out
     end do
 
@@ -672,14 +673,16 @@ module ipeCap
       call ESMF_StateGet(exportState, field=efield, &
         itemName=trim(exportFieldNames(item)), rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-        ESMF_CONTEXT)) &
+        line=__LINE__,  &
+        file=__FILE__)) &
         return  ! bail out
 
       ! --- get field data
       nullify(dataPtr)
       call ESMF_FieldGet(efield, farrayPtr=dataPtr, rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-        ESMF_CONTEXT)) &
+        line=__LINE__,  &
+        file=__FILE__)) &
         return  ! bail out
 
       i = item - importFieldCount
@@ -715,9 +718,6 @@ module ipeCap
   end subroutine ModelAdvance
  
   !-----------------------------------------------------------------------------
-
-#undef  ESMF_METHOD
-#define ESMF_METHOD "IPECap::Finalize()"
 
   subroutine Finalize(gcomp, rc)
 
