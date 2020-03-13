@@ -90,7 +90,8 @@ CONTAINS
 
     init_success = .false.
 
-    CALL ipe % mpi_layer % Set_Domain( ipe % parameters % NMP, error )
+    CALL ipe % mpi_layer % Set_Domain( ipe % parameters % NLP, &
+                                       ipe % parameters % NMP, error )
     IF ( error /= 0 ) RETURN
 
     ! Initialize I/O

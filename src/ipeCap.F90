@@ -30,7 +30,6 @@ module ipeCap
 
   use ipeMethods
   use IPE_Wrapper
-  use IPE_Constants_Dictionary
 
 
   implicit none
@@ -224,8 +223,6 @@ module ipeCap
       file=__FILE__)) &
       return  ! bail out
 
-    rc = ESMF_SUCCESS
-    
     ! import fields from WAM
     call NUOPC_Advertise(importState, StandardNames=importFieldNames, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -262,8 +259,12 @@ module ipeCap
     ! local variables    
     type(ESMF_Field) :: field
     type(ESMF_Mesh)  :: mesh
+    type(ESMF_VM)    :: vm
 
-    integer :: item
+    type(IPE_InternalState_Type) :: is
+    type(IPE_Model), pointer     :: ipe
+
+    integer :: item, stat
     integer :: verbosity
     logical :: isConnected
     character(len=ESMF_MAXSTR) :: name
@@ -309,8 +310,38 @@ module ipeCap
       return
     end if
 
+    ! allocate memory for the internal state and store it into component
+    allocate(is % model, stat=stat)
+    if (ESMF_LogFoundAllocError(statusToCheck=stat, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__,  &
+      rcToReturn=rc)) &
+      return  ! bail out
+    allocate(is % model % ipe, stat=stat)
+    if (ESMF_LogFoundAllocError(statusToCheck=stat, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__,  &
+      rcToReturn=rc)) &
+      return  ! bail out
+    call ESMF_GridCompSetInternalState(gcomp, is, rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
+    ! initialize internal state
+    nullify(is % model % nodeToIndexMap)
+
+    ipe => is % model % ipe
+
+    ! Get local VM
+    call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
+
     ! initialize IPE
-    CALL Initialize_IPE(clock, rc)
+    CALL Initialize_IPE(ipe, clock, vm=vm, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=__FILE__)) &
@@ -453,11 +484,17 @@ module ipeCap
     type(ESMF_Mesh)    :: mesh
     type(ESMF_VM)      :: vm
 
-    integer :: i, item
+    type(IPE_InternalState_Type)  :: is
+    type(IPE_Model_Type), pointer :: this
+    type(IPE_Model),      pointer :: ipe
+
+    integer :: lps, mps
+    integer :: i, id, item
     integer :: iHemi
     integer :: kp, kpp, kpStart, kpEnd, kpStep, kpOffset
     integer :: lp, mp, mpp
     integer :: nCount
+    integer :: numLocalNodes
     integer :: localrc, localPet
     integer :: verbosity, diagnostic
     integer(ESMF_KIND_R8) :: advanceCount
@@ -507,8 +544,40 @@ module ipeCap
       ESMF_CONTEXT)) &
       return  ! bail out
 
+    ! -- get internal state
+    nullify(this, ipe)
+    call ESMF_GridCompGetInternalState(gcomp, is, rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
+    this => is % model
+    ipe  => is % model % ipe
+
+    if (.not.associated(this % nodeToIndexMap)) then
+      call ESMF_LogSetError(ESMF_RC_PTR_NOTALLOC, &
+        msg="nodeToIndexMap unavailable", &
+        line=__LINE__,  &
+        file=__FILE__,  &
+        rcToReturn=rc)
+      return  ! bail out
+    end if
+
+    if (.not.associated(this % ipe)) then
+      call ESMF_LogSetError(ESMF_RC_PTR_NOTALLOC, &
+        msg="IPE model unavailable", &
+        line=__LINE__,  &
+        file=__FILE__,  &
+        rcToReturn=rc)
+      return  ! bail out
+    end if
+
+    numLocalNodes = size(this % nodeToIndexMap, 1)
 
     if (advanceCount /= 0) then
+
+      lps = ipe % mpi_layer % lp_low
+      mps = ipe % mpi_layer % mp_low
 
       ! -- import data
 
@@ -526,19 +595,6 @@ module ipeCap
         if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
           ESMF_CONTEXT)) &
           return  ! bail out
-
-        ! -- check if data size is consistent with local mesh size
-        if (size(dataPtr) /= numLocalNodes) then
-          errmsg = ""
-          write(errmsg, '("Field: ",a,": retrieved data size (",i0,&
-            &") does not match expected data size (",i0,")")') &
-            trim(importFieldNames(item)), size(dataPtr), numLocalNodes
-          call ESMF_LogSetError(ESMF_RC_PTR_BAD, &
-            msg=errmsg, &
-            ESMF_CONTEXT, &
-            rcToReturn=rc)
-          return  ! bail out
-        end if
 
         ! -- identify IPE neutral array receiving imported field data
         nullify(neutralsPtr)
@@ -562,22 +618,11 @@ module ipeCap
             cycle
         end select
 
-        nCount = 0
-        do iHemi = iHemiStart, iHemiEnd
-          do mp = mps, mpe
-            do lp = lps, lpe
-              kpStep   = numLineNodes(lp,iHemi) - 1
-              kpStart  = iHemi * kpStep + 1
-              kpEnd    = (1 - iHemi) * kpStep + 1
-              kpStep   = 1 - 2 * iHemi
-              kpOffset = (1 - iHemi) * jmin(lp) + iHemi * jSouth(lp) - 1
-              do kpp = kpStart, kpEnd, kpStep
-                nCount = nCount + 1
-                kp = kpp + kpOffset
-                neutralsPtr(kp,lp,mp) = dataPtr(nCount)
-              end do
-            end do
-          end do
+        do id = 1, numLocalNodes
+          kp = this % nodeToIndexMap(id, 1)
+          lp = this % nodeToIndexMap(id, 2)
+          mp = this % nodeToIndexMap(id, 3)
+          neutralsPtr(kp, lp, mp) = dataPtr(id)
         end do
 
       end do
@@ -595,7 +640,7 @@ module ipeCap
     nullify(dataPtr)
 
     ! -- advance IPE model
-    call Update_IPE(clock, rc)
+    call Update_IPE(ipe, clock, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       ESMF_CONTEXT)) &
       return  ! bail out
@@ -638,35 +683,24 @@ module ipeCap
         return  ! bail out
 
       i = item - importFieldCount
-      nCount = 0
-      do iHemi = iHemiStart, iHemiEnd
-        do mp = mps, mpe
-          do lp = lps, lpe
-            kpStep   = numLineNodes(lp,iHemi) - 1
-            kpStart  = iHemi * kpStep + 1
-            kpEnd    = (1 - iHemi) * kpStep + 1
-            kpStep   = 1 - 2 * iHemi
-            kpOffset = (1 - iHemi) * jmin(lp) + iHemi * jSouth(lp) - 1
-            do kpp = kpStart, kpEnd, kpStep
-              nCount = nCount + 1
-              kp = kpp + kpOffset
-              select case (trim(exportFieldNames(item)))
-                case ("ion_temperature")
-                  dataPtr(nCount) = ipe % plasma % ion_temperature(kp,lp,mp)
-                case ("electron_temperature")
-                  dataPtr(nCount) = ipe % plasma % electron_temperature(kp,lp,mp)
-                case ("eastward_exb_velocity")
-                  dataPtr(nCount) = ipe % eldyn % v_exb_geographic(1,kp,lp,mp)
-                case ("northward_exb_velocity")
-                  dataPtr(nCount) = ipe % eldyn % v_exb_geographic(2,kp,lp,mp)
-                case ("upward_exb_velocity")
-                  dataPtr(nCount) = ipe % eldyn % v_exb_geographic(3,kp,lp,mp)
-                case default
-                  dataPtr(nCount) = ipe % plasma % ion_densities(i,kp,lp,mp)
-              end select
-            end do
-          end do
-        end do
+      do id = 1, numLocalNodes
+        kp = this % nodeToIndexMap(id, 1)
+        lp = this % nodeToIndexMap(id, 2)
+        mp = this % nodeToIndexMap(id, 3)
+        select case (trim(exportFieldNames(item)))
+          case ("ion_temperature")
+            dataPtr(id) = ipe % plasma % ion_temperature(kp,lp,mp)
+          case ("electron_temperature")
+            dataPtr(id) = ipe % plasma % electron_temperature(kp,lp,mp)
+          case ("eastward_exb_velocity")
+            dataPtr(id) = ipe % eldyn % v_exb_geographic(1,kp,lp,mp)
+          case ("northward_exb_velocity")
+            dataPtr(id) = ipe % eldyn % v_exb_geographic(2,kp,lp,mp)
+          case ("upward_exb_velocity")
+            dataPtr(id) = ipe % eldyn % v_exb_geographic(3,kp,lp,mp)
+          case default
+            dataPtr(id) = ipe % plasma % ion_densities(i,kp,lp,mp)
+        end select
       end do
 
     end do
@@ -691,9 +725,12 @@ module ipeCap
     integer, intent(out) :: rc
 
     ! -- local variables
-    integer :: localrc
+    integer :: localrc, stat
     integer :: verbosity
     character(len=ESMF_MAXSTR) :: name
+
+    type(IPE_InternalState_Type)  :: is
+    type(IPE_Model_Type), pointer :: this
 
     ! local parameters
     character(len=*), parameter :: rName = "Finalize"
@@ -715,12 +752,41 @@ module ipeCap
       file=__FILE__)) &
       return  ! bail out
 
-    ! -- finalize IPE model
-    call Finalize_IPE(rc)
+    ! get internal state
+    nullify(this)
+    call ESMF_GridCompGetInternalState(gcomp, is, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__,  &
       file=__FILE__)) &
       return  ! bail out
+    this => is % model
+
+    if (associated(this % ipe)) then
+      ! finalize IPE model
+      call Finalize_IPE(this % ipe, rc=rc)
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+        line=__LINE__,  &
+        file=__FILE__)) &
+        return  ! bail out
+      deallocate(this % ipe, stat=stat)
+      if (ESMF_LogFoundDeallocError(statusToCheck=stat, msg=ESMF_LOGERR_PASSTHRU, &
+        line=__LINE__,  &
+        file=__FILE__,  &
+        rcToReturn=rc)) &
+        return  ! bail out
+      nullify(this % ipe)
+    end if
+
+    ! deallocate work memory
+    if (associated(this % nodeToIndexMap)) then
+      deallocate(this % nodeToIndexMap, stat=stat)
+      if (ESMF_LogFoundDeallocError(statusToCheck=stat, msg=ESMF_LOGERR_PASSTHRU, &
+        line=__LINE__,  &
+        file=__FILE__,  &
+        rcToReturn=rc)) &
+        return  ! bail out
+      nullify(this % nodeToIndexMap)
+    end if
 
     ! extro
     call NUOPC_LogExtro(name, rName, verbosity, rc=rc)

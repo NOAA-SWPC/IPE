@@ -25,6 +25,7 @@ MODULE IPE_MPI_Layer_Class
     LOGICAL :: initialized
     INTEGER :: global_nmp
     INTEGER :: nmp
+    INTEGER :: lp_low, lp_high ! This processes nlp lower and upper bounds
     INTEGER :: mp_low, mp_high ! This processes nmp lower and upper bounds
     INTEGER :: mp_halo_size       ! how many mp grid points to the right and left should I keep updated from my neighbors
     INTEGER :: mpi_prec
@@ -67,6 +68,8 @@ CONTAINS
     mpi_layer % initialized      = .false.
     mpi_layer % global_nmp       = 0
     mpi_layer % nmp              = 0
+    mpi_layer % lp_low           = 0
+    mpi_layer % lp_high          = 0
     mpi_layer % mp_low           = 0
     mpi_layer % mp_high          = 0
     mpi_layer % mp_halo_size     = 0
@@ -113,9 +116,10 @@ CONTAINS
   END SUBROUTINE Initialize_MPI_Layer
 
 
-  SUBROUTINE Set_Domain_On_MPI_Layer( mpi_layer, NMP, error )
+  SUBROUTINE Set_Domain_On_MPI_Layer( mpi_layer, NLP, NMP, error )
 
     CLASS( IPE_MPI_Layer ), INTENT(inout) :: mpi_layer
+    INTEGER,                INTENT(in)    :: NLP
     INTEGER,                INTENT(in)    :: NMP
     INTEGER,                INTENT(out)   :: error
 
@@ -126,6 +130,8 @@ CONTAINS
 
     error = 0
 
+    mpi_layer % lp_low       = 1
+    mpi_layer % lp_high      = NLP
     mpi_layer % global_nmp   = NMP
     mpi_layer % mp_halo_size = 1
 
