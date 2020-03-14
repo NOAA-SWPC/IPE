@@ -262,7 +262,7 @@ module ipeCap
 
     integer :: item, stat
     integer :: verbosity
-    logical :: isConnected
+    logical :: isImportConnected, isExportConnected
     character(len=ESMF_MAXSTR) :: name
 
     ! local parameters
@@ -285,27 +285,19 @@ module ipeCap
       file=__FILE__)) &
       return  ! bail out
 
-    ! check if all required fields are connected
-    item = 0
-    isConnected = .true.
-    do while (isConnected .and. (item < importFieldCount))
-      item = item + 1
-      isConnected = NUOPC_IsConnected(importState, &
-        fieldName=trim(importFieldNames(item)), rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-        line=__LINE__, &
-        file=__FILE__)) &
-        return  ! bail out
-    end do
-
-    if (item < importFieldCount) then
-      call ESMF_LogSetError(ESMF_RC_NOT_FOUND, &
-        msg="Not all required fields are connected", &
-        line=__LINE__, &
-        file=__FILE__, &
-        rcToReturn=rc)
-      return
-    end if
+    ! check if fields are connected, i.e. if the model is coupled
+    ! - import state
+    isImportConnected = IPEIsStateConnected(importState, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
+    ! - export state
+    isExportConnected = IPEIsStateConnected(exportState, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
 
     ! allocate memory for the internal state and store it into component
     allocate(is % model, stat=stat)
@@ -344,37 +336,32 @@ module ipeCap
       file=__FILE__)) &
       return  ! bail out
 
-    ! create 3D IPE mesh
-    call IPEMeshCreate(gcomp, mesh, fill=(ipe % parameters % mesh_fill > 0), rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=__FILE__)) &
-      return  ! bail out
+    ! set IPE coupled flag
+    ipe % forcing % coupled = isImportConnected
 
-    ! write IPE mesh to VTK file if requested
-    if (ipe % parameters % mesh_write > 0) then
-      call ESMF_MeshWrite(mesh, trim(ipe % parameters % mesh_write_file), rc=rc)
+    if (isImportConnected .or. isExportConnected) then
+      ! create 3D IPE mesh
+      call IPEMeshCreate(gcomp, mesh, fill=(ipe % parameters % mesh_fill > 0), rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
         line=__LINE__, &
         file=__FILE__)) &
         return  ! bail out
+
+      ! write IPE mesh to VTK file if requested
+      if (ipe % parameters % mesh_write > 0) then
+        call ESMF_MeshWrite(mesh, trim(ipe % parameters % mesh_write_file), rc=rc)
+        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+          line=__LINE__, &
+          file=__FILE__)) &
+          return  ! bail out
+      end if
     end if
 
     ! realize connected Fields in the importState
     do item = 1, importFieldCount
-      field = ESMF_FieldCreate(mesh, ESMF_TYPEKIND_R8, &
-        name=trim(importFieldNames(item)), rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-        line=__LINE__, &
-        file=__FILE__)) &
-        return  ! bail out
-      call ESMF_FieldFill(field, dataFillScheme="const", &
-        const1=0._ESMF_KIND_R8, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-        line=__LINE__, &
-        file=__FILE__)) &
-        return  ! bail out
-      call NUOPC_Realize(importState, field=field, rc=rc)
+      call NUOPC_Realize(importState, mesh, fieldName=trim(importFieldNames(item)), &
+        typekind=ESMF_TYPEKIND_R8, selection="realize_connected_remove_others", &
+        dataFillScheme="const", rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
         line=__LINE__, &
         file=__FILE__)) &
@@ -383,25 +370,13 @@ module ipeCap
 
     ! realize connected Fields in the exportState
     do item = 1, exportFieldCount
-      isConnected = NUOPC_IsConnected(exportState, &
-        fieldName=trim(exportFieldNames(item)), rc=rc)
+      call NUOPC_Realize(exportState, mesh, fieldName=trim(exportFieldNames(item)), &
+        typekind=ESMF_TYPEKIND_R8, selection="realize_connected_remove_others", &
+        dataFillScheme="const", rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
         line=__LINE__, &
         file=__FILE__)) &
         return  ! bail out
-      if (isConnected) then
-        field = ESMF_FieldCreate(mesh, ESMF_TYPEKIND_R8, &
-          name=trim(exportFieldNames(item)), rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-          line=__LINE__, &
-          file=__FILE__)) &
-          return  ! bail out
-        call NUOPC_Realize(exportState, field=field, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-          line=__LINE__, &
-          file=__FILE__)) &
-          return  ! bail out
-      end if
     end do
 
     ! extro
@@ -472,28 +447,23 @@ module ipeCap
     ! local variables
     type(ESMF_Clock)   :: clock
     type(ESMF_State)   :: importState, exportState
-    type(ESMF_Field)   :: field, efield
-    type(ESMF_Mesh)    :: mesh
-    type(ESMF_VM)      :: vm
+    type(ESMF_Field), pointer :: fieldList(:)
 
     type(IPE_InternalState_Type)  :: is
     type(IPE_Model_Type), pointer :: this
     type(IPE_Model),      pointer :: ipe
 
-    integer :: lps, mps
-    integer :: i, id, item
-    integer :: iHemi
-    integer :: kp, kpp, kpStart, kpEnd, kpStep, kpOffset
-    integer :: lp, mp, mpp
-    integer :: nCount
+    integer :: id, item, stat
+    integer :: kps, kpe, lps, lpe, mph, mps, mpe
+    integer :: kp, lp, mp
     integer :: numLocalNodes
-    integer :: localrc, localPet
     integer :: verbosity, diagnostic
     integer(ESMF_KIND_R8) :: advanceCount
-    character(len=ESMF_MAXSTR) :: errmsg
     character(len=ESMF_MAXSTR) :: name
-    real(ESMF_KIND_R8), dimension(:),     pointer :: dataPtr
-    real(prec),         dimension(:,:,:), pointer :: neutralsPtr
+    character(len=ESMF_MAXSTR), pointer :: standardNameList(:)
+    character(len=ESMF_MAXSTR), pointer :: connectedList(:)
+    real(ESMF_KIND_R8), dimension(:),     pointer :: fieldPtr
+    real(prec),         dimension(:,:,:), pointer :: modelPtr
 
     ! local parameters
     character(len=*), parameter :: rName = "Run"
@@ -548,15 +518,6 @@ module ipeCap
     this => is % model
     ipe  => is % model % ipe
 
-    if (.not.associated(this % nodeToIndexMap)) then
-      call ESMF_LogSetError(ESMF_RC_PTR_NOTALLOC, &
-        msg="nodeToIndexMap unavailable", &
-        line=__LINE__,  &
-        file=__FILE__,  &
-        rcToReturn=rc)
-      return  ! bail out
-    end if
-
     if (.not.associated(this % ipe)) then
       call ESMF_LogSetError(ESMF_RC_PTR_NOTALLOC, &
         msg="IPE model unavailable", &
@@ -566,49 +527,63 @@ module ipeCap
       return  ! bail out
     end if
 
-    numLocalNodes = size(this % nodeToIndexMap, 1)
+    kps = 1
+    lps = ipe % mpi_layer % lp_low
+    mps = ipe % mpi_layer % mp_low
+    mph = mps - ipe % mpi_layer % mp_halo_size
 
-    if (advanceCount /= 0) then
+    ! -- import data
+    nullify(fieldList, connectedList, standardNameList)
 
-      lps = ipe % mpi_layer % lp_low
-      mps = ipe % mpi_layer % mp_low
+    if (advanceCount > 0) then
+      call NUOPC_GetStateMemberLists(importState, &
+        StandardNameList=standardNameList, ConnectedList=connectedList, &
+        fieldList=fieldList, nestedFlag=.true., rc=rc)
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+        line=__LINE__,  &
+        file=__FILE__)) &
+        return  ! bail out
+    end if
 
-      ! -- import data
+    if (associated(fieldList)) then
 
-      do item = 1, importFieldCount
-        ! --- retrieve field
-        call ESMF_StateGet(importState, field=field, &
-          itemName=trim(importFieldNames(item)), rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      if (.not.associated(this % nodeToIndexMap)) then
+        call ESMF_LogSetError(ESMF_RC_PTR_NOTALLOC, &
+          msg="nodeToIndexMap unavailable", &
           line=__LINE__,  &
-          file=__FILE__)) &
-          return  ! bail out
+          file=__FILE__,  &
+          rcToReturn=rc)
+        return  ! bail out
+      end if
 
+      numLocalNodes = size(this % nodeToIndexMap, 1)
+
+      do item = 1, size(fieldList)
         ! --- get field data
-        nullify(dataPtr)
-        call ESMF_FieldGet(field, farrayPtr=dataPtr, rc=rc)
+        nullify(fieldPtr)
+        call ESMF_FieldGet(fieldList(item), farrayPtr=fieldPtr, rc=rc)
         if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
           line=__LINE__,  &
           file=__FILE__)) &
           return  ! bail out
 
         ! -- identify IPE neutral array receiving imported field data
-        nullify(neutralsPtr)
-        select case (trim(importFieldNames(item)))
+        nullify(modelPtr)
+        select case (trim(standardNameList(item)))
           case ("temp_neutral")
-            neutralsPtr(1:,lps:,mps:) => ipe % neutrals % temperature
+            modelPtr(kps:,lps:,mps:) => ipe % neutrals % temperature
           case ("eastward_wind_neutral")
-            neutralsPtr(1:,lps:,mps:) => ipe % neutrals % velocity_geographic(1,:,:,:)
+            modelPtr(kps:,lps:,mps:) => ipe % neutrals % velocity_geographic(1,:,:,:)
           case ("northward_wind_neutral")
-            neutralsPtr(1:,lps:,mps:) => ipe % neutrals % velocity_geographic(2,:,:,:)
+            modelPtr(kps:,lps:,mps:) => ipe % neutrals % velocity_geographic(2,:,:,:)
           case ("upward_wind_neutral")
-            neutralsPtr(1:,lps:,mps:) => ipe % neutrals % velocity_geographic(3,:,:,:)
+            modelPtr(kps:,lps:,mps:) => ipe % neutrals % velocity_geographic(3,:,:,:)
           case ("O_Density")
-            neutralsPtr(1:,lps:,mps:) => ipe % neutrals % oxygen
+            modelPtr(kps:,lps:,mps:) => ipe % neutrals % oxygen
           case ("O2_Density")
-            neutralsPtr(1:,lps:,mps:) => ipe % neutrals % molecular_oxygen
+            modelPtr(kps:,lps:,mps:) => ipe % neutrals % molecular_oxygen
           case ("N2_Density")
-            neutralsPtr(1:,lps:,mps:) => ipe % neutrals % molecular_nitrogen
+            modelPtr(kps:,lps:,mps:) => ipe % neutrals % molecular_nitrogen
           case default
             ! -- unavailable neutrals array, skip it
             cycle
@@ -618,11 +593,35 @@ module ipeCap
           kp = this % nodeToIndexMap(id, 1)
           lp = this % nodeToIndexMap(id, 2)
           mp = this % nodeToIndexMap(id, 3)
-          neutralsPtr(kp, lp, mp) = dataPtr(id)
+          modelPtr(kp, lp, mp) = fieldPtr(id)
         end do
-
       end do
 
+    end if
+
+    if (associated(fieldList)) then
+      deallocate(fieldList, stat=stat)
+      if (ESMF_LogFoundDeallocError(statusToCheck=stat, msg=ESMF_LOGERR_PASSTHRU, &
+        line=__LINE__,  &
+        file=__FILE__,  &
+        rcToReturn=rc)) &
+        return  ! bail out
+    end if
+    if (associated(connectedList)) then
+      deallocate(connectedList, stat=stat)
+      if (ESMF_LogFoundDeallocError(statusToCheck=stat, msg=ESMF_LOGERR_PASSTHRU, &
+        line=__LINE__,  &
+        file=__FILE__,  &
+        rcToReturn=rc)) &
+        return  ! bail out
+    end if
+    if (associated(standardNameList)) then
+      deallocate(standardNameList, stat=stat)
+      if (ESMF_LogFoundDeallocError(statusToCheck=stat, msg=ESMF_LOGERR_PASSTHRU, &
+        line=__LINE__,  &
+        file=__FILE__,  &
+        rcToReturn=rc)) &
+        return  ! bail out
     end if
 
     ! -- check values of imported fields, if requested
@@ -634,8 +633,6 @@ module ipeCap
         return  ! bail out
     end if
 
-    nullify(dataPtr)
-
     ! -- advance IPE model
     call Update_IPE(ipe, clock, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -643,70 +640,122 @@ module ipeCap
       file=__FILE__)) &
       return  ! bail out
 
-    ! -- copy import neutral field data to export fields for I/O purposes
-    do item = 1, importFieldCount
-      ! --- retrieve import field
-      call ESMF_StateGet(importState, field=field, &
-        itemName=trim(importFieldNames(item)), rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-        line=__LINE__,  &
-        file=__FILE__)) &
-        return  ! bail out
-      ! --- retrieve export field
-      call ESMF_StateGet(exportState, field=efield, &
-        itemName=trim(importFieldNames(item)), rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-        line=__LINE__,  &
-        file=__FILE__)) &
-        return  ! bail out
-      ! -- copy content
-      call ESMF_FieldCopy(efield, field, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-        line=__LINE__,  &
-        file=__FILE__)) &
-        return  ! bail out
-    end do
+    ! -- export data
+    nullify(fieldList, connectedList, standardNameList)
+    call NUOPC_GetStateMemberLists(exportState, &
+      StandardNameList=standardNameList, ConnectedList=connectedList, &
+      fieldList=fieldList, nestedFlag=.true., rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
 
-    ! -- export ion densities
-    do item = importFieldCount + 1, exportFieldCount
-      ! --- retrieve export field
-      call ESMF_StateGet(exportState, field=efield, &
-        itemName=trim(exportFieldNames(item)), rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-        line=__LINE__,  &
-        file=__FILE__)) &
-        return  ! bail out
+    if (associated(fieldList)) then
 
-      ! --- get field data
-      nullify(dataPtr)
-      call ESMF_FieldGet(efield, farrayPtr=dataPtr, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-        line=__LINE__,  &
-        file=__FILE__)) &
+      if (.not.associated(this % nodeToIndexMap)) then
+        call ESMF_LogSetError(ESMF_RC_PTR_NOTALLOC, &
+          msg="nodeToIndexMap unavailable", &
+          line=__LINE__,  &
+          file=__FILE__,  &
+          rcToReturn=rc)
         return  ! bail out
+      end if
 
-      i = item - importFieldCount
-      do id = 1, numLocalNodes
-        kp = this % nodeToIndexMap(id, 1)
-        lp = this % nodeToIndexMap(id, 2)
-        mp = this % nodeToIndexMap(id, 3)
-        select case (trim(exportFieldNames(item)))
+      numLocalNodes = size(this % nodeToIndexMap, 1)
+
+      do item = 1, size(fieldList)
+        ! --- get field data
+        nullify(fieldPtr)
+        call ESMF_FieldGet(fieldList(item), farrayPtr=fieldPtr, rc=rc)
+        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+          line=__LINE__,  &
+          file=__FILE__)) &
+          return  ! bail out
+
+        ! -- identify IPE neutral array receiving imported field data
+        nullify(modelPtr)
+        select case (trim(standardNameList(item)))
+          case ("temp_neutral")
+            modelPtr(kps:,lps:,mps:) => ipe % neutrals % temperature
+          case ("eastward_wind_neutral")
+            modelPtr(kps:,lps:,mps:) => ipe % neutrals % velocity_geographic(1,:,:,:)
+          case ("northward_wind_neutral")
+            modelPtr(kps:,lps:,mps:) => ipe % neutrals % velocity_geographic(2,:,:,:)
+          case ("upward_wind_neutral")
+            modelPtr(kps:,lps:,mps:) => ipe % neutrals % velocity_geographic(3,:,:,:)
+          case ("O_Density")
+            modelPtr(kps:,lps:,mps:) => ipe % neutrals % oxygen
+          case ("O2_Density")
+            modelPtr(kps:,lps:,mps:) => ipe % neutrals % molecular_oxygen
+          case ("N2_Density")
+            modelPtr(kps:,lps:,mps:) => ipe % neutrals % molecular_nitrogen
           case ("ion_temperature")
-            dataPtr(id) = ipe % plasma % ion_temperature(kp,lp,mp)
+            modelPtr(kps:,lps:,mph:) => ipe % plasma % ion_temperature
           case ("electron_temperature")
-            dataPtr(id) = ipe % plasma % electron_temperature(kp,lp,mp)
+            modelPtr(kps:,lps:,mph:) => ipe % plasma % electron_temperature
+          case ("O_plus_density")
+            modelPtr(kps:,lps:,mph:) => ipe % plasma % ion_densities(1,:,:,:)
+          case ("H_plus_density")
+            modelPtr(kps:,lps:,mph:) => ipe % plasma % ion_densities(2,:,:,:)
+          case ("He_plus_density")
+            modelPtr(kps:,lps:,mph:) => ipe % plasma % ion_densities(3,:,:,:)
+          case ("N_plus_density")
+            modelPtr(kps:,lps:,mph:) => ipe % plasma % ion_densities(4,:,:,:)
+          case ("NO_plus_density")
+            modelPtr(kps:,lps:,mph:) => ipe % plasma % ion_densities(5,:,:,:)
+          case ("O2_plus_density")
+            modelPtr(kps:,lps:,mph:) => ipe % plasma % ion_densities(6,:,:,:)
+          case ("N2_plus_density")
+            modelPtr(kps:,lps:,mph:) => ipe % plasma % ion_densities(7,:,:,:)
+          case ("O_plus_2D_density")
+            modelPtr(kps:,lps:,mph:) => ipe % plasma % ion_densities(8,:,:,:)
+          case ("O_plus_2P_density")
+            modelPtr(kps:,lps:,mph:) => ipe % plasma % ion_densities(9,:,:,:)
           case ("eastward_exb_velocity")
-            dataPtr(id) = ipe % eldyn % v_exb_geographic(1,kp,lp,mp)
+            modelPtr(kps:,lps:,mps:) => ipe % eldyn % v_exb_geographic(1,:,:,:)
           case ("northward_exb_velocity")
-            dataPtr(id) = ipe % eldyn % v_exb_geographic(2,kp,lp,mp)
+            modelPtr(kps:,lps:,mps:) => ipe % eldyn % v_exb_geographic(2,:,:,:)
           case ("upward_exb_velocity")
-            dataPtr(id) = ipe % eldyn % v_exb_geographic(3,kp,lp,mp)
+            modelPtr(kps:,lps:,mps:) => ipe % eldyn % v_exb_geographic(3,:,:,:)
           case default
-            dataPtr(id) = ipe % plasma % ion_densities(i,kp,lp,mp)
+            ! -- unavailable neutrals array, skip it
+            cycle
         end select
+
+        do id = 1, numLocalNodes
+          kp = this % nodeToIndexMap(id, 1)
+          lp = this % nodeToIndexMap(id, 2)
+          mp = this % nodeToIndexMap(id, 3)
+          fieldPtr(id) = modelPtr(kp, lp, mp)
+        end do
       end do
 
-    end do
+    end if
+
+    if (associated(fieldList)) then
+      deallocate(fieldList, stat=stat)
+      if (ESMF_LogFoundDeallocError(statusToCheck=stat, msg=ESMF_LOGERR_PASSTHRU, &
+        line=__LINE__,  &
+        file=__FILE__,  &
+        rcToReturn=rc)) &
+        return  ! bail out
+    end if
+    if (associated(connectedList)) then
+      deallocate(connectedList, stat=stat)
+      if (ESMF_LogFoundDeallocError(statusToCheck=stat, msg=ESMF_LOGERR_PASSTHRU, &
+        line=__LINE__,  &
+        file=__FILE__,  &
+        rcToReturn=rc)) &
+        return  ! bail out
+    end if
+    if (associated(standardNameList)) then
+      deallocate(standardNameList, stat=stat)
+      if (ESMF_LogFoundDeallocError(statusToCheck=stat, msg=ESMF_LOGERR_PASSTHRU, &
+        line=__LINE__,  &
+        file=__FILE__,  &
+        rcToReturn=rc)) &
+        return  ! bail out
+    end if
 
     ! extro
     call NUOPC_LogExtro(name, rName, verbosity, rc=rc)

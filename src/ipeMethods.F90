@@ -29,6 +29,7 @@ module ipeMethods
   public :: prec
 
   public :: IPEFieldDiagnostics
+  public :: IPEIsStateConnected
   public :: IPEMeshCreate
 
 contains
@@ -1229,5 +1230,41 @@ contains
     end if
 
   end subroutine IPEFieldDiagnostics
+
+  logical function IPEIsStateConnected(state, rc)
+    type(ESMF_State)               :: state
+    integer, optional, intent(out) :: rc
+
+    ! local variables
+    integer :: localrc
+    character(len=ESMF_MAXSTR), pointer :: connectedList(:)
+
+    ! begin
+    if (present(rc)) rc = ESMF_SUCCESS
+
+    IPEIsStateConnected = .false.
+
+    ! determine how many fields are connected
+    nullify(connectedList)
+    call NUOPC_GetStateMemberLists(state, ConnectedList=connectedList, &
+      nestedFlag=.true., rc=localrc)
+    if (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__,  &
+      rcToReturn=rc)) &
+      return  ! bail out
+
+
+    if (associated(connectedList)) then
+      IPEIsStateConnected = any(connectedList == "true")
+      deallocate(connectedList, stat=localrc)
+      if (ESMF_LogFoundDeallocError(statusToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+        line=__LINE__,  &
+        file=__FILE__,  &
+        rcToReturn=rc)) &
+        return  ! bail out
+    end if
+
+  end function IPEIsStateConnected
  
 end module ipeMethods

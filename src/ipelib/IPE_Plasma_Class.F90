@@ -17,14 +17,14 @@ MODULE IPE_Plasma_Class
     INTEGER :: nFluxTube, NLP, NMP
     INTEGER :: mp_low, mp_high, mp_halo
 
-    REAL(prec), ALLOCATABLE :: ion_densities(:,:,:,:)
+    REAL(prec), POINTER     :: ion_densities(:,:,:,:)
     REAL(prec), ALLOCATABLE :: ion_velocities(:,:,:,:)
-    REAL(prec), ALLOCATABLE :: ion_temperature(:,:,:)
+    REAL(prec), POINTER     :: ion_temperature(:,:,:)
 
     REAL(prec), ALLOCATABLE :: electron_density(:,:,:)
     REAL(prec), ALLOCATABLE :: electron_density2(:,:,:)
     REAL(prec), ALLOCATABLE :: electron_velocity(:,:,:,:)
-    REAL(prec), ALLOCATABLE :: electron_temperature(:,:,:)
+    REAL(prec), POINTER     :: electron_temperature(:,:,:)
 
     REAL(prec), ALLOCATABLE :: ion_densities_old(:,:,:,:)
     REAL(prec), ALLOCATABLE :: ion_velocities_old(:,:,:,:)
