@@ -123,7 +123,8 @@ contains
     if (present(rc)) rc = ESMF_SUCCESS
 
     ! -- get verbosity and diagnostic levels
-    call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, rc=localrc)
+    call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, &
+      diagnostic=diagnostic, rc=localrc)
     if (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__,  &
       file=__FILE__,  &
