@@ -920,15 +920,13 @@ CONTAINS
     TYPE( IPE_Plasma ),           INTENT(in)    :: plasma
     TYPE( IPE_MPI_Layer ),        INTENT(in)    :: mpi_layer
 
+    INTEGER, PARAMETER :: dyn_midpoint=48 
     REAL(prec) :: ed_IPE(2,grid % NLP,grid % NMP,2) !1:N/SH....4:ed1/2
-!   REAL(prec) :: eldyn_conductivities(6,2,grid % NLP,grid % NMP) !1:N/SH....4:ed1/2
-    REAL(prec) :: eldyn_conductivities(6,2,48,grid % NMP) !1:N/SH....4:ed1/2
+    REAL(prec) :: eldyn_conductivities(6,2,dyn_midpoint,grid % NMP) !1:N/SH....4:ed1/2
     REAL(prec) :: ed_conductivities(6,kmlon+1,kmlat)
-
     INTEGER    :: year,i,i_dyn,j,k,l,ilat_dyn,ilon_dyn
     INTEGER    :: diffval,imlat_plas,imlat_dyn
-!   INTEGER    :: tube_need(47),ihem,lp_dyn
-    INTEGER    :: tube_need(48),ihem,lp_dyn
+    INTEGER    :: tube_need(dyn_midpoint),ihem,lp_dyn
     REAL(prec) :: mlat_plas,mlat_dyn
     REAL(prec) :: fkp
     REAL(prec) :: ed_dyn(170,80,2)
@@ -944,7 +942,6 @@ CONTAINS
 
     sangle= forcing % solarwind_angle ( forcing % current_index )
     bt= forcing % solarwind_Bt (forcing % current_index )
-!   stilt= forcing % solarwind_angle ( forcing % current_index )
     swvel= forcing % solarwind_velocity (forcing % current_index )
     swden= forcing % solarwind_density (forcing % current_index )
     stilt= get_tilt(time_tracker%year,time_tracker%month,time_tracker%day,time_tracker%utime)
@@ -963,7 +960,7 @@ CONTAINS
     DO i = 1, grid % NLP
       mlat_plas  = 90. - grid % magnetic_colatitude(1,i)*rtd
       imlat_plas = INT(mlat_plas*10.)
-      DO i_dyn=1,48 !from SH toward eq
+      DO i_dyn=1,dyn_midpoint !from SH toward eq
         mlat_dyn  = xlatm_deg(i_dyn) ![deg]
         imlat_dyn = INT(mlat_dyn*10.)
 
@@ -1016,19 +1013,11 @@ CONTAINS
       do i=1,kmlon+1
         ed_conductivities(j,i,1)=ed_conductivities(j,i,2) !South
         ed_conductivities(j,i,kmlat)=ed_conductivities(j,i,kmlat-1) !North
-!       ed_conductivities(j,i,49)=(ed_conductivities(j,i,47)+ed_conductivities(j,i,51))*0.5 !magnetic eq
-!       ed_conductivities(j,i,48)=(ed_conductivities(j,i,47)+ed_conductivities(j,i,49))*0.5
-!       ed_conductivities(j,i,50)=(ed_conductivities(j,i,49)+ed_conductivities(j,i,51))*0.5
         ed_conductivities(j,i,49)=(ed_conductivities(j,i,46)+ed_conductivities(j,i,52))*0.5 !magnetic eq
         ed_conductivities(j,i,48)=(ed_conductivities(j,i,49)+ed_conductivities(j,i,46))*0.5
         ed_conductivities(j,i,47)=(ed_conductivities(j,i,48)+ed_conductivities(j,i,46))*0.5
         ed_conductivities(j,i,50)=(ed_conductivities(j,i,49)+ed_conductivities(j,i,52))*0.5
         ed_conductivities(j,i,51)=(ed_conductivities(j,i,50)+ed_conductivities(j,i,52))*0.5
-!       if (i.eq.1) then
-!         do k=1,97
-!       print *,'ed_conductivities',i,j,k,ed_conductivities(j,i,k)
-!         enddo
-!       endif
       enddo
 
     ENDDO

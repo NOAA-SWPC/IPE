@@ -399,10 +399,10 @@ CONTAINS
 ! GHGM no transport for first call .....
       endif  ! if(time_tracker % utime.gt.0.00001) then
 
-!     CALL plasma % Auroral_Precipitation( grid, &
-!                                          neutrals, &
-!                                          forcing, &
-!                                          time_tracker )
+      CALL plasma % Auroral_Precipitation( grid, &
+                                           neutrals, &
+                                           forcing, &
+                                           time_tracker )
 
       CALL plasma % FLIP_Wrapper( grid,         &
                                   neutrals,     &
@@ -1046,12 +1046,6 @@ CONTAINS
           coslam = cos( half_pi - grid % magnetic_colatitude(1,lp) )
           sinim  = 2.0_prec*sqrt( 1.0_prec - coslam*coslam )/sqrt( 4.0_prec - 3.0_prec*coslam*coslam )
           theta_t0 = colat_90km(lp) - v_ExB(2,lp,mp)*time_step/(r*sinim)
-!         if((mp.eq.17).and.(lp.eq.131)) then
-!           write(6,7777) theta_t0*rad_to_deg,colat_90km(lp)*rad_to_deg,colat_90km(lp+1)*rad_to_deg,colat_90km(lp-1)*rad_to_deg, &
-!                         v_ExB(2,lp,mp),time_step,sinim,r 
-!7777       format('GHGM COLAT ',5f8.3,3e12.4) 
-!         endif
-
 
           ! If a Lagrangian trajectory crosses the equator, we clip the colatitude
           ! so that the point resides at the equator.
