@@ -110,8 +110,10 @@ MODULE IPE_Plasma_Class
 
   INTEGER, PARAMETER, PRIVATE    :: n_transport_species    = 4
   REAL(prec), PARAMETER, PRIVATE :: transport_min_altitude = 150000.0_prec
-  INTEGER, PARAMETER , PRIVATE   :: transport_highlat_lp   = 17
+  INTEGER, PARAMETER , PRIVATE   :: transport_highlat_lp   = 30
   INTEGER, PARAMETER , PRIVATE   :: perp_transport_max_lp  = 151
+! GHGM 
+!  INTEGER, PARAMETER , PRIVATE   :: perp_transport_max_lp  = 130
 
   ! :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: !
 
@@ -129,8 +131,8 @@ MODULE IPE_Plasma_Class
   REAL(dp), PARAMETER, PRIVATE :: COLFACX  = 1.7D0
   REAL(dp), PARAMETER, PRIVATE :: HPEQ     = 0.0D0
   ! IHEPLS,INPLS turn on diffusive solutions if > 0. no solution if 0, chemical equilibrium if < 0
-  INTEGER, PARAMETER, PRIVATE  :: IHEPLS   = 0
-  INTEGER, PARAMETER, PRIVATE  :: INPLS    = 0
+  INTEGER, PARAMETER, PRIVATE  :: IHEPLS   = 1
+  INTEGER, PARAMETER, PRIVATE  :: INPLS    = 1
   INTEGER, PARAMETER, PRIVATE  :: INNO     = 0
   integer :: istop
   ! :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: !
@@ -327,8 +329,13 @@ CONTAINS
     INTEGER :: mpiError
 #endif
 
+! GHGM no transport for first call .....
+      if(time_tracker % utime.gt.0.00001) then
       CALL plasma % Test_Transport_Time_step( grid, v_ExB, time_step, mpi_layer, &
                                               max_transport_convection_ratio_local )
+!     write(6,7999) mpi_layer % rank_id , grid % mp_low, grid % mp_high, max_transport_convection_ratio_local, &
+!                                          v_ExB(1,5:7,grid % mp_low), v_ExB(2,5:7,grid % mp_high)     
+!7999 format('GHGM convect ratio ', 3i4 , f12.1, 6e10.2)
 
 #ifdef HAVE_MPI
       CALL MPI_ALLREDUCE( max_transport_convection_ratio_local, &
@@ -350,6 +357,15 @@ CONTAINS
       n_transport_timesteps = ceiling(max_transport_convection_ratio_local)
 
 #endif
+
+! GHGM minimun transport timestep of 1 minute .....
+      if (n_transport_timesteps.lt.3) then
+        if (mpi_layer % rank_id.eq.0) then
+          write(6,*) 'GHGM TRANSPORT TIMESTEP LT 3 ', n_transport_timesteps
+        endif
+        n_transport_timesteps = 3
+      endif
+! GHGM minimun transport timestep of 1 minute .....
 
       transport_time_step2 = time_step / float(n_transport_timesteps)
 
@@ -379,29 +395,20 @@ CONTAINS
 
         CALL plasma % Cross_Flux_Tube_Transport( grid, v_ExB, transport_time_step2, mpi_layer )
 
-!       CALL plasma % High_Latitude_Flux_Tube_Transport( grid, v_ExB, transport_time_step, mpi_layer, time_tracker, forcing )
-
       ENDDO
+! GHGM no transport for first call .....
+      endif  ! if(time_tracker % utime.gt.0.00001) then
 
-!      CALL plasma % Cross_Flux_Tube_Transport2( grid, v_ExB, transport_time_step, mpi_layer, time_tracker, forcing )
-! GHGM moved precipitation to here
-
-!     CALL plasma % Auroral_Precipitation( grid, &
-!                                          neutrals, &
-!                                          forcing, &
-!                                          time_tracker )
+      CALL plasma % Auroral_Precipitation( grid, &
+                                           neutrals, &
+                                           forcing, &
+                                           time_tracker )
 
       CALL plasma % FLIP_Wrapper( grid,         &
                                   neutrals,     &
                                   forcing,      &
                                   time_tracker, &
                                   time_step,nflag_t,nflag_d )
-!      do mp = plasma % mp_low , plasma % mp_high
-!      do lp = 1 , plasma % NLP
-!         if(nflag_t(lp,mp).ne.0) write(6,*) 'T ',mp,lp
-!         if(nflag_d(lp,mp).ne.0) write(6,*) 'D ',mp,lp
-!     enddo
-!     enddo
 
       !TWFANG, calculate field line integrals for dynamo solver
       CALL plasma % Calculate_Field_Line_Integrals(grid, neutrals, mpi_layer)
@@ -1034,15 +1041,11 @@ CONTAINS
       DO 100 mp = plasma % mp_low, plasma % mp_high
         DO 200 lp = 1, perp_transport_max_lp
 
-!         if((mp.eq.1).and.(lp.eq.40)) then
-!           write(612,*) 'GHGM exb ', v_ExB(1,lp,mp), v_ExB(2,lp,mp)
-!         endif
           phi_t0   = grid % magnetic_longitude(mp) - v_ExB(1,lp,mp)*time_step/(r*sin( colat_90km(lp) ) )
 
           coslam = cos( half_pi - grid % magnetic_colatitude(1,lp) )
           sinim  = 2.0_prec*sqrt( 1.0_prec - coslam*coslam )/sqrt( 4.0_prec - 3.0_prec*coslam*coslam )
           theta_t0 = colat_90km(lp) - v_ExB(2,lp,mp)*time_step/(r*sinim)
-
 
           ! If a Lagrangian trajectory crosses the equator, we clip the colatitude
           ! so that the point resides at the equator.
@@ -1073,9 +1076,46 @@ CONTAINS
           ENDIF
 
           IF( lp_min == 0 )THEN
+            write(6,*) 'GHGM Need to expand search ', mp , lp
 !           STOP 'lp-CFL > 1'
+            ! Check poleward
+            IF( theta_t0 <= colat_90km(lp-1) .AND. theta_t0 >= colat_90km(lp-2) )THEN
+              lp_min = lp - 1
+              write(6,*) 'GHGM 2 poleward ', mp , lp
+            ! Check equatorward
+            ELSEIF( theta_t0 <= colat_90km(lp+2) .AND. theta_t0 >= colat_90km(lp+1) )THEN
+              lp_min = lp + 2
+              write(6,*) 'GHGM 2 equatorward ', mp , lp
+            ENDIF
           ENDIF
 
+          IF( lp_min == 0 )THEN
+            write(6,*) 'GHGM Still didnt get it trying again ', mp , lp
+            IF( theta_t0 <= colat_90km(lp-2) .AND. theta_t0 >= colat_90km(lp-3) )THEN
+              lp_min = lp - 2
+              write(6,*) 'GHGM 3 poleward ', mp , lp
+            ! Check equatorward
+            ELSEIF( theta_t0 <= colat_90km(lp+3) .AND. theta_t0 >= colat_90km(lp+2) )THEN
+              lp_min = lp + 3
+              write(6,*) 'GHGM 3 equatorward ', mp , lp
+            ENDIF
+          ENDIF
+
+          IF( lp_min == 0 )THEN
+            write(6,*) 'GHGM Still didnt get it trying again AGAIN ', mp , lp
+            IF( theta_t0 <= colat_90km(lp-3) .AND. theta_t0 >= colat_90km(lp-4) )THEN
+              lp_min = lp - 3
+              write(6,*) 'GHGM 4 poleward ', mp , lp
+            ! Check equatorward
+            ELSEIF( theta_t0 <= colat_90km(lp+4) .AND. theta_t0 >= colat_90km(lp+3) )THEN
+              lp_min = lp + 4
+              write(6,*) 'GHGM 4 equatorward ', mp , lp
+            ENDIF
+          ENDIF
+
+          IF( lp_min == 0 )THEN
+            write(6,*) 'GHGM OK I GIVE UP ', mp , lp
+          ENDIF
 
           lp_t0(1) = lp_min-1
           lp_t0(2) = lp_min
@@ -1111,6 +1151,13 @@ CONTAINS
             ENDDO
 
           ELSE ! lp_min =/= 1 ....
+
+              
+              if(lp_t0(2).eq.0) then
+                lp_t0(1) = 1
+                lp_t0(2) = 2
+                write(6,*) 'GHGM LP_T0 ',mp,lp,v_ExB(1,lp,mp), v_ExB(2,lp,mp)
+              endif
 
             lp_comp_weight(1) =  ( theta_t0 - colat_90km(lp_t0(2)) )/( colat_90km(lp_t0(1))-colat_90km(lp_t0(2)) )
             lp_comp_weight(2) = -( theta_t0 - colat_90km(lp_t0(1)) )/( colat_90km(lp_t0(1))-colat_90km(lp_t0(2)) )
@@ -1206,6 +1253,7 @@ CONTAINS
 !             plasma % electron_temperature(i,lp,mp) = electron_temperature_int
               plasma % ion_temperature(i,lp,mp) = ion_temperature_int*( ksi_fac**(4.0_prec/3.0_prec) )
               plasma % electron_temperature(i,lp,mp) = electron_temperature_int*( ksi_fac**(4.0_prec/3.0_prec) )
+
 
 
               endif     ! if(grid % altitude(i,lp).ge.200000.0_prec)
@@ -3624,6 +3672,10 @@ end SUBROUTINE interpolate_in_q
 
             apex_D = grid % d1xd2_magnitude(i,lp,mp)
             apex_BMAG = grid % magnetic_field_strength(i,lp,mp)
+!         if (lp.gt.135.and.lp.le.138.and.mp.eq.78.and.ihem.eq.1) then
+!          print *,'p1',lp,Ue(1),Ue(2),apex_d1d1,apex_d2d2,apex_d1d2
+!          print *,'p1',apex_D,apex_BMAG
+!         endif
 
       !      ni_oplus_1d(i1d)=plasma_3d(i,lp_plas,mp,1)
       !      ni_hplus_1d(i1d)=plasma_3d(i,lp_plas,mp,2)
@@ -3695,6 +3747,11 @@ end SUBROUTINE interpolate_in_q
 
 ! get integrals
                 abs_ds = ABS(ds)
+
+!         if (lp.gt.134.and.lp.le.139.and.mp.eq.78.and.ihem.eq.1) then
+!           print *,i,lp,electron_density,plasma % ion_densities(1,i,lp,mp),plasma % ion_densities(5,i,lp,mp),plasma % ion_densities(6,i,lp,mp)
+!           print *,i,lp,sigma_ped,sigma_hall
+!         endif
 !g
 !g  The following integrals all come from page 203 and 204 of the paper.  They are numbered
 !g  to match the equations in the paper...
@@ -3799,7 +3856,7 @@ end SUBROUTINE interpolate_in_q
                        mpi_layer % mpi_prec, &
                        mpi_layer % mpi_communicator, &
                        mpierror)
-
+    WRITE( 5000 + mpi_layer % rank_id,* ) plasma % conductivities
 #endif
 
   END SUBROUTINE Calculate_Field_Line_Integrals

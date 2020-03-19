@@ -281,7 +281,7 @@ C.... The parameters ending in X are dummy variables to be transferred to
 C.... the FLIP module variables. 
 C.... Dummy variables are also used because it is assumed that the values 
 C.... of FLIP variables are not preserved from call to call
-C---- Additional mods Change TI to (TI(2,DIM)
+C---- Additional mods Change TI to (temp_ti_te(2,DIM)
 C---- Change SCOLUMN for grazing incidence
 C.... Written by P. Richards June-September 2010.
       SUBROUTINE CTIPINT(
@@ -334,7 +334,7 @@ C.... Written by P. Richards June-September 2010.
       USE PRODUCTION
 
       IMPLICIT NONE
-      integer mp,lp,i_which_call,nflag_t,nflag_d
+      integer mp,lp,i_which_call,nflag_t,nflag_d,test_te
       INTEGER IHEPLS, INPLS, INNO
       INTEGER CTIPDIM         !.. CTIPe array dimension, must equal to FLDIM
       INTEGER JTI             !.. Dummy variable to count the number of calls to this routine
@@ -354,7 +354,7 @@ C.... Written by P. Richards June-September 2010.
       DOUBLE PRECISION OX(CTIPDIM),HX(CTIPDIM),N2X(CTIPDIM),O2X(CTIPDIM)
       DOUBLE PRECISION HEX(CTIPDIM),TNX(CTIPDIM),SZAX(CTIPDIM)
       DOUBLE PRECISION XIONNX(9,CTIPDIM),XIONVX(9,CTIPDIM)
-      !.. TE_TI(3,J) = Te, TE_TIX(2,J) = Ti = TE_TIX(2,J)
+      !.. TE_ti(3,J) = Te, TE_TIX(2,J) = Ti = TE_TIX(2,J)
       DOUBLE PRECISION TE_TIX(3,CTIPDIM)
       !.. EHTX(3,J) = e heating rate, EHTX(1,J) = ion heating rate, EHTX(2,J) unused
       DOUBLE PRECISION EHTX(3,CTIPDIM)
@@ -370,13 +370,14 @@ C.... Written by P. Richards June-September 2010.
       DOUBLE PRECISION DT,DTMIN,FD(9),BCKPRD,FPAS,HEPRAT,PCO,UTHRS !$$$
       DOUBLE PRECISION COLUM(3,CTIPDIM)  !.. Neutral column densities for PEPRIM
       DOUBLE PRECISION N(4,CTIPDIM)      !.. FLIP variable for O+ H+ & total ions
-      DOUBLE PRECISION TI(3,CTIPDIM)     !.. FLIP variable for Te and Ti
+      DOUBLE PRECISION temp_ti_te(3,CTIPDIM)     !.. FLIP variable for Te and Ti
       DOUBLE PRECISION N_SAVE(4,CTIPDIM)      !.. FLIP variable for O+ H+ & total ions
       DOUBLE PRECISION TI_SAVE(3,CTIPDIM)     !.. FLIP variable for Te and Ti
       DOUBLE PRECISION NHEAT(CTIPDIM)    !.. Neutral heating rate
       DOUBLE PRECISION RTS(99)           !.. Reaction rates
-      DOUBLE PRECISION EDEN(CTIPDIM)     !.. electron density
+      DOUBLE PRECISION electron_density(CTIPDIM)     !.. electron density
       DOUBLE PRECISION O2DISF(CTIPDIM)   !.. O2 dissociation frequency
+      DOUBLE PRECISION sza_north, sza_south !solar zenith angles at the north and south end of a tube                         
       INTEGER IWR         !$$$  for writing in files
       integer istop
 
@@ -482,12 +483,17 @@ C.... Written by P. Richards June-September 2010.
         XIONN(I,J)=XIONNX(I,J)*M3_to_CM3
         XIONV(I,J)=XIONVX(I,J)*M_to_CM
       ENDDO
+!       XIONN(3,J)=0.0
+!       XIONV(3,J)=0.0
+!       XIONN(4,J)=0.0
+!       XIONV(4,J)=0.0
+! GHGM
       ENDDO
 
       !.. Transfer Te and Ti to FLIP variable TI
       DO J=JMIN,JMAX
       DO I=1,3
-        TI(I,J)=TE_TIX(I,J)
+        temp_ti_te(I,J)=TE_TIX(I,J)
         EHT(I,J)=EHTX(I,J)
       ENDDO
       ENDDO
@@ -495,6 +501,14 @@ C.... Written by P. Richards June-September 2010.
       !.. Upload thermosphere parameters to THERMOSPHERE module
       COLFAC=COLFACX  !.. O+ - O collision frequency Burnside factor 1-1.7 
       DO J=JMIN,JMAX
+! GHGM - set N+ and He+ to zero
+!       if(uthrs.lt.2.0E-2) then
+!       XIONN(3,J)=0.0
+!       XIONV(3,J)=0.0
+!       XIONN(4,J)=0.0
+!       XIONV(4,J)=0.0
+!       endif
+! GHGM
         ON(J)=OX(J)*M3_to_CM3
         HN(J)=HX(J)*M3_to_CM3
 ! GHGM
@@ -514,12 +528,19 @@ C.... Written by P. Richards June-September 2010.
         N(4,J)=XIONN(3,J)
         NHEAT(J)=0.0
         O2DISF(J)=0.0
+! GHGM - intialize ti and te ......
+!       if(uthrs.lt.2.0E-2) then
+!       temp_ti_te(3,J)=904.0*DLOG(z(j))-3329.0
+!       IF(temp_ti_te(3,J).GT.3000.) temp_ti_te(3,J)=3000.
+!       temp_ti_te(1,J)=0.5*(TN(J)+temp_ti_te(3,J))
+!       endif
+! GHGM
       ENDDO
 
       !.. Set up initial temperature and density profiles.
       !.. 0.1 < HPEQ < 1.0.
       IF(HPEQ.GT.0.001) THEN
-        CALL PROFIN(IHEPLS,INPLS,PCO,F107,N,TI,HPEQ,HEPRAT)
+        CALL PROFIN(IHEPLS,INPLS,PCO,F107,N,temp_ti_te,HPEQ,HEPRAT)
       ENDIF
 
       !.. This routine adjusts the H+ and He+ densities for depleted flux tubes      
@@ -538,14 +559,22 @@ C.... Written by P. Richards June-September 2010.
 
       !.. electron density for photoelectron routine
       DO J=JMIN,JMAX
-        EDEN(J)=XIONN(1,J)+XIONN(2,J)+XIONN(3,J)+XIONN(4,J)+XIONN(5,J)+
-     >    XIONN(6,J)
+        electron_density(J)=XIONN(1,J)+XIONN(2,J)+XIONN(3,J)+XIONN(4,J)+
+     >                      XIONN(5,J)+XIONN(6,J)
       ENDDO
 
       !.. 2-stream photoelectron routine to get electron heating 
       !.. rate and secondary ion production
-      CALL PE2S(F107,F107A,N,TI,FPAS,-1.0E22,EDEN,UVFAC,COLUM,
-     > IHEPLS,INPLS,INNO,mp,lp)
+
+      sza_north = sza(5) * 180.0 / 3.14159
+      sza_south = sza(jmax - 4) * 180.0 / 3.14159
+
+      IF(sza_north.LT.103.0.OR.sza_south.LT.103.0) then
+
+      CALL PE2S(F107,F107A,N,temp_ti_te,FPAS,electron_density,UVFAC,
+     >          COLUM,IHEPLS,INPLS,INNO,mp,lp)
+
+      ENDIF
 
       !-- Sum the EUV, photoelectron, and auroral production rate
       CALL SUMPRD(JMIN,JMAX,AUR_PROD)
@@ -567,7 +596,8 @@ C.... Written by P. Richards June-September 2010.
          N2D(J)=0.0
          IF(Z(J).GE.80.AND.Z(J).LE.700) THEN
            !.. CALL cminor to get NO+, O+(2D), O2+, N2+ & O+(2P) densities
-           CALL CMINOR(0,J,0,IHEPLS,INPLS,INNO,FD,7,N,TI,Z,EFLAG,mp,lp)
+           CALL CMINOR(0,J,0,IHEPLS,INPLS,INNO,FD,7,N,temp_ti_te,
+     >                 Z,EFLAG,mp,lp)
            BCKPRD=2.0E-10*N2N(J)*EXP(-5.0E-14*N2N(J)*TN(J))
            PHION(J)=SUMION(1,7,J)+SUMION(2,4,J)+SUMION(2,5,J)+FD(9)
            PHION(J)=PHION(J)+BCKPRD
@@ -589,12 +619,31 @@ C.... Written by P. Richards June-September 2010.
 
       !..  electron and ion temperature solution
       n_save = n
-      ti_save = ti
-      CALL TLOOPS(JMIN,JMAX,CTIPDIM,Z,N,TI,DT,DTMIN,EFLAG,mp,lp,nflag_t) 
+      ti_save = temp_ti_te
+      CALL TLOOPS(JMIN,JMAX,CTIPDIM,Z,N,temp_ti_te,DT,DTMIN,EFLAG,
+     >            mp,lp,nflag_t) 
+! GHGM - simple attempt to stop Te climbing above 5,000K
+!     test_te = 0
+!     DO J=JMIN,JMAX
+!       if(temp_ti_te(3,j).ge.5000.) then
+!         test_te = 1
+!         goto 2345
+!       endif
+!     ENDDO
+!2345 continue
+!     if(test_te.eq.1) then
+!!     write(6,*) 'GHGM TE greater than 5000K, resetting ',mp,lp
+!     DO J=JMIN,JMAX
+!       temp_ti_te(3,J)=904.0*DLOG(z(j))-3329.0
+!       IF(temp_ti_te(3,J).GT.3000.) temp_ti_te(3,J)=3000.
+!       temp_ti_te(1,J)=0.5*(TN(J)+temp_ti_te(3,J))
+!     ENDDO
+!     endif
+! GHGM - simple attempt to stop Te climbing above 5,000K
 !     if((mp.eq.2).and.(lp.eq.27)) then
 !       do j = jmin,jmax
 !         write(6,11) j,z(j),n(1,j),n(2,j),n(3,j),n(4,j),
-!    >    ti(1,j),ti(2,j),ti(3,j)           
+!    >    temp_ti_te(1,j),temp_ti_te(2,j),temp_ti_te(3,j)           
 !         write(6,11) j,z(j),XIONN(4,J),XIONN(5,J),XIONN(6,J), 
 !    >                XIONN(7,J),XIONN(8,J)    
 !         write(6,*) '*******************************'
@@ -610,8 +659,9 @@ C.... Written by P. Richards June-September 2010.
 
       !.. O+, H+ solution
       n_save = n
-      ti_save = ti
-      CALL DLOOPS(JMIN,JMAX,CTIPDIM,Z,N,TI,DT,DTMIN,EFLAG,mp,lp,nflag_d)
+      ti_save = temp_ti_te
+      CALL DLOOPS(JMIN,JMAX,CTIPDIM,Z,N,temp_ti_te,DT,DTMIN,EFLAG,
+     >            mp,lp,nflag_d)
 !     if(nflag_d.ne.0) then
 !       write(6,*) 'GHGM flagged Density ', mp,lp,nflag_d
 !       n = n_save
@@ -622,19 +672,20 @@ C.... Written by P. Richards June-September 2010.
       !.. Added by PGR 2012-11-29
       DO J=JMIN,JMAX 
        IF(Z(J).GE.80.AND.Z(J).LE.700) THEN
-          CALL CMINOR(0,J,0,IHEPLS,INPLS,INNO,FD,7,N,TI,Z,EFLAG,mp,lp)
+          CALL CMINOR(0,J,0,IHEPLS,INPLS,INNO,FD,7,N,temp_ti_te,
+     >                Z,EFLAG,mp,lp)
        ENDIF
       ENDDO
 
       !.. He+ solution
       IF(EFLAG(2,1).EQ.0.AND.IHEPLS.GT.0) THEN
         i_which_call = 1
-        CALL XION(TI,DT,DTMIN,9,EFLAG,mp,lp,i_which_call)
+        CALL XION(temp_ti_te,DT,DTMIN,9,EFLAG,mp,lp,i_which_call)
       ENDIF
       !.. N+ solution
       IF(EFLAG(2,1).EQ.0.AND.INPLS.GT.0) THEN
         i_which_call = 2
-        CALL XION(TI,DT,DTMIN,11,EFLAG,mp,lp,i_which_call)
+        CALL XION(temp_ti_te,DT,DTMIN,11,EFLAG,mp,lp,i_which_call)
       ENDIF
 
         !.. transfer densities from FLIP to CTIP variable
@@ -649,7 +700,7 @@ C.... Written by P. Richards June-September 2010.
       !.. Transfer Te and Ti and e heating to CTIPe variable
       DO J=JMIN,JMAX
         DO I=1,3
-          TE_TIX(I,J)=TI(I,J)
+          TE_TIX(I,J)=temp_ti_te(I,J)
           EHTX(I,J)=EHT(I,J)
         ENDDO
       ENDDO
@@ -658,12 +709,12 @@ C.... Written by P. Richards June-September 2010.
 !        DO J=JMIN,JMAX
 !          IF(Z(J).GE.80.AND.Z(J).LE.700) THEN
 !            !.. electron density for photoelectron routine
-!            EDEN(J)=XIONN(1,J)+XIONN(2,J)+XIONN(3,J)+XIONN(4,J)+
+!            electron_density(J)=XIONN(1,J)+XIONN(2,J)+XIONN(3,J)+XIONN(4,J)+
 !     >      XIONN(5,J)+XIONN(6,J)
-!            CALL RATS(J,TI(3,J),TI(1,J),TN(J),RTS)  !.. Reaction rates
+!            CALL RATS(J,temp_ti_te(3,J),temp_ti_te(1,J),TN(J),RTS)  !.. Reaction rates
 !            !.. Neutral heating rate
-!            CALL NEUT_HEATING(0,JMIN,J,Z(J),RTS,TI(3,J),TI(2,J),TN(J),
-!     >        ON(J),O2N(J),N2N(J),HE(J),N4S(J),EDEN(J),N(1,J),XIONN(6,J)
+!            CALL NEUT_HEATING(0,JMIN,J,Z(J),RTS,temp_ti_te(3,J),temp_ti_te(2,J),TN(J),
+!     >        ON(J),O2N(J),N2N(J),HE(J),N4S(J),electron_density(J),N(1,J),XIONN(6,J)
 !     >       ,XIONN(5,J),N(2,J),XIONN(7,J),XIONN(4,J),NNO(J),N2D(J)
 !     >       ,N2P(J),N2A(J),XIONN(8,J),XIONN(9,J),O1D(J),O1S(J)
 !     >       ,EHT(3,J),NHEAT(J),O2DISF(J))
