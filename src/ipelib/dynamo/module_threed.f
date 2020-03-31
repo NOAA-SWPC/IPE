@@ -111,8 +111,8 @@
       enddo ! i = 1,kmlonp1
 !
 !
-      write(unit=4022,FMT='(20E12.4)') ed1dy
-      write(unit=4023,FMT='(20E12.4)') ed2dy
+!     write(unit=4022,FMT='(20E12.4)') ed1dy
+!     write(unit=4023,FMT='(20E12.4)') ed2dy
 
       end subroutine threed
 !-----------------------------------------------------------------------

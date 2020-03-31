@@ -209,7 +209,6 @@
 !
       phim(1) = phir
       phim(2) = phir*2.
-!   write(6,"('epotval: phir=',1pe12.4,' phim=',2(1pe12.4))") phir,phim
       cospm(:) = cos(phim(:))
       sinpm(:) = sin(phim(:))
 !
@@ -223,8 +222,6 @@
          if (ab(j)==1) then
 
             plm = scplm2005Ipe(j,colat,nlm) ! scplm function is in this module
-!       write(6,"('epotval: j=',i3,' plm=',1pe12.4,' m=',i3)") &
-!        j,plm,m
 
             skip = 0
             if (m == 0) then

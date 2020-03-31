@@ -483,11 +483,6 @@ C.... Written by P. Richards June-September 2010.
         XIONN(I,J)=XIONNX(I,J)*M3_to_CM3
         XIONV(I,J)=XIONVX(I,J)*M_to_CM
       ENDDO
-!       XIONN(3,J)=0.0
-!       XIONV(3,J)=0.0
-!       XIONN(4,J)=0.0
-!       XIONV(4,J)=0.0
-! GHGM
       ENDDO
 
       !.. Transfer Te and Ti to FLIP variable TI

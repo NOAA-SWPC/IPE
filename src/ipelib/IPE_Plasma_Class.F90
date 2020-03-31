@@ -3672,25 +3672,7 @@ end SUBROUTINE interpolate_in_q
 
             apex_D = grid % d1xd2_magnitude(i,lp,mp)
             apex_BMAG = grid % magnetic_field_strength(i,lp,mp)
-!         if (lp.gt.135.and.lp.le.138.and.mp.eq.78.and.ihem.eq.1) then
-!          print *,'p1',lp,Ue(1),Ue(2),apex_d1d1,apex_d2d2,apex_d1d2
-!          print *,'p1',apex_D,apex_BMAG
-!         endif
 
-      !      ni_oplus_1d(i1d)=plasma_3d(i,lp_plas,mp,1)
-      !      ni_hplus_1d(i1d)=plasma_3d(i,lp_plas,mp,2)
-
-      !      n_plus( i1d)=plasma_3d(i,lp_plas,mp,4)
-      !      no_plus(i1d)=plasma_3d(i,lp_plas,mp,5)
-      !      o2_plus(i1d)=plasma_3d(i,lp_plas,mp,6)
-      !      n2_plus(i1d)=plasma_3d(i,lp_plas,mp,7)
-      !      ti_oplus_1d(i1d)=plasma_3d(i,lp_plas,mp,11)
-
-      !      tn(i1d)=TN_k(  i,lp_plas,mp) ![K]
-      !      o(i1d)=ON_m3( i,lp_plas,mp) !m-3
-      !      o2(i1d)=O2N_m3(i,lp_plas,mp)
-      !      n2(i1d)=N2N_m3(i,lp_plas,mp)
-      !      grid % apex_be3(lp_plas,mp)
              effective_temp = (neutrals % temperature(i,lp,mp)+plasma % ion_temperature(i,lp,mp))/2.0_prec
              IF ( effective_temp < neutrals % temperature(i,lp,mp) ) effective_temp = neutrals % temperature(i,lp,mp)
 
@@ -3748,11 +3730,6 @@ end SUBROUTINE interpolate_in_q
 ! get integrals
                 abs_ds = ABS(ds)
 
-!         if (lp.gt.134.and.lp.le.139.and.mp.eq.78.and.ihem.eq.1) then
-!           print *,i,lp,electron_density,plasma % ion_densities(1,i,lp,mp),plasma % ion_densities(5,i,lp,mp),plasma % ion_densities(6,i,lp,mp)
-!           print *,i,lp,sigma_ped,sigma_hall
-!         endif
-!g
 !g  The following integrals all come from page 203 and 204 of the paper.  They are numbered
 !g  to match the equations in the paper...
 !g  The integral parts are calculated here and then some additional factors are applied below.

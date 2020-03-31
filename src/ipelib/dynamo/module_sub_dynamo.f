@@ -337,7 +337,7 @@
         enddo ! i=1,kmlonp1
       enddo ! j=1,kmlat 
 
-       write(unit=4024,FMT='(20E12.4)')phim
+!      write(unit=4024,FMT='(20E12.4)')phim
 !
 ! Call threed to calculate 2-d electric potential array in geomagnetic coordinates
 !   from 2-d solver output phim, corrected for the SH potential

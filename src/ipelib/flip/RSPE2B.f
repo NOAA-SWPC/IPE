@@ -112,24 +112,6 @@ C... FRPAS= fraction of flux lost in plasmasphere
            PROB(I_energy)=0.2526*EXP(-0.2526*E(I_energy))
  200     CONTINUE
 
-!       write(9000 + mp,*) 'GHGM emax iemax ', emax, iemax
-!       write(9000 + mp,*) 'GHGM ENERGY ', mp,lp
-!       write(9000 + mp,3333) E
-!       write(9000 + mp,*) 'GHGM EB ', mp,lp
-!       write(9000 + mp,3333) EB
-!       write(9000 + mp,*) 'GHGM DELTE ', mp,lp
-!       write(9000 + mp,3333) DELTE
-!       write(9000 + mp,*) 'GHGM idge ', mp,lp
-!       write(9000 + mp,4444) idge
-!       write(9000 + mp,*) 'GHGM joe ', mp,lp
-!       write(9000 + mp,4444) joe
-!       write(9000 + mp,*) 'GHGM jn2e ', mp,lp
-!       write(9000 + mp,4444) jn2e
-!       write(9000 + mp,*) 'GHGM prob ', mp,lp
-!       write(9000 + mp,3333) prob
-!3333   format(10f10.2)
-!4444   format(10i6)
-
       !.. Get production frequencies (RJOX,RJN2,RJO2,RJHE) for the energy cells
       IF(ABS((F107-F107SV)/F107).GE.0.05) THEN
         F107SV=F107
@@ -212,21 +194,6 @@ C... FRPAS= fraction of flux lost in plasmasphere
 
       !.. Initial energy index set for highest energy
       I_energy=IEMAX
-
-!     if((mp.eq.23).and.(lp.eq.27)) then
-!     write(6,*) 'GHGM TUBE ',jmin,jmax,j_apex,j1000N,j120N,
-!    >  j120S,j1000S,ipas,ipasc
-!     write(6,*) '120  N ', z(j120N)
-!     write(6,*) '1000 N ', z(j1000N)
-!     write(6,*) 'APEX   ', z(j_apex)
-!     write(6,*) '1000 S ', z(j1000S)
-!     write(6,*) '120  S ', z(j120S)
-!       do j = jmin,jmax
-!         write(6,2435) j,z(j)
-!       enddo
-!2435   format(i6,f10.1)
-!     stop
-!     endif
 
 C////////////main calculations  begin here ////////////
  23   CONTINUE
