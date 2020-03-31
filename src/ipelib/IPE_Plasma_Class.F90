@@ -1115,6 +1115,13 @@ CONTAINS
             write(6,*) 'GHGM OK I GIVE UP ', mp , lp
           ENDIF
 
+! GHGM - check that lp_min is not greater than NLP
+          
+          IF( lp_min.gt. grid % NLP )THEN
+            write(6,*) 'GHGM LP_MIN is greater than NLP - out of bounds ', mp , lp
+            lp_min = grid % NLP
+          ENDIF
+
           lp_t0(1) = lp_min-1
           lp_t0(2) = lp_min
 
