@@ -65,8 +65,6 @@ MODULE IPE_Plasma_Class
       PROCEDURE, PRIVATE :: Buffer_Old_State
       PROCEDURE, PRIVATE :: Calculate_Pole_Values
       PROCEDURE, PRIVATE :: Cross_Flux_Tube_Transport
-      PROCEDURE, PRIVATE :: Cross_Flux_Tube_Transport2
-      PROCEDURE, PRIVATE :: High_Latitude_Flux_Tube_Transport
       PROCEDURE, PRIVATE :: Test_Transport_Time_step
       PROCEDURE, PRIVATE :: Auroral_Precipitation
       PROCEDURE, PRIVATE :: FLIP_Wrapper
@@ -1122,18 +1120,20 @@ CONTAINS
             lp_min = grid % NLP
           ENDIF
 
+! GHGM - check that lp_min is not greater than NLP
+          
+          IF( lp_min.lt. 2 )THEN
+            write(6,*) 'GHGM LP_MIN is less than 2 - out of bounds ', mp , lp
+            lp_min = 2
+          ENDIF
+
           lp_t0(1) = lp_min-1
           lp_t0(2) = lp_min
 
-          mp_min = 0
           IF( phi_t0 <= grid % magnetic_longitude(mp) .AND. phi_t0 >= grid % magnetic_longitude(mp-1) )THEN
             mp_min = mp
           ELSEIF( phi_t0 <= grid % magnetic_longitude(mp+1) .AND. phi_t0 >= grid % magnetic_longitude(mp) )THEN
             mp_min = mp+1
-          ENDIF
-
-          IF( mp_min == 0 )THEN
-!           STOP 'mp-CFL > 1'
           ENDIF
 
           mp_t0(1) = mp_min-1
