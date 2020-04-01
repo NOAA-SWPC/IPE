@@ -59,7 +59,7 @@
       if (trim(model) /= 'epot'.and.trim(model) /= 'bpot') then
          write(6,"('>>> model=',a)") trim(model)
          write(6,"('>>> setmodel: model must be either epot or bpot')")
-         stop 'setmodel' 
+!        stop 'setmodel' 
       endif
 
 !   write(6,"('setmodel: angle=',f8.2,' bt=',f8.2,' tilt=',f8.2,' swvel=',&
@@ -314,7 +314,7 @@
          if (tablesize > mxtablesize) then 
             write(6,"('>>> tablesize > mxtablesize: tablesize=',i5,     &
      &' mxtablesize=',i5,' tn0=',e12.4)") tablesize,mxtablesize,th0
-            stop 'tablesize'
+!           stop 'tablesize'
          endif
 !     write(6,"('scplm: indx=',i3,' colat=',f8.3,' th0=',e12.4,&
 !       &' tablesize=',i3)") indx,colat,th0,tablesize
@@ -713,17 +713,17 @@
          write(6,"('>>> read_potential: file ',a                        &
      &,': incompatable csize: ','csize_rd=',i4,' csize=',i4)")          &
      &        fname,csize_rd,csize
-         stop 'csize'
+!        stop 'csize'
       endif
       if (d1_rd /= d1_pot) then
          write(6,"('>>> read_potential: file ',a,': incompatable d1: '  &
      &,'d1_rd=',i4,' d1_pot=',i4)") fname,d1_rd,d1_pot
-         stop 'd1'
+!        stop 'd1'
       endif
       if (d2_rd /= d2_pot) then
          write(6,"('>>> read_potential: file ',a,': incompatable d2: '  &
      &,'d2_rd=',i4,' d2_pot=',i4)") fname,d2_rd,d2_pot
-         stop 'd2'
+!        stop 'd2'
       endif
       do i=1,csize
          read(lu,"(6e20.9)") alschfits(:,i)
@@ -786,12 +786,12 @@
       if (rd_na /= na) then
          write(6,"('>>> read_potential: file ',a,': incompatable na: ', &
      &'rd_na=',i4,' na=',i4)") fname,rd_na,na
-         stop 'na'
+!        stop 'na'
       endif
       if (rd_nb /= nb) then
          write(6,"('>>> read_potential: file ',a,': incompatable nb: ', &
      &'rd_nb=',i4,' nb=',i4)") fname,rd_nb,nb
-         stop 'nb'
+!        stop 'nb'
       endif
       read(lu,"(8e20.9)") bndya
       read(lu,"(8e20.9)") bndyb
