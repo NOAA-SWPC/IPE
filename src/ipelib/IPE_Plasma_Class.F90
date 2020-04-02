@@ -2751,10 +2751,11 @@ end SUBROUTINE interpolate_in_q
     REAL(dp) :: NHEAT(1:grid % nFluxTube)
     REAL(dp) :: SZA(1:grid % nFluxTube)
     REAL(dp) :: dotprod, sini
-    REAL(sp) :: F107D, F107A
+    REAL(sp) :: F107D, F107A, KP_flip
 
       F107D = forcing % f107( forcing % current_index )
       F107A = forcing % f107_81day_avg( forcing % current_index )
+      KP_flip = forcing % kp( forcing % current_index )
       UTHR  = time_tracker % hour + (time_tracker % minute) / 60.0
       HPEQ_flip = HPEQ
       nflag_t = 0
@@ -2862,6 +2863,7 @@ end SUBROUTINE interpolate_in_q
                         DTMIN, & !.. Minimum time step allowed (>=10 secs?)
                         F107D, & !.. Daily F10.7
                         F107A, & !.. 81 day average F10.7
+                        KP_FLIP, & !.. current Kp value
                         SZA(1:JMAXX), & !.. Solar Zenith angle (radians)
                         FPAS, & !.. Pitch angle scattering fraction
                         HPEQ_flip, & !.. Sets initial equatorial H+ density. See declaration below
