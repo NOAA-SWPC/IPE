@@ -1073,7 +1073,9 @@ CONTAINS
 
           IF( lp_min == 0 )THEN
             write(6,*) 'GHGM Need to expand search ', mp , lp
-!           STOP 'lp-CFL > 1'
+
+            if((lp.ge.3).and(lp.le.grid % NLP - 2)) then ! Make sure lp is within bounds                   
+
             ! Check poleward
             IF( theta_t0 <= colat_90km(lp-1) .AND. theta_t0 >= colat_90km(lp-2) )THEN
               lp_min = lp - 1
@@ -1083,10 +1085,16 @@ CONTAINS
               lp_min = lp + 2
               write(6,*) 'GHGM 2 equatorward ', mp , lp
             ENDIF
+
+          endif ! Make sure lp is within bounds
+
           ENDIF
 
           IF( lp_min == 0 )THEN
             write(6,*) 'GHGM Still didnt get it trying again ', mp , lp
+
+            if((lp.ge.4).and(lp.le.grid % NLP - 3)) then ! Make sure lp is within bounds                   
+
             IF( theta_t0 <= colat_90km(lp-2) .AND. theta_t0 >= colat_90km(lp-3) )THEN
               lp_min = lp - 2
               write(6,*) 'GHGM 3 poleward ', mp , lp
@@ -1095,10 +1103,16 @@ CONTAINS
               lp_min = lp + 3
               write(6,*) 'GHGM 3 equatorward ', mp , lp
             ENDIF
+
+          endif ! Make sure lp is within bounds
+
           ENDIF
 
           IF( lp_min == 0 )THEN
             write(6,*) 'GHGM Still didnt get it trying again AGAIN ', mp , lp
+
+            if((lp.ge.5).and(lp.le.grid % NLP - 4)) then ! Make sure lp is within bounds                   
+
             IF( theta_t0 <= colat_90km(lp-3) .AND. theta_t0 >= colat_90km(lp-4) )THEN
               lp_min = lp - 3
               write(6,*) 'GHGM 4 poleward ', mp , lp
@@ -1107,6 +1121,9 @@ CONTAINS
               lp_min = lp + 4
               write(6,*) 'GHGM 4 equatorward ', mp , lp
             ENDIF
+
+          endif ! Make sure lp is within bounds
+
           ENDIF
 
           IF( lp_min == 0 )THEN
@@ -1115,17 +1132,17 @@ CONTAINS
 
 ! GHGM - check that lp_min is not greater than NLP
           
-          IF( lp_min.gt. grid % NLP )THEN
-            write(6,*) 'GHGM LP_MIN is greater than NLP - out of bounds ', mp , lp
-            lp_min = grid % NLP
-          ENDIF
+!         IF( lp_min.gt. grid % NLP )THEN
+!           write(6,*) 'GHGM LP_MIN is greater than NLP - out of bounds ', mp , lp
+!           lp_min = grid % NLP
+!         ENDIF
 
 ! GHGM - check that lp_min is not greater than NLP
-          
-          IF( lp_min.lt. 2 )THEN
-            write(6,*) 'GHGM LP_MIN is less than 2 - out of bounds ', mp , lp
-            lp_min = 2
-          ENDIF
+!         
+!         IF( lp_min.lt. 2 )THEN
+!           write(6,*) 'GHGM LP_MIN is less than 2 - out of bounds ', mp , lp
+!           lp_min = 2
+!         ENDIF
 
           lp_t0(1) = lp_min-1
           lp_t0(2) = lp_min
