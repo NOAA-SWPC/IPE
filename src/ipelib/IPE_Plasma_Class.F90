@@ -1074,7 +1074,7 @@ CONTAINS
           IF( lp_min == 0 )THEN
             write(6,*) 'GHGM Need to expand search ', mp , lp
 
-            if((lp.ge.3).and(lp.le.grid % NLP - 2)) then ! Make sure lp is within bounds                   
+            if((lp.ge.3).and.(lp.le.grid % NLP - 2)) then ! Make sure lp is within bounds                   
 
             ! Check poleward
             IF( theta_t0 <= colat_90km(lp-1) .AND. theta_t0 >= colat_90km(lp-2) )THEN
@@ -1093,7 +1093,7 @@ CONTAINS
           IF( lp_min == 0 )THEN
             write(6,*) 'GHGM Still didnt get it trying again ', mp , lp
 
-            if((lp.ge.4).and(lp.le.grid % NLP - 3)) then ! Make sure lp is within bounds                   
+            if((lp.ge.4).and.(lp.le.grid % NLP - 3)) then ! Make sure lp is within bounds                   
 
             IF( theta_t0 <= colat_90km(lp-2) .AND. theta_t0 >= colat_90km(lp-3) )THEN
               lp_min = lp - 2
@@ -1111,7 +1111,7 @@ CONTAINS
           IF( lp_min == 0 )THEN
             write(6,*) 'GHGM Still didnt get it trying again AGAIN ', mp , lp
 
-            if((lp.ge.5).and(lp.le.grid % NLP - 4)) then ! Make sure lp is within bounds                   
+            if((lp.ge.5).and.(lp.le.grid % NLP - 4)) then ! Make sure lp is within bounds                   
 
             IF( theta_t0 <= colat_90km(lp-3) .AND. theta_t0 >= colat_90km(lp-4) )THEN
               lp_min = lp - 3
