@@ -95,6 +95,7 @@ C... Written by P. Richards September 2010
       DOUBLE PRECISION ALPHA,HP_MIN,HPEQ,PCO,N(4,IDIM)
 
       !.. Equatorial density for a depleted flux tube (~20% full).
+      print *,'TWFANG in NEW_HP'
       HP_MIN=300/PCO**2
       IF(HP_MIN.LT.5.0) HP_MIN=5.0
 
