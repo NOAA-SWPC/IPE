@@ -653,10 +653,10 @@
 !
       implicit none
       real,intent(in) :: xx
-      real :: x,y,tmp,ser
-      real :: cof(6) = (/76.18009172947146, -86.50532032941677,
+      real,parameter :: cof(6)= (/76.18009172947146, -86.50532032941677,
      c                   24.01409824083091, -1.231739572450155,
      c               0.1208650973866179e-2, -0.5395239384953e-5/)
+      real :: x,y,tmp,ser
       integer :: j
 !
       y = xx
@@ -705,26 +705,34 @@
       character(len=16) :: fname
       integer :: i,lu=20
       integer :: csize_rd,d1_rd,d2_rd
+      integer :: iulog=6, ios
 !
-      open(lu,file=infile,status='old', ACCESS ='SEQUENTIAL')
+      open(lu,file=infile,status='old', ACCESS ='SEQUENTIAL',
+     &     iostat=ios)
+        if(ios.gt.0) then
+         write(iulog,*)
+     &'read error in opening file ', infile, 
+     &' unit ', lu
+        end if
+
       read(lu,"(a)") fname
       read(lu,"(28i3)") ab
       read(lu,"(3i3)") csize_rd,d1_rd,d2_rd
       if (csize_rd /= csize) then
-!        write(iulog,"('>>> read_potential: file ',a,': incompatable csize: ',
-!     c     'csize_rd=',i4,' csize=',i4)") fname,csize_rd,csize
-        stop 'csize'
+        write(iulog,"('>>> read_potential: file ',a,': 
+     c     incompatable csize: ',
+     c     'csize_rd=',i4,' csize=',i4)") fname,csize_rd,csize
       endif
-      if (d1_rd /= d1_pot) then
-!        write(iulog,"('>>> read_potential: file ',a,': incompatable d1: ',
-!     c     'd1_rd=',i4,' d1_pot=',i4)") fname,d1_rd,d1_pot
-        stop 'd1'
-      endif
-      if (d2_rd /= d2_pot) then
-!        write(iulog,"('>>> read_potential: file ',a,': incompatable d2: ',
-!     c     'd2_rd=',i4,' d2_pot=',i4)") fname,d2_rd,d2_pot
-        stop 'd2'
-      endif
+!      if (d1_rd /= d1_pot) then
+!        write(iulog,"('>>> read_potential: file ',a,': 
+!     c   incompatable d1: ',
+!     c   'd1_rd=',i4,' d1_pot=',i4)") fname,d1_rd,d1_pot
+!      endif
+!      if (d2_rd /= d2_pot) then
+!        write(iulog,"('>>> read_potential: file ',a,': 
+!     c   incompatable d2: ',
+!     c   'd2_rd=',i4,' d2_pot=',i4)") fname,d2_rd,d2_pot
+!      endif
       do i=1,csize
         read(lu,"(6e20.9)") alschfits(:,i)
       enddo
@@ -753,8 +761,16 @@
 !
       character(len=16) :: fname
       integer :: i,j,lu=20
+      integer :: iulog=6, ios
 !
-      open(lu,file=infile,status='old', ACCESS = 'SEQUENTIAL')
+      open(lu,file=infile,status='old', ACCESS ='SEQUENTIAL',
+     &     iostat=ios)
+        if(ios.gt.0) then
+         write(iulog,*)
+     &'read error in opening file ', infile, 
+     &' unit ', lu
+        end if
+      
       read(lu,"(a)") fname
       read(lu,"(2i3)") maxk_scha,maxm_scha
       do i=1,d3_scha
@@ -783,20 +799,28 @@
 !
       character(len=16) :: fname
       integer :: rd_na,rd_nb,lu=20
+      integer :: iulog=6, ios
 !
-      open(lu,file=infile,status='old', ACCESS = 'SEQUENTIAL')
+      open(lu,file=infile,status='old', ACCESS ='SEQUENTIAL',
+     &     iostat=ios)
+        if(ios.gt.0) then
+         write(iulog,*)
+     &'read error in opening file ', infile, 
+     &' unit ', lu
+        end if
+
       read(lu,"(a)") fname
       read(lu,"(2i3)") rd_na,rd_nb
-      if (rd_na /= na) then
-!        write(iulog,"('>>> read_potential: file ',a,': incompatable na: ',
+!      if (rd_na /= na) then
+!        write(iulog,"('>>> read_potential: file ',a,': 
+!     c  incompatable na: ',
 !     c     'rd_na=',i4,' na=',i4)") fname,rd_na,na
-        stop 'na'
-      endif
-      if (rd_nb /= nb) then
-!        write(iulog,"('>>> read_potential: file ',a,': incompatable nb: ',
-!     c     'rd_nb=',i4,' nb=',i4)") fname,rd_nb,nb
-        stop 'nb'
-      endif
+!      endif
+!      if (rd_nb /= nb) then
+!        write(iulog,"('>>> read_potential: file ',a,': 
+!     c  incompatable nb: ',
+!     c  'rd_nb=',i4,' nb=',i4)") fname,rd_nb,nb
+!      endif
       read(lu,"(8e20.9)") bndya
       read(lu,"(8e20.9)") bndyb
       read(lu,"(8e20.9)") ex_bndy
