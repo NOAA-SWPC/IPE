@@ -309,7 +309,6 @@ C.... Written by P. Richards June-September 2010.
      >             DTMIN,  !.. Minimum time step allowed (>=10 secs?)
      >              F107,  !.. Daily F10.7
      >             F107A,  !.. 81 day average F10.7
-     >                KP,  !.. Geomagnetic activity Kp
      >              SZAX,  !.. Solar Zenith angle (radians)
      >              FPAS,  !.. Pitch angle scattering fraction
      >              HPEQ,  !.. Sets initial equatorial H+ density. See declaration below
@@ -379,7 +378,6 @@ C.... Written by P. Richards June-September 2010.
       DOUBLE PRECISION electron_density(CTIPDIM)     !.. electron density
       DOUBLE PRECISION O2DISF(CTIPDIM)   !.. O2 dissociation frequency
       DOUBLE PRECISION sza_north, sza_south !solar zenith angles at the north and south end of a tube                         
-      REAL DEN_HP_EQ,KP,KPSAVE                      
       INTEGER IWR         !$$$  for writing in files
       INTEGER istop
       INTEGER JEQ
@@ -541,20 +539,9 @@ C.... Written by P. Richards June-September 2010.
         CALL PROFIN(IHEPLS,INPLS,PCO,F107,N,temp_ti_te,HPEQ,HEPRAT)
       ENDIF
 
-! TWFANG adding plasma depletion
       !.. This routine adjusts the H+ and He+ densities for depleted flux tubes      
       !..  if HPEQ is negative. 0.1 < -HPEQ < 1.0
-!     IF(HPEQ.LT.-0.001) CALL NEW_HP(JMIN,JMAX,PCO,HPEQ,N,EFLAG)
-      JEQ=(JMAX+1)/2
-      print *,'TWFANG JEQ=',JEQ,JMIN,JMAX
-      DEN_HP_EQ=XIONN(2,JEQ)
-      print *,'DEN_HP_EQ',DEN_HP_EQ,KP
-      print *,'HPEQ before, and PCO',HPEQ,PCO
-      CALL NEW_HPEQ(KP,PCO,DEN_HP_EQ,KPSAVE,HPEQ)  
-      print *,'HPEQ after',HPEQ
       IF(HPEQ.LT.-0.001) CALL NEW_HP(JMIN,JMAX,PCO,HPEQ,N,EFLAG)
-
-! TWFANG
 
       !.. Update solar EUV flux factors
       CALL FACEUV(F107,F107A,UVFAC,EUVFLUX)

@@ -95,7 +95,6 @@ C... Written by P. Richards September 2010
       DOUBLE PRECISION ALPHA,HP_MIN,HPEQ,PCO,N(4,IDIM)
 
       !.. Equatorial density for a depleted flux tube (~20% full).
-      print *,'TWFANG in NEW_HP'
       HP_MIN=300/PCO**2
       IF(HP_MIN.LT.5.0) HP_MIN=5.0
 
@@ -142,22 +141,23 @@ C      KPPP=(6.0-PCO)/0.50    ! Kp for plasmapause: Richards
      >                   PCO,  !..  IN: L-shell
      >             DEN_HP_EQ,  !..  IN: Equatorial H+ density
      >                KPSAVE,  !..  OUT: Saved Kp value
-     >                  HPEQ)  !..  OUT: =0/1 Signal if H+ depletion
-      REAL DEN_HP_EQ,KP,KPSAVE
-      DOUBLE PRECISION PCO,HPEQ
-      REAL KPPP    !.. Kp of plasmapause location
-      REAL KPINC   !.. How much Kp has to increase before depletion occurs
+     >                  HPEQ_out)  !..  OUT: =0/1 Signal if H+ depletion
+      REAL*8 DEN_HP_EQ,KP,KPSAVE,PCO,HPEQ_out
+c      DOUBLE PRECISION DEN_HP_EQ,KP,KPSAVE
+c     DOUBLE PRECISION PCO,HPEQ
+      REAL*8 KPPP    !.. Kp of plasmapause location
+      REAL*8 KPINC   !.. How much Kp has to increase before depletion occurs
       DATA KPINC/0.7/
 
       !.. Make sure flux tube is not over full. Max tube content ~ 5E14 ions for L>3.0
       !.. Flux tubes < 3 will never reach this limit. Tube volume goes as ~1.0/L**4 
-      IF(DEN_HP_EQ.GT.6E5/PCO**4) HPEQ=-1   !.. Not needed if Kp depletions
+      IF(DEN_HP_EQ.GT.6E5/PCO**4) HPEQ_out=-1.   !.. Not needed if Kp depletions
 
       !.. Plasmapause location. If desired, replace with different KPPP above
       KPPP=(6.0-PCO)/0.5        !.. Kp for plasmapause Richards
 
       !.. Determine if flux tube needs to be deleted
-      IF(KP-KPSAVE.GT.KPINC.AND.KP.GE.KPPP) HPEQ=-1    ! PGR 
+      IF(KP-KPSAVE.GT.KPINC.AND.KP.GE.KPPP) HPEQ_out=-1.    ! PGR 
 
       KPSAVE=KP  !.. Save Kp for changing Lpp only when Kp increases
       RETURN

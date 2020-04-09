@@ -2740,7 +2740,7 @@ end SUBROUTINE interpolate_in_q
     REAL(prec), INTENT(in)             :: flip_time_step
     ! Local
     INTEGER  :: i, lp, mp, iprint, ii
-    INTEGER  :: JMINX, JMAXX
+    INTEGER  :: JMINX, JMAXX, JEQ
     INTEGER  :: EFLAG(11,11)
     INTEGER  :: nflag_t(1 : plasma % NLP,plasma % mp_low : plasma % mp_high)
     INTEGER  :: nflag_d(1 : plasma % NLP,plasma % mp_low : plasma % mp_high)
@@ -2768,7 +2768,8 @@ end SUBROUTINE interpolate_in_q
     REAL(dp) :: NHEAT(1:grid % nFluxTube)
     REAL(dp) :: SZA(1:grid % nFluxTube)
     REAL(dp) :: dotprod, sini
-    REAL(sp) :: F107D, F107A, KP_flip
+    REAL(sp) :: F107D, F107A
+    REAL(dp) :: KP_flip,KPSAVE,DEN_HP_EQ
 
       F107D = forcing % f107( forcing % current_index )
       F107A = forcing % f107_81day_avg( forcing % current_index )
@@ -2856,6 +2857,15 @@ end SUBROUTINE interpolate_in_q
           JMINX = 1
           JMAXX = grid % flux_tube_max(lp)
 
+          JEQ=(JMAXX+1)/2
+          print *,'TWFANG JEQ=',JEQ,JMINX,JMAXX
+          DEN_HP_EQ=XIONNX(2,JEQ)
+          print *,'DEN_HP_EQ',DEN_HP_EQ,KP_flip
+          print *,'HPEQ before, and PCO',HPEQ_flip,PCO
+          CALL NEW_HPEQ(KP_flip,PCO,DEN_HP_EQ,KPSAVE,HPEQ_flip)
+          print *,'HPEQ after',HPEQ_flip
+   
+
           CALL CTIPINT( JMINX, & !.. index of the first point on the field line
                         JMAXX, & !.. index of the last point on the field line
                         grid % flux_tube_max(lp), & !.. CTIPe array dimension, must equal to FLDIM
@@ -2880,7 +2890,7 @@ end SUBROUTINE interpolate_in_q
                         DTMIN, & !.. Minimum time step allowed (>=10 secs?)
                         F107D, & !.. Daily F10.7
                         F107A, & !.. 81 day average F10.7
-                        KP_FLIP, & !.. current Kp value
+!                       KP_FLIP, & !.. current Kp value
                         SZA(1:JMAXX), & !.. Solar Zenith angle (radians)
                         FPAS, & !.. Pitch angle scattering fraction
                         HPEQ_flip, & !.. Sets initial equatorial H+ density. See declaration below
@@ -3485,6 +3495,4 @@ end SUBROUTINE interpolate_in_q
   END SUBROUTINE IONNEUT_PLAS
 !
 !
-!
-
 END MODULE IPE_Plasma_Class
