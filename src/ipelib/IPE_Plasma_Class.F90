@@ -76,7 +76,7 @@ MODULE IPE_Plasma_Class
   INTEGER, PARAMETER, PRIVATE    :: n_ion_species = 9
   REAL(prec), PARAMETER, PRIVATE :: safe_density_minimum = 1.0e+06_prec
   REAL(prec), PARAMETER, PRIVATE :: safe_temperature_minimum = 100.0_prec
-  REAL(prec), PARAMETER, PRIVATE :: colfac = 1.5_prec
+  REAL(prec), PARAMETER, PRIVATE :: colfac = 1.7_prec
   REAL(prec), PARAMETER, PRIVATE :: qeoNao10 = 9.6489E7_prec        !  qe/m_e*1000 [C/g]
   REAL(prec), PARAMETER, PRIVATE :: qeomeo10 = 1.7588028E11_prec    ! qe/m_e*1000 [C/g]
   REAL(prec), PARAMETER, PRIVATE :: rmassinv_nop = 1.0_prec / NO_mass ! inverted rmass
@@ -124,7 +124,7 @@ MODULE IPE_Plasma_Class
   REAL(dp), PARAMETER, PRIVATE :: DTMIN    = 1.0D0
   REAL(dp), PARAMETER, PRIVATE :: FPAS     = 0.0D0
   REAL(dp), PARAMETER, PRIVATE :: HEPRAT   = 9.0D-2
-  REAL(dp), PARAMETER, PRIVATE :: COLFACX  = 1.7D0
+! REAL(dp), PARAMETER, PRIVATE :: COLFACX  = 1.7D0
   REAL(dp), PARAMETER, PRIVATE :: HPEQ     = 0.0D0
   ! IHEPLS,INPLS turn on diffusive solutions if > 0. no solution if 0, chemical equilibrium if < 0
   INTEGER, PARAMETER, PRIVATE  :: IHEPLS   = 1
@@ -2883,7 +2883,8 @@ end SUBROUTINE interpolate_in_q
                         FPAS, & !.. Pitch angle scattering fraction
                         HPEQ_flip, & !.. Sets initial equatorial H+ density. See declaration below
                         HEPRAT, & !.. Intial He+/H+ ratio (.01 to 1.0)
-                        COLFACX, & !.. O+ - O collision frequency Burnside factor (1.0 to 1.7)
+!                       COLFACX, & !.. O+ - O collision frequency Burnside factor (1.0 to 1.7)
+                        COLFAC, & !.. O+ - O collision frequency Burnside factor (1.0 to 1.7)
                         IHEPLS, &
                         INPLS, &
                         UTHR, &  !.. Universal time in hours
