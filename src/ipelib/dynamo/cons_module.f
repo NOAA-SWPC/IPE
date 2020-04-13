@@ -14,7 +14,7 @@
      &  pi_dyn=3.14159265358979312 ! pi used in dynamo calculations
       real,parameter ::                                                 &
      &  re   = 6.37122e8,                                               &! earth radius (cm)                
-     &  h0 =9.0e6, r0 =re+h0	! use mean earth radius
+     &  h0 =9.0e6, r0 =re+h0    ! use mean earth radius
       real ::                                                           &
      &  dlatm, dlonm,                                                   &! grid spacing
      &  xlatm(kmlat),                                                   &! magnetic latitudes (radians)
@@ -26,19 +26,15 @@
 !
 ! Critical colatitude limits for use of Heelis potential in dynamo:
       real,parameter ::                                                 &
-!     &  crit(2) = (/0.261799387, 0.523598775/) ! original values
-     &  crit(2) = (/0.523598775, 0.61086524/)  ! plasmasphere has zero  
+     &  crit(2) = (/0.261799387, 0.523598775/) ! original values
+!    &  crit(2) = (/0.523598775, 0.61086524/)  ! plasmasphere has zero  
 !nm031407:     &  crit(2) = (/0.523598775, 0.525298775/)  !nm041106: test
                                           ! conductances aboce &lam&>60 deg therefore I set the pcb to 60deg
                                           ! and the auroral zone equator boundary to 55 deg
-	! now above &lam&>60 set the conductances to some value which shouldn't
-	! matter and below it's an interpolation between high and low latitude 
-	! potential
+! now above &lam&>60 set the conductances to some value which shouldn't
+! matter and below it's an interpolation between high and low latitude
+! potential
 !nm040607:     &  crit(2) = (/0.5314827561378479, 0.61086524/)  !crit(1) corresponds to max lat gip(83)=59.54828119329674  !nm040607:
-	
-      integer, parameter :: jyr =1997,                                  &! JYR,
-     &   jday =97 ! JDAY
-      real, parameter :: jsecs =150300.! JSECS
 
       integer, public :: idyn_save(kmlat) !correspondance between lp_plas & lp_dyn
 

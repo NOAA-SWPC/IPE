@@ -206,7 +206,7 @@ CONTAINS
 
     ! FileIO !
     read_apex_neutrals        = .TRUE.
-    read_geographic_neutrals  = .FALSE.
+    read_geographic_neutrals  = .TRUE.
     write_apex_neutrals       = .TRUE.
     write_geographic_neutrals = .TRUE.
     write_geographic_eldyn    = .TRUE.
