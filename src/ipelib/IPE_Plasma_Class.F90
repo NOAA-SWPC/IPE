@@ -3354,7 +3354,6 @@ end SUBROUTINE interpolate_in_q
                        mpi_layer % mpi_prec, &
                        mpi_layer % mpi_communicator, &
                        mpierror)
-    WRITE( 5000 + mpi_layer % rank_id,* ) plasma % conductivities
 #endif
 
   END SUBROUTINE Calculate_Field_Line_Integrals
