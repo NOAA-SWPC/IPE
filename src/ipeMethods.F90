@@ -1091,6 +1091,8 @@ contains
 
       localMin = huge(0._ESMF_KIND_R8)
       localMax = -localMin
+      globalMin = 0._ESMF_KIND_R8
+      globalMax = 0._ESMF_KIND_R8
 
       ! -- find longest field name for formatting purpose
       maxLength = 0
