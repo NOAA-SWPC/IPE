@@ -595,7 +595,17 @@ module ipeCap
           mp = this % nodeToIndexMap(id, 3)
           modelPtr(kp, lp, mp) = fieldPtr(id)
         end do
+
       end do
+
+      ! -- check values of imported fields, if requested
+      if (btest(diagnostic,17)) then
+        call IPEFieldDiagnostics(gcomp, rc=rc)
+        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+          line=__LINE__,  &
+          file=__FILE__)) &
+          return  ! bail out
+      end if
 
     end if
 
@@ -621,15 +631,6 @@ module ipeCap
         line=__LINE__,  &
         file=__FILE__,  &
         rcToReturn=rc)) &
-        return  ! bail out
-    end if
-
-    ! -- check values of imported fields, if requested
-    if (btest(diagnostic,17)) then
-      call IPEFieldDiagnostics(gcomp, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-        line=__LINE__,  &
-        file=__FILE__)) &
         return  ! bail out
     end if
 
