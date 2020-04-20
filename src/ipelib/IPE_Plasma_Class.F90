@@ -76,7 +76,7 @@ MODULE IPE_Plasma_Class
   INTEGER, PARAMETER, PRIVATE    :: n_ion_species = 9
   REAL(prec), PARAMETER, PRIVATE :: safe_density_minimum = 1.0e+06_prec
   REAL(prec), PARAMETER, PRIVATE :: safe_temperature_minimum = 100.0_prec
-  REAL(prec), PARAMETER, PRIVATE :: colfac = 1.7_prec
+  REAL(prec), PARAMETER, PRIVATE :: colfac = 1.3_prec
   REAL(prec), PARAMETER, PRIVATE :: qeoNao10 = 9.6489E7_prec        !  qe/m_e*1000 [C/g]
   REAL(prec), PARAMETER, PRIVATE :: qeomeo10 = 1.7588028E11_prec    ! qe/m_e*1000 [C/g]
   REAL(prec), PARAMETER, PRIVATE :: rmassinv_nop = 1.0_prec / NO_mass ! inverted rmass
