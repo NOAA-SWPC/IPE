@@ -2859,7 +2859,7 @@ end SUBROUTINE interpolate_in_q
 
           JEQ=(JMAXX+1)/2
           print *,'TWFANG JEQ=',JEQ,JMINX,JMAXX
-          DEN_HP_EQ=XIONNX(2,JEQ)
+          DEN_HP_EQ=XIONNX(2,JEQ)*1.0E-6  !convert the density to cm-3
           print *,'DEN_HP_EQ',DEN_HP_EQ,KP_flip
           print *,'HPEQ before, and PCO',HPEQ_flip,PCO
           CALL NEW_HPEQ(KP_flip,PCO,DEN_HP_EQ,KPSAVE,HPEQ_flip)
