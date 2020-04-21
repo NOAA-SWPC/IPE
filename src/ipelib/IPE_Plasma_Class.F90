@@ -2774,6 +2774,7 @@ end SUBROUTINE interpolate_in_q
       F107D = forcing % f107( forcing % current_index )
       F107A = forcing % f107_81day_avg( forcing % current_index )
       KP_flip = forcing % kp( forcing % current_index )
+      KPSAVE = forcing % kp( forcing % current_index-1 )
       UTHR  = time_tracker % hour + (time_tracker % minute) / 60.0
       HPEQ_flip = HPEQ
       nflag_t = 0
@@ -2860,7 +2861,7 @@ end SUBROUTINE interpolate_in_q
           JEQ=(JMAXX+1)/2
           print *,'TWFANG JEQ=',JEQ,JMINX,JMAXX
           DEN_HP_EQ=XIONNX(2,JEQ)*1.0E-6  !convert the density to cm-3
-          print *,'DEN_HP_EQ',DEN_HP_EQ,KP_flip
+          print *,'DEN_HP_EQ',DEN_HP_EQ,UTHR,KP_flip,KPSAVE
           print *,'HPEQ before, and PCO',HPEQ_flip,PCO
           CALL NEW_HPEQ(KP_flip,PCO,DEN_HP_EQ,KPSAVE,HPEQ_flip)
           print *,'HPEQ after',HPEQ_flip

@@ -151,7 +151,7 @@ c     DOUBLE PRECISION PCO,HPEQ
 
       !.. Make sure flux tube is not over full. Max tube content ~ 5E14 ions for L>3.0
       !.. Flux tubes < 3 will never reach this limit. Tube volume goes as ~1.0/L**4 
-      IF(DEN_HP_EQ.GT.6E5/PCO**4) HPEQ_out=-1.   !.. Not needed if Kp depletions
+!     IF(DEN_HP_EQ.GT.6E5/PCO**4) HPEQ_out=-1.   !.. Not needed if Kp depletions
 
       !.. Plasmapause location. If desired, replace with different KPPP above
       KPPP=(6.0-PCO)/0.5        !.. Kp for plasmapause Richards
@@ -159,6 +159,6 @@ c     DOUBLE PRECISION PCO,HPEQ
       !.. Determine if flux tube needs to be deleted
       IF(KP-KPSAVE.GT.KPINC.AND.KP.GE.KPPP) HPEQ_out=-1.    ! PGR 
 
-      KPSAVE=KP  !.. Save Kp for changing Lpp only when Kp increases
+!     KPSAVE=KP  !.. Save Kp for changing Lpp only when Kp increases
       RETURN
       END
