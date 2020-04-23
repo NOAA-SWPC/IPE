@@ -40,7 +40,7 @@ IMPLICIT NONE
     REAL(prec), ALLOCATABLE :: electric_potential2(:,:)
     REAL(prec), ALLOCATABLE :: mhd_electric_potential(:,:)
     REAL(prec), ALLOCATABLE :: electric_field(:,:,:)
-    REAL(prec), ALLOCATABLE :: v_ExB_geographic(:,:,:,:)  ! "zonal" and "meridional" direction on the geographic grid
+    REAL(prec), POINTER     :: v_ExB_geographic(:,:,:,:)  ! "zonal" and "meridional" direction on the geographic grid
     REAL(prec), ALLOCATABLE :: v_ExB_apex(:,:,:) ! "zonal" and "meridional" direction ( VEXBth, VEXBe ) on the apex grid
 
     REAL(prec), ALLOCATABLE, PRIVATE :: lat_interp_weights(:,:) ! Weights for interpolating from magnetic longitude to ipe longitude

@@ -6,36 +6,53 @@ MODULE IPE_Wrapper
 
   IMPLICIT NONE
 
-  TYPE( IPE_Model ) :: ipe
-  INTEGER           :: lps, lpe, mps, mpe
+  PRIVATE
 
-  PUBLIC
+  PUBLIC :: IPE_Model
+
+  PUBLIC :: Initialize_IPE
+  PUBLIC :: Update_IPE
+  PUBLIC :: Finalize_IPE
 
 CONTAINS
   
-  SUBROUTINE Initialize_IPE ( clock, rc )
+  SUBROUTINE Initialize_IPE ( ipe, clock, vm, rc )
 
-    TYPE(ESMF_Clock)     :: clock
-    INTEGER, intent(out) :: rc
+    TYPE(IPE_Model)                      :: ipe
+    TYPE(ESMF_Clock)                     :: clock
+    TYPE(ESMF_VM), OPTIONAL              :: vm
+    INTEGER,       OPTIONAL, INTENT(OUT) :: rc
     ! Local
     LOGICAL               :: init_success
-    TYPE(ESMF_VM)         :: vm_IPE
-    TYPE(ESMF_Time)       :: currTime
+    LOGICAL               :: file_exists
+    INTEGER               :: localrc
     INTEGER               :: year, month, day, hour, minute, second
     INTEGER               :: mpicomm, mpierr
     INTEGER(ESMF_KIND_I4) :: mm, dd, h, m, s
     INTEGER(ESMF_KIND_I4) :: yystop, mmstop, ddstop, hstop, mstop, sstop
-    LOGICAL               :: file_exists
     CHARACTER(LEN=30)     :: init_file
+    TYPE(ESMF_VM)         :: vm_IPE
+    TYPE(ESMF_Time)       :: currTime
 
-    rc = ESMF_SUCCESS
+    ! begin
+    IF (PRESENT(rc)) rc = ESMF_SUCCESS
 
-    CALL ESMF_VMGetCurrent(vm=vm_IPE, rc=rc)
-    IF( ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__,FILE=__FILE__) ) RETURN  ! bail out
+    IF (PRESENT(vm)) THEN
+      vm_IPE = vm
+    ELSE
+      CALL ESMF_VMGetCurrent(vm=vm_IPE, rc=localrc)
+      IF( ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+        line=__LINE__, &
+        FILE=__FILE__, &
+        rcToReturn=rc) ) RETURN  ! bail out
+    END IF
 
     ! Obtain communicator
-    CALL ESMF_VMGet(vm=vm_IPE, mpiCommunicator=mpicomm, rc=rc)
-    IF( ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__,FILE=__FILE__) ) RETURN  ! bail out
+    CALL ESMF_VMGet(vm=vm_IPE, mpiCommunicator=mpicomm, rc=localrc)
+    IF( ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      FILE=__FILE__, &
+      rcToReturn=rc) ) RETURN  ! bail out
 
     ! Build IPE
     PRINT*, ' IPE : Initializing IPE'
@@ -44,25 +61,28 @@ CONTAINS
 
     IF( .not. init_success )THEN
       CALL ESMF_LogSetError(ESMF_RC_INTNRL_BAD, msg="Error building IPE", &
-        line=__LINE__, file=__FILE__, rcToReturn=rc)
+        line=__LINE__, &
+        file=__FILE__, &
+        rcToReturn=rc)
       RETURN
     ENDIF
 
     ! Set IPE run mode to coupled
     ipe % forcing % coupled = .true.
 
-    ! Set local (lp,mp) bounds
-    lps = 1
-    lpe = ipe % grid % NLP
-    mps = ipe % grid % mp_low
-    mpe = ipe % grid % mp_high
-
     ! Set IPE internal clock
-    CALL ESMF_ClockGet(clock, currTime=currTime, rc=rc)
-    IF( ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__,FILE=__FILE__) ) RETURN  ! bail out
+    CALL ESMF_ClockGet(clock, currTime=currTime, rc=localrc)
+    IF( ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      FILE=__FILE__, &
+      rcToReturn=rc) ) RETURN  ! bail out
 
-    CALL ESMF_TimeGet(currTime, yy=year,mm=month,dd=day,h=hour,m=minute,s=second,rc=rc)
-    IF( ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__,FILE=__FILE__) ) RETURN  ! bail out
+    CALL ESMF_TimeGet(currTime, yy=year, mm=month, dd=day, &
+      h=hour, m=minute, s=second, rc=localrc)
+    IF( ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      FILE=__FILE__, &
+      rcToReturn=rc) ) RETURN  ! bail out
 
     CALL ipe % time_tracker % Set_Date( year, month, day )
     CALL ipe % time_tracker % Set_HourMinute( hour, minute )
@@ -75,45 +95,63 @@ CONTAINS
       CALL ipe % Initialize( init_file, init_success )
       IF ( .not. init_success ) THEN
         CALL ESMF_LogSetError(ESMF_RC_INTNRL_BAD, msg="Error initializing IPE", &
-          line=__LINE__, file=__FILE__, rcToReturn=rc)
+          line=__LINE__, &
+          file=__FILE__, &
+          rcToReturn=rc)
         RETURN
       ENDIF
     ELSE
       PRINT*, ' IPE : File not found '//TRIM(init_file)
-      CALL ESMF_LogSetError(ESMF_RC_FILE_OPEN, msg="IPE: File "//trim(init_file)//" not found", &
-        line=__LINE__, file=__FILE__, rcToReturn=rc)
+      CALL ESMF_LogSetError(ESMF_RC_FILE_OPEN, &
+        msg="IPE: File "//trim(init_file)//" not found", &
+        line=__LINE__, &
+        file=__FILE__, &
+        rcToReturn=rc)
       RETURN
     ENDIF
 
   END SUBROUTINE Initialize_IPE
 
   
-  SUBROUTINE Update_IPE( clock, rc )
+  SUBROUTINE Update_IPE( ipe, clock, rc )
 
-    TYPE(ESMF_Clock)     :: clock
-    INTEGER, intent(out) :: rc
+    TYPE(IPE_Model)                :: ipe
+    TYPE(ESMF_Clock)               :: clock
+    INTEGER, OPTIONAL, INTENT(OUT) :: rc
      ! Local
     TYPE(ESMF_Time)         :: currTime, startTime
     TYPE(ESMF_TimeInterval) :: elapsedTime
     REAL(ESMF_KIND_R8)      :: elapsed_s
+    INTEGER                 :: localrc
     INTEGER                 :: error
     INTEGER                 :: year, month, day, hour, minute, second
     CHARACTER(LEN=30)       :: hdf5_file
 
-    rc = ESMF_SUCCESS
+    ! begin
+    IF (PRESENT(rc)) rc = ESMF_SUCCESS
 
-    CALL ESMF_ClockGet(clock, startTime=startTime, currTime=currTime, rc=rc)
-    IF( ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__,FILE=__FILE__) ) RETURN  ! bail out
+    CALL ESMF_ClockGet(clock, startTime=startTime, currTime=currTime, rc=localrc)
+    IF( ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      FILE=__FILE__, &
+      rcToReturn=rc) ) RETURN  ! bail out
 
-    CALL ESMF_TimeGet(currtime, yy=year, mm=month, dd=day, h=hour, m=minute, s=second, rc=rc)
-    IF( ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__,FILE=__FILE__) ) RETURN  ! bail out
+    CALL ESMF_TimeGet(currtime, yy=year, mm=month, dd=day, &
+      h=hour, m=minute, s=second, rc=localrc)
+    IF( ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      FILE=__FILE__, &
+      rcToReturn=rc) ) RETURN  ! bail out
 
     CALL ipe % time_tracker % Set_Date( year, month, day )
     CALL ipe % time_tracker % Set_HourMinute( hour, minute )
 
     elapsedTime = currTime - startTime
-    CALL ESMF_TimeIntervalGet(elapsedTime, s_r8=elapsed_s, rc=rc)
-    IF( ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__,FILE=__FILE__) ) RETURN  ! bail out
+    CALL ESMF_TimeIntervalGet(elapsedTime, s_r8=elapsed_s, rc=localrc)
+    IF( ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      FILE=__FILE__, &
+      rcToReturn=rc) ) RETURN  ! bail out
 
     ipe % time_tracker % elapsed_sec = REAL(elapsed_s, KIND=prec)
 
@@ -125,7 +163,9 @@ CONTAINS
       CALL ipe % Write_to_HDF5( hdf5_file, error )
       IF ( error /= 0 ) THEN
         CALL ESMF_LogSetError(ESMF_RC_FILE_WRITE, msg="Error writing to HDF5 file "//hdf5_file, &
-          line=__LINE__, file=__FILE__, rcToReturn=rc)
+          line=__LINE__, &
+          file=__FILE__, &
+          rcToReturn=rc)
         RETURN
       ENDIF
 
@@ -134,21 +174,31 @@ CONTAINS
   END SUBROUTINE Update_IPE
 
   
-  SUBROUTINE Finalize_IPE( rc )
+  SUBROUTINE Finalize_IPE( ipe, rc )
 
-    INTEGER, intent(out) :: rc  
+    TYPE(IPE_Model)                :: ipe
+    INTEGER, OPTIONAL, INTENT(OUT) :: rc
+
+    ! local variables
+    integer :: localrc
  
-    rc = ESMF_SUCCESS
+    ! begin
+    IF (PRESENT(rc)) rc = ESMF_SUCCESS
 
-    CALL ESMF_LogWrite("Finalize_IPE start:", ESMF_LOGMSG_INFO, rc=rc)
-    IF( ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__,FILE=__FILE__) ) RETURN  ! bail out
+    CALL ESMF_LogWrite("Finalize_IPE start:", ESMF_LOGMSG_INFO, rc=localrc)
+    IF( ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      FILE=__FILE__, &
+      rcToReturn=rc) ) RETURN  ! bail out
 
     CALL ipe % Trash( )
 
-    CALL ESMF_LogWrite("Finalize_IPE end:", ESMF_LOGMSG_INFO, rc=rc)
-    IF( ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__,FILE=__FILE__) ) RETURN  ! bail out
+    CALL ESMF_LogWrite("Finalize_IPE end:", ESMF_LOGMSG_INFO, rc=localrc)
+    IF( ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      FILE=__FILE__, &
+      rcToReturn=rc) ) RETURN  ! bail out
 
  END SUBROUTINE Finalize_IPE
 
 END MODULE IPE_Wrapper
-

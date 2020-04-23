@@ -15,9 +15,10 @@ libipm_a_FCFLAGS = $(FC_MODINC) ipelib \
         $(FC_MODINC) ipelib/flip \
         $(FC_MODINC) ipelib/msise00
 
-libipm_a_SOURCES = ipeCap.F90 IPE_Wrapper.F90
+libipm_a_SOURCES = ipeCap.F90 ipeMethods.F90 IPE_Wrapper.F90
 
-libipm_a-ipeCap.$(OBJEXT): libipm_a-IPE_Wrapper.$(OBJEXT)
+libipm_a-ipeCap.$(OBJEXT): libipm_a-ipeMethods.$(OBJEXT) libipm_a-IPE_Wrapper.$(OBJEXT)
+libipm_a-ipeMethods.$(OBJEXT): libipm_a-IPE_Wrapper.$(OBJEXT)
 libipm_a-IPE_Wrapper.$(OBJEXT): $(builddir)/ipelib/libipe.a
 else
 bin_PROGRAMS = ipe.x
