@@ -289,12 +289,6 @@
 !-----------------------------------------------------------------------
       call DerivPotential
 
-!      if(i_rank.eq.0) then
-!           write(2000+i_rank, *) potent
-!           write(2000+i_rank, *) ed1 
-!           write(2000+i_rank, *) ed2
-!      end if 
-
       end subroutine get_efield_ipe
 
       subroutine GlobalElPotential
