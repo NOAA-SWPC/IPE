@@ -162,7 +162,7 @@ CONTAINS
 
       dynamo_efield = dynamo
       IF ( .not. dynamo ) THEN
-        CALL efield_init
+        CALL efield_init_ipe
         ! Maps latitude from 130km to 90km along flux tube.
         DO j=0,nmlat
           theta130_rad   = ( 180.0_prec - ylatm(j) ) * dtr
@@ -459,13 +459,16 @@ CONTAINS
     ut=utime/3600.0_prec
 
     f107d = forcing % f107( forcing % current_index )
-    v_sw  = forcing % solarwind_velocity( forcing % current_index )
     bz    = forcing % solarwind_Bz( forcing % current_index )
     by    = forcing % solarwind_By( forcing % current_index )
+    bt    = forcing % solarwind_Bt( forcing % current_index )
+    angle = forcing % solarwind_angle( forcing % current_index )
+    v_sw  = forcing % solarwind_velocity( forcing % current_index )
+    swden = forcing % solarwind_density( forcing % current_index )
 
     iyear = 1999
 
-    call get_efield(mpi_layer % rank_id)
+    call get_efield_ipe(mpi_layer%rank_id)
 
     ! Interpolate the potential to the IPE grid
     potent_local = potent

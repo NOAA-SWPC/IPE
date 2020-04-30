@@ -1,5 +1,5 @@
 
-      module efield_ipe
+      module  efield_ipe
 !--------------------------------------------------------------------- 
 ! description: calculates the electric potential for a given year,
 !      day of year,UT, F10.7, B_z(K_p)
@@ -39,35 +39,34 @@
 ! - 12/15/03 input value iseasav : replaced by day -> month and day of month
 ! - 12/15/03 S_aM calculated according to Scherliess draft paper and added
 !   S_aM(corrected) = 90*(S_aM+1) to get variation in fig 1 Scherliess draft
+! Author: A. Maute Dec 2003  am 12/30/03
+
 !
 !   Apr 06 2012 Henry Juang, initial implement for nems
 !   Nov 20 2014 Jun   Wang,  change JULDAY to JULDAY_WAM
 !   Mar 18 2017 Zhuxiao Li and Tzu-Wei, add option to read the solar
 !   wind related driving parameteres from outside parameter file.
-!
-! Author: A. Maute Dec 2003  am 12/30/03 
+!   May 2018 Zhuxiao Li, add the code to call Weimer2005 (w05sc) .
+
 !------------------------------------------------------------------------------ 
 
-!     use shr_kind_mod,  only: r8 => shr_kind_r8
-!     use physconst,     only: pi
-!     use abortutils,    only: endrun
-!     use cam_logfile,   only: iulog
-!      use IDEA_IO_UNITS, only : iulog  
+      use weimer2005_ipe, only: EpotVal_new, SetModel_new, read_bndy,
+     &                         read_potential, read_schatable, model
  
       implicit none
 
-      public :: efield_init,   ! interface routine                     
-     &          get_efield     ! interface routine
+      public :: efield_init_ipe,   ! interface routine                     
+     &          get_efield_ipe     ! interface routine
       public :: ed1,           ! zonal electric field Ed1  [V/m] 
      &          ed2,           ! meridional electric field Ed2 [V/m] 
      &          potent,        ! electric potential [V]
      &	        nmlon, nmlat,  ! dimension of mag. grid 
      &          dlatm, dlonm,  ! grid spacing of mag. grid 
-     &	        ylonm, ylatm   ! magnetic longitudes/latitudes (degc)
-     &,iday,iyear,iday_m,imo,f107d,by,bz,ut
-     &,angle, bt, tilt, v_sw
+     &	        ylonm, ylatm,  ! magnetic longitudes/latitudes (degc)
+     &          iday,iyear,iday_m,imo,f107d,by,bz,ut,
+     &          bt, angle, v_sw, swden, tilt      !   by Zhuxiao, for IPE
 
-      public :: Coef , Cn,ML,MM1,MaxL,MaxM,MaxN,ALAMN,ALAMX,ALAMR,
+      public :: ALAMN,ALAMX,ALAMR,
      &STPD,STP2,CSTP,SSTP,CX,ST,CT,AM,EPOCH,TH0,PH0,DIPOLE
 !     private
 
@@ -84,12 +83,23 @@
       real ::   f107d           ! 10.7 cm solar flux
       real ::   by              ! By component of IMF [nT]
       real ::   bz              ! Bz component of IMF [nT]
-      real ::  angle 
+
+! for IPE, by Zhuxiao Li
       real :: bt
+      real :: angle
       real :: tilt
       real :: v_sw
+      real :: swden
 
       private
+
+! setting weimer2005 model
+
+      character*4, parameter ::  my_model = 'epot' 
+! for MPI trace      
+
+      integer :: i_rank     
+
 !---------------------------------------------------------------------- 
 ! mag. grid dimensions (assumed resolution of 2deg)
 !---------------------------------------------------------------------- 
@@ -100,7 +110,6 @@
      &nmlonh= nmlon/2,      ! mlon/2
      &nmlonp1 = nmlon+1,    ! mlon+1 
      &nmlatp1 = nmlat+1     ! mlat+1
-!     &iulog=10
 
       real ::         
      &  ylatm(0:nmlat),      ! magnetic latitudes (deg)
@@ -185,9 +194,6 @@
 !---------------------------------------------------------------------- 
 !replace wei96.f common block 
 !---------------------------------------------------------------------- 
-      real :: Coef(0:1,0:8,0:3) 
-      real :: Cn(0:3,0:1,0:4,0:1,0:8,0:3) 
-      integer  ML,MM1,MaxL,MaxM,MaxN
       real ALAMN,ALAMX,ALAMR,STPD,STP2,CSTP,SSTP
       real CX(9),ST(6),CT(6),AM(3,3,11)
       real , parameter :: EPOCH=1980.,TH0=11.19,PH0=-70.76,
@@ -205,9 +211,7 @@
 !
       contains
 
-      subroutine efield_init
-!hmhj subroutine efield_init(efield_lflux_file, efield_hflux_file, 
-!hmhj&efield_wei96_file)
+      subroutine efield_init_ipe
 !--------------------------------------------------------------------
 ! Purpose: read in and set up coefficients needed for electric field
 !          calculation (independent of time & geog. location)
@@ -216,14 +220,12 @@
 !
 ! Author: A. Maute Dec 2003  am 12/17/03 
 !-------------------------------------------------------------------
-!hmhj character(len=*), intent(in) :: efield_lflux_file
-!hmhj character(len=*), intent(in) :: efield_hflux_file
-!hmhj character(len=*), intent(in) :: efield_wei96_file
 
       character(len=*), parameter :: 
      &                  efield_lflux_file='global_idea_coeff_lflux.dat',
-     &                  efield_hflux_file='global_idea_coeff_hflux.dat',
-     &                  efield_wei96_file='global_idea_wei96.cofcnts'
+     &                  efield_hflux_file='global_idea_coeff_hflux.dat'
+
+      model = my_model
 
       call constants	 ! calculate constants
 !-----------------------------------------------------------------------
@@ -236,11 +238,21 @@
 !-----------------------------------------------------------------------
 !following part should be independent of time & location if IMF constant
 !-----------------------------------------------------------------------
-      call ReadCoef (efield_wei96_file)
+      call readcoef_ipe
 
-      end subroutine efield_init
+      if (trim(model) == 'epot') then
+        call read_potential('global_idea_coeff_W05scEpot.dat')
+      else
+        call read_potential('global_idea_coeff_W05scBpot.dat')
+      endif
 
-      subroutine get_efield(i_rank)
+      call read_schatable('global_idea_coeff_W05SCHAtable.dat')
+
+      call read_bndy('global_idea_coeff_W05scBndy.dat')
+
+      end subroutine efield_init_ipe
+
+      subroutine get_efield_ipe(i_rank)
 !-----------------------------------------------------------------------
 ! Purpose: calculates the global electric potential field on the
 !          geomagnetic grid (MLT in deg) and derives the electric field 
@@ -250,66 +262,36 @@
 ! Author: A. Maute Dec 2003  am 12/17/03    
 !-----------------------------------------------------------------------
 
-!     use time_manager,   only : get_curr_calday, get_curr_date
-!     use mo_solar_parms, only : get_solar_parms
-!     use mag_parms,      only : get_mag_parms
-!     use cam_control_mod, only: magfield_fix_year
-!     use spmd_utils,      only: masterproc
-
-      integer :: i_rank
+      integer, intent(in):: i_rank
       integer :: idum1, idum2, tod ! time of day [s] 
       real kp
+
 
 !-----------------------------------------------------------------------
 ! get current calendar day of year & date components 
 ! valid at end of current timestep
 !-----------------------------------------------------------------------
-!     iday = get_curr_calday()                   ! day of year
-!     call get_curr_date (iyear,imo,iday_m,tod)! year, time of day [sec]
-!     iyear = magfield_fix_year
-!     iyear = 1995
-
-!     if( iyear < 1900 ) then
-!       write(iulog,"(/,'>>> get_efield: year < 1900 not possible: 
-!    &year=',i5)") iyear
-!       call endrun
-!     end if
 
       tod=ut*3600.
 !     ut = tod/3600.                   ! UT of day [sec]
-
-!-----------------------------------------------------------------------
-! get solar parms
-!-----------------------------------------------------------------------
-!     call get_solar_parms( f107_s = f107d )
-!-----------------------------------------------------------------------
-! get mag parms
-!-----------------------------------------------------------------------
-!     call get_mag_parms( by = by, bz = bz )
-!     print*,by,bz,f107d,ut
-!#ifdef EFIELD_DIAGS
-!      if( masterproc ) then
-!         write(iulog,*) 'get_efield: f107d,by,bz = ', f107d,by,bz 
-!      end if
-!#endif
 !-----------------------------------------------------------------------
 ! ajust S_a
 !-----------------------------------------------------------------------
-      call adj_S_a(i_rank)
+      call adj_S_a
 !-----------------------------------------------------------------------
 ! calculate global electric potential    
 !-----------------------------------------------------------------------
-      call GlobalElPotential(i_rank)
+      call GlobalElPotential
+!     print*,'pot_efield',potent(149,66),potent(149,64)
 
 !-----------------------------------------------------------------------
 ! calculate derivative of global electric potential 
 !-----------------------------------------------------------------------
       call DerivPotential
-!     print*,'ed2_efield',ed2(149,65),potent(149,66),potent(149,64)
 
-      end subroutine get_efield
+      end subroutine get_efield_ipe
 
-      subroutine GlobalElPotential(i_rank)
+      subroutine GlobalElPotential
 !-----------------------------------------------------------------------
 ! Purpose: calculates the global electric potential field on the
 !          geomagnetic grid (MLT in deg) 
@@ -328,7 +310,6 @@
 !-----------------------------------------------------------------------
 ! local variables
 !-----------------------------------------------------------------------
-      integer  :: i_rank
       integer  :: ilon, ilat, idlat
       integer  :: ihlat_bnd(0:nmlon)     ! high latitude boundary
       integer  :: itrans_width(0:nmlon)  ! width of transition zone
@@ -338,16 +319,10 @@
       real :: pot_highlats(0:nmlon,0:nmlat)! smoothed potential from Weimer model
 
 !-----------------------------------------------------------------------
-! Externals
-!-----------------------------------------------------------------------
-!      real,external :: EpotVal        ! in wei96.f
-
-!-----------------------------------------------------------------------
 ! convert to date and day	
 !-----------------------------------------------------------------------
       day  = iday + ut/24.
       date = iyear + day/dy2yr
-
 
 !-----------------------------------------------------------------------
 ! low/midlatitude electric potential - empirical model Scherliess 1999  
@@ -356,11 +331,12 @@
       do ilat = 0,nmlath             ! Calculate only for one magn. hemisphere
 	mlat = ylatm(ilat)                      ! mag. latitude
         do ilon = 0,nmlon	                ! lon. loop
-          call efield_mid( mlat, ylonm(ilon), pot, i_rank )
+          call efield_mid( mlat, ylonm(ilon), pot )
 	  pot_midlat(ilon,ilat+nmlath) = pot	! SH/NH symmetry 
 	  pot_midlat(ilon,nmlath-ilat) = pot
         end do
       end do
+!     print*,'www1','midlat',pot_midlat(149,66)
 
 !-----------------------------------------------------------------------
 ! hight latitude potential from Weimer model
@@ -372,10 +348,10 @@
       do ilat = 0,nmlat_wei  ! Calculate only for one magn. hemisphere
         mlat_90 = 90. - ylatm(ilat)  ! mag. latitude
         do ilon = 0,nmlon
-    	  pot  = 1000.*EpotVal( mlat_90, ylonm(ilon)*deg2mlt ) ! calculate potential (kv -> v)
-! GHGM - multiply high-lat potential....
-!         pot = 5.0 * pot
-! GHGM
+
+          call EpotVal_new(mlat_90, ylonm(ilon)*deg2mlt, pot )
+          pot = 1000.*pot
+
 !-----------------------------------------------------------------------
 ! NH/SH symmetry
 !-----------------------------------------------------------------------
@@ -385,6 +361,8 @@
     	  pot_highlats(ilon,nmlat-ilat) = pot
         end do
       end do     
+!     print*,'www2','highlat',ut,by,bz,pot_highlat(0:180,68),nmlat_wei
+
 !-----------------------------------------------------------------------
 ! weighted smoothing of high latitude potential
 !-----------------------------------------------------------------------
@@ -432,19 +410,6 @@
       idlat = nmlon/48          ! smooth over -idlat:idlat grid points
       call pot_lonsmo( potent, idlat )
 !     print*,'www6','pot_efield',ut,by,bz,potent(0:180,68)
-!-----------------------------------------------------------------------
-! output
-!-----------------------------------------------------------------------
-! output ( change later to netcdf file)
-!      do ilat=0,nmlat
-!       do ilon=0,nmlon
-!         write(iulog,'(4(x,f12.5))') ylatm(ilat),ylonm(ilon), &
-!           potent(ilon,ilat),potent(ilon,nmlat-ilat)
-!         write(iulog,'(4(x,f12.5))') ylatm(ilat),ylonm(ilon), &
-!           potent(ilon,ilat),potent(ilon,nmlat-ilat)
-!	write(iulog,'(f10.3)') potent(ilon,ilat)
-!       end do
-!      end do
 
       end subroutine GlobalElPotential
 
@@ -624,7 +589,6 @@
 !    &     ' not equal to ni =',ni 
         stop
       end if							
-!     if(debug) write(iulog,*) 'imax=',imax
 
       end subroutine index_quiet                                                           
 
@@ -667,8 +631,6 @@
 !------------------------------------------------------------------    
 ! open datafile with coefficients A_klnm
 !------------------------------------------------------------------     
-!     write(iulog,*) 'read_acoef: open file ',trim(locfn),
-!    &' unit ',unit
       open(unit=unit,file=trim(locfn), 
      &     status = 'old',iostat = ios)
 !     if(ios.gt.0) then
@@ -681,7 +643,6 @@
 !----------------------------------------------------------------------------                                                                   
 ! read datafile with coefficients A_klnm
 !--------------------------------------------------------------------   
-!     write(iulog,*) 'read_acoef: read file ',trim(locfn),' unit ',unit
       read(unit,*,iostat = ios) a_lf
 !     if(ios.gt.0) then
 !     write(iulog,*) 
@@ -693,8 +654,6 @@
 ! close & free unit      
 !--------------------------------------------------------------------  
       close(unit)
-!     call freeunit(unit)
-!     write(iulog,*) 'read_acoef: free unit ',unit
 
 !--------------------------------------------------------------------  
 !  get coefficients file for solar maximum: 
@@ -707,7 +666,6 @@
 !-------------------------------------------------------------------
 ! open datafile with coefficients A_klnm
 !------------------------------------------------------------------
-!     write(iulog,*) 'read_acoef: open file ',trim(locfn),' unit ',unit
       open(unit=unit,file=trim(locfn), 
      &     status = 'old',iostat = ios)
 !     if(ios.gt.0) then
@@ -719,7 +677,6 @@
 !-----------------------------------------------------------------
 ! read datafile with coefficients A_klnm
 !----------------------------------------------------------------
-!     write(iulog,*) 'read_acoef: read file ',trim(locfn)
       read(unit,*,iostat = ios) a_hf
 !     if(ios.gt.0) then
 !      write(iulog,*) 
@@ -731,12 +688,10 @@
 ! close & free unit      
 !-------------------------------------------------------------- 
       close(unit)
-!     call freeunit(unit)
-!     write(iulog,*) 'read_acoef: free unit ',unit
 
       end subroutine read_acoef
 
-      subroutine adj_S_a(i_rank)
+      subroutine adj_S_a
 !------------------------------------------------------------------
 ! adjust S_a -> S_aM   eqn.8-11 Scherliess draft
 !------------------------------------------------------------------
@@ -746,7 +701,6 @@
 !-----------------------------------------------------------------
 ! local variables
 !------------------------------------------------------------------
-      integer  :: i_rank
       integer  :: i
       real :: x2, y2, a90, a180, S_aM
 
@@ -762,8 +716,6 @@
       y2 = y2*y2
       S_aM = (atan2(y2,x2) - a90)/(a180 - a90) 
       S_aM = 90.*(1. + S_aM)
-!     if(debug) write(iulog,*) 'f107d=',f107d,' S_aM =',S_aM
-!     if(debug) write(iulog,*) 'By=',by
 
 !-----------------------------------------------------------------
 ! inter/extrapolate to S_a (f107d)
@@ -948,10 +900,10 @@
       fs(1) = 1.
 !     fs(2) = S_a			  
       fs(2) = f107d			  
- 
+
       end subroutine set_fkflfs
 
-      subroutine efield_mid( mlat, mlon, pot, i_rank )
+      subroutine efield_mid( mlat, mlon, pot )
 !------------------------------------------------------------------
 ! Purpose: calculate the electric potential for low and 
 !      midlatitudes from an empirical model (Scherliess 1999)
@@ -970,7 +922,6 @@
 !-------------------------------------------------------------------
 ! local variables
 !-------------------------------------------------------------------
-      integer  :: i_rank
       integer  :: i, mp, np, nn
       real :: mod_mlat, ct, x
       real :: fk(0:2)      	    ! f_-k(day) 
@@ -1019,26 +970,50 @@
 !     	       tilt      ! tilt of earth
 !
 ! Author: A. Maute Nov 2003  am 11/20/03
+!    more output: v_sw, swden
+
 !-----------------------------------------------------------------
 
-      if( by == 0. .and. bz == 0.) then
-         angle = 0.
-      else
-         angle = atan2( by,bz )
-      end if
-      
-      angle = angle*rtd
-      call adjust( angle )
-      bt = sqrt( by*by + bz*bz )
+!!      use idea_wam_control, only : SPW_DRIVERS, SWIN_DRIVERS
+!!      use wam_f107_kp_mod,  only : kdt_interval,interpolate_weight,  
+!!     &                             swbz_wy, swvel_wy, swbt_wy, swang_wy, swden_wy
+
+!!      real    :: swbz_curdt, swvel_curdt, swbt_curdt, swang_curdt, swden_curdt
+
+!-----------------------------------------------------------------
+!  local variables
+!-----------------------------------------------------------------
+!!      real ::  
+!!     &  angle,  ! IMF angle
+!!     &  bt,    ! IMF magnitude
+!!     &  tilt,       ! tilt of earth
+!!     &  v_sw,       ! sw velocity
+!!     &  swden         ! sw density
+!-----------------------------------------------------------------
+! function declarations
+!-----------------------------------------------------------------
+      real, external :: get_tilt_ipe	 ! in wei96.f
+
+!------by Zhuxiao-----
+!!       swden = 5.
+!!      if( by == 0. .and. bz == 0.) then
+!!         angle = 0.
+!!      else
+!!         angle = atan2( by,bz )
+!!      end if
+!!      angle = angle*rtd
+!!      call adjust_ipe( angle )
+!!      bt = sqrt( by*by + bz*bz )
+
+!!        print *, angle,bt,tilt,v_sw,swden
 
 !-------------------------------------------------------------------
 ! use month and day of month - calculated with average no.of days per month
 ! as in Weimer
 !-------------------------------------------------------------------
+      tilt = get_tilt_ipe( iyear, imo, iday_m, ut )
 
-      tilt = get_tilt( iyear, imo, iday_m, ut )
-
-      call SetModel( angle, bt, tilt, v_sw )
+      call SetModel_new(angle,bt,tilt,v_sw,swden)
 
       end subroutine prep_weimer
 
@@ -1077,24 +1052,6 @@
         wgt   = wgt + w(id)
       end do
       wgt = 1./wgt
-
-!     do ilon = 0,nmlon
-!        do ilat = idlat,nmlat_wei-idlat
-!       do ilat = idlat,nmlat-idlat
-!         pot_smo(ilat) = 0.
-!         do id = -idlat,idlat	!  org. was degree now grid points
-!           pot_smo(ilat) = pot_smo(ilat) + w(id)*pot(ilon,ilat+id)
-!           write(iulog,"('pot_latsmo: ilon=',i3,' ilat=',i3,' id=',i3,' pot(ilon,ilat+id)=',e12.4)") ilon,ilat,id,pot(ilon,ilat+id)
-!         end do
-!         pot_smo(ilat)       = pot_smo(ilat)*wgt
-!         pot_smo(nmlat-ilat) = pot_smo(ilat)
-!       end do
-!      pot(ilon,idlat:nmlat-idlat) =  &        ! copy back into pot
-!         pot_smo(idlat:nmlat-idlat)
-!        pot(ilon,idlat:nmlat_wei-idlat)       = pot_smo(idlat:nmlat_wei-idlat)
-!       pot(ilon,nmlat-nmlat_wei+idlat:nmlat) = pot_smo(nmlat-nmlat_wei+idlat:nmlat)
-!        pot(ilon,nmlat-nmlat_wei+idlat:nmlat-idlat) = pot_smo(nmlat-nmlat_wei+idlat:nmlat-idlat)
-!     end do
 
 !$omp parallel do private(ilat)
       do ilat = idlat,nmlat_wei-idlat
@@ -1144,17 +1101,6 @@
       end do
       wgt = 1./wgt
 
-!     do ilon = 0,nmlon
-!       do ilat = idlat,nmlath-idlat  ! ilat = 5:175
-!         pot_smo(ilat) = 0.
-!         do id = -idlat,idlat	!  org. was degree now grid points
-!           pot_smo(ilat) = pot_smo(ilat) + w(id)*pot(ilon,ilat+id)
-!         end do
-!         pot_smo(ilat) = pot_smo(ilat)*wgt
-!       end do
-!       pot(ilon,idlat:nmlath-idlat) = pot_smo(idlat:nmlath-idlat) ! copy back into pot
-!     end do
-
 !$omp parallel do private(ilat)
       do ilat = idlat,nmlath-idlat
          pot_smo(:,ilat) = matmul( pot(:,ilat-idlat:ilat+idlat),w )*wgt
@@ -1202,27 +1148,6 @@
       end do
         wgt = 1./wgt
 
-!-------------------------------------------------------------------
-! averaging     
-!-------------------------------------------------------------------
-!     do ilon = 0,nmlon
-!       do ilat = 0,nmlath
-!         pot_smo(ilat) = 0.
-!         do id = -idlon,idlon	                  !  org. was degree now grid points
-!           iabs = ilon + id
-!           if( iabs > nmlon ) then
-!              iabs = iabs - nmlon ! test if wrap around
-!           end if
-!           if( iabs < 0 ) then
-!              iabs = iabs + nmlon ! test if wrap around
-!           end if
-!           pot_smo(ilat) = pot_smo(ilat) + w(id)*pot(iabs,ilat)
-!         end do
-!         pot_smo(ilat)  = pot_smo(ilat)*wgt
-!         pot(ilon,ilat) = pot_smo(ilat)       ! copy back into pot 
-!         pot(ilon,nmlat-ilat) = pot_smo(ilat) ! copy back into pot    
-!       end do   
-!     end do
 !     print*,'www7','pot_efield',pot(149,66),idlon,w
 
 !$omp parallel do private(ilat,ilon,tmp)
@@ -1273,7 +1198,7 @@
         mlt  = ylonm(ilon)*deg2mlt              ! mag.local time ?
         do ilat = nmlat_wei+1,0,-1              ! lat. loop moving torwards pole
 	  mlat = 90. - ylatm(ilat)           ! mag. latitude pole = 90 equator = 0
-          call gecmp( mlat, mlt, es, ez )	! get electric field
+          call gecmp_ipe( mlat, mlt, es, ez )	! get electric field
           e_tot = sqrt( es**2 + ez**2 )
           if( abs(e_tot) >= ef_max ) then                        ! e-filed > limit -> boundary
             ihlat_bnd(ilon) = ilat - (ilat - ilat_sft_rvs)/2     ! shift boundary to lat_sft (54deg)
@@ -1309,9 +1234,6 @@
 !    trans_width(phi)=8.-2.*cos(phi) 
 !
 ! Author: A. Maute Nov 2003  am 11/20/03
-!------------------------------------------------------------------
-
-!     use sv_decomp, only : svdcmp, svbksb
      
 !----------------------------------------------------------------------------                                                                   
 !	... dummy arguments
@@ -1357,10 +1279,9 @@
       end do
 
 !     if (debug) write(iulog,*) ' Single Value Decomposition'
-      call svdcmp( u, nmax_a, nmax_a, nmax_a, nmax_a, w, v )
+      call svdcmp_ipe(u, nmax_a, nmax_a, nmax_a, nmax_a, w, v )
 
-!     if (debug) write(iulog,*) ' Solving'
-      call svbksb( u, w, v, nmax_a, nmax_a, nmax_a, nmax_a, rhs, lsg )
+      call svbksb_ipe(u,w,v, nmax_a, nmax_a, nmax_a, nmax_a, rhs, lsg)
 !      
       do ilon = 0,nmlon  ! long.
 !       sum = 0.
@@ -1537,6 +1458,7 @@
         if (j2 < 0) j2 = 0              ! Tomoko's fix - j2 >= 0
 	wrk1 = pot_midlat(ilon,j1)
 	wrk2 = pot_highlats(ilon,j2)
+!        write(iulog,*) 'pot_all ',ilon,hb1,hb2,nmlath -ibnd,tw
         min_ilat = ibnd-tw
         if (min_ilat < 0) min_ilat = 0  ! Tomoko's fix
         do ilat = min_ilat,ibnd+tw      ! do ilat = ibnd-tw,ibnd+tw
@@ -1657,6 +1579,7 @@
 
       end subroutine DerivPotential
 
+      end module efield_ipe
 !      
 ! Purpose: 
 ! Subroutines to calculate the electric potentials from the Weimer '96 model of
@@ -1664,7 +1587,7 @@
 !
 ! Method:
 !
-! To use, first call subroutine ReadCoef once.
+! To use, first call subroutine readcoef_ipe once.
 ! Next, call SetModel with the specified input parameters.
 ! The function EpotVal(gLAT,gMLT) can then be used repeatively to get the
 ! electric potential at the desired location in geomagnetic coordinates.
@@ -1680,77 +1603,7 @@
 !*********************** Copyright 1996, Dan Weimer/MRC ***********************
 !==================================================================
 
-	FUNCTION EpotVal(gLAT,gMLT)
-!
-!-----------------------------------------------------------------------
-! Return the value of the electric potential in kV at
-! corrected geomagnetic coordinates gLAT (degrees) and gMLT (hours).
-!
-! Must first call ReadCoef and SetModel to set up the model coeficients for
-! the desired values of Bt, IMF clock angle, Dipole tilt angle, and SW Vel.
-!-----------------------------------------------------------------------
-!
-!       use shr_kind_mod, only: r8 => shr_kind_r8
-        !use efield_ipe, only: Coef =>Coef,ML=>ML,MM=>MM1
-        implicit none 
-!
-!-----------------------------Return Value------------------------------
-!
-        real EpotVal
-!
-!-------------------------------Commons---------------------------------
-!
-!       INTEGER ML,MM
-!       REAL Coef(0:1,0:8,0:3),pi
-!       COMMON/SetCoef/Coef,pi,ML,MM
-        real pi
-!
-!------------------------------Arguments--------------------------------
-!
-	REAL gLAT,gMLT
-!
-!---------------------------Local variables-----------------------------
-!
-        integer limit,l,m
-
-	Real Theta,Phi,Z,ct,Phim
-        real r
-	REAL Plm(0:20,0:20)
-
-!
-!-----------------------------------------------------------------------
-!
-        pi=3.141592653
-	r=90.-gLAT
-	IF(r .LT. 45.)THEN
-	  Theta=r*pi/45.
-          Phi=gMLT*pi/12.
-	  Z=Coef(0,0,0)
-	  ct=COS(Theta)
-	  CALL Legendre(ct,ML,MM1,Plm)
-	  DO l=1,ML
-	    Z=Z + Coef(0,l,0)*Plm(l,0)
-	    IF(l.LT.MM1)THEN
-	      limit=l
-	    ELSE
-	      limit=MM1
-	    ENDIF
-	    DO m=1,limit
-	      phim=phi*m
-              Z=Z + Coef(0,l,m)*Plm(l,m)*COS(phim) +  
-     &	   Coef(1,l,m)*Plm(l,m)*SIN(phim)
-	    ENDDO
-	  ENDDO
-	ELSE
-	  Z=0.
-	ENDIF
-	EpotVal=Z
-	RETURN
-	END FUNCTION EpotVal
-
-!================================================================================================
-
-	SUBROUTINE ReadCoef (wei96_file)
+	SUBROUTINE readcoef_ipe ()
 !
 !-----------------------------------------------------------------------
 !
@@ -1765,11 +1618,9 @@
 !     use ioFileMod,     only : getfil
 !     use units,         only : getunit, freeunit
 !     use abortutils,    only : endrun
-!     use cam_logfile,   only : iulog
-!      use efield_ipe, only: ALAMN =>ALAMN,ALAMX=>ALAMX,ALAMR=>ALAMR,
-!     &STPD=>STPD,STP2=>STP2,CSTP=>CSTP,SSTP=>SSTP,
-!     &Cn=>Cn,MaxL=>MaxL,MaxM=>MaxM,MaxN=>MaxN
-      implicit none 
+      use efield_ipe, only: ALAMN =>ALAMN,ALAMX=>ALAMX,ALAMR=>ALAMR,
+     &STPD=>STPD,STP2=>STP2,CSTP=>CSTP,SSTP=>SSTP
+      implicit none
 !
 !-------------------------------Commons---------------------------------
 !
@@ -1781,35 +1632,17 @@
 !            STP2  = Denominator in gradient calc
 
 !
-!------------------------------Arguments--------------------------------
-!
-      character(len=*), intent(in) :: wei96_file
-!
 !-----------------------------Parameters------------------------------
 !
       real d2r, r2d
-      PARAMETER ( D2R =  0.0174532925199432957692369076847 ,  
+      PARAMETER ( D2R =  0.0174532925199432957692369076847 ,
      &            R2D = 57.2957795130823208767981548147)
 !
 !---------------------------Local variables-----------------------------
 !
-      INTEGER udat,unit,ios
-      integer ll,mm,k,m,klimit,kk,nn,ii,i,n,ilimit,mlimit,l
-
-      REAL C(0:3)
       real stpr, step
-
-      CHARACTER*15 skip
-
-!     INTEGER iulog
-!     INTEGER MaxL,MaxM,MaxN,iulog
-!     REAL Cn( 0:3 , 0:1 , 0:4 , 0:1 , 0:8 , 0:3 )
-!     COMMON /AllCoefs/Cn,MaxL,MaxM,MaxN
-
-      character(len=256) :: locfn
 !
 !-----------------------------------------------------------------------
-!      iulog=14
       STEP = 10.
       STPR = STEP/6671.
       STPD = STPR*R2D
@@ -1819,288 +1652,8 @@
       ALAMN = 45.
       ALAMX = 90. - STPD
       ALAMR = ALAMN*D2R
-!          End NCAR addition
-! 
-!  get coeff_file  
-!     unit= getunit()
-      unit= 600
-!     print*, 'Weimer: getting file ',trim(wei96_file),
-!    &' unit ',unit
-!     call getfil( wei96_file, locfn, 0 )
-      locfn= wei96_file
-!      
-!     write(iulog,*) 'Weimer: opening file ',trim(locfn),
-!    &' unit ',unit	
-!     OPEN(unit=unit,file=trim(locfn),  
-      open(unit=unit,file=locfn,status = 'old',iostat = ios)
-      if(ios.gt.0) then
-       print*, 'Weimer: error in opening wei96.cofcnts',
-     &' unit ',unit
-!       call endrun
-      endif
-  900 FORMAT(A15)
-c1000 FORMAT(3I8)
- 1000 format(3i8)
- 2000 FORMAT(3I2)
- 3000 FORMAT(2I2,4E15.6)
-!     READ(udat,900) skip
-!     write(iulog,*) 'Weimer: reading file ',trim(locfn),
-!    &' unit ',unit	
-!     READ(unit,1000,iostat = ios) MaxL,MaxM,MaxN
-      read(unit,1000,iostat = ios) MaxL,MaxM,MaxN
-!     print*,'www0',ios,MaxL,MaxM,MaxN
-!     if(ios.gt.0) then
-!     write(iulog,*) 
-!    &'ReadCoef: error in reading wei96.cofcnts file',
-!    &' unit ',unit	
-!       call endrun
-!     endif
-      DO l=0,MaxL
-        IF(l.LT.MaxM)THEN
-          mlimit=l
-        ELSE
-          mlimit=MaxM
-        ENDIF
-        DO m=0,mlimit
-          IF(m.LT.1)THEN
-            klimit=0
-          ELSE
-            klimit=1
-          ENDIF
-          DO k=0,klimit
-            read(unit,2000,iostat = ios) ll,mm,kk
-!           print*,k,ll,mm,kk
-!           if(ios.gt.0) then
-!     	      write(iulog,*) 
-!    &'ReadCoef: error in reading wei96.cofcnts file',' unit ',
-!    &unit	
-!             call endrun
-!           endif
-!           IF(ll.NE.l .OR. mm.NE.m .OR. kk.NE.k)THEN
-!             WRITE(IULOG,*)'Data File Format Error'
-!             CALL ENDRUN
-!           ENDIF
-            DO n=0,MaxN
-              IF(n.LT.1)THEN
-        	ilimit=0
-              ELSE
-        	ilimit=1
-              ENDIF
-              DO i=0,ilimit
-        	READ(unit,3000,iostat = ios) nn,ii,C
-!     print*,'www0',nn,ii,C,i,n,k,l,m
-!               if(ios.gt.0) then
-!     	          write(iulog,*) 'ReadCoef: error in reading',  
-!    &                 ' wei96.cofcnts file',' unit ',unit	
-!                 call endrun
-!               endif
-!       	IF(nn.NE.n .OR. ii.NE.i)THEN
-!       	  WRITE(IULOG,*)'Data File Format Error'
-!       	  CALL ENDRUN
-!       	ENDIF
-        	Cn(0,i,n,k,l,m)=C(0)
-        	Cn(1,i,n,k,l,m)=C(1)
-        	Cn(2,i,n,k,l,m)=C(2)
-        	Cn(3,i,n,k,l,m)=C(3)
-              ENDDO
-            ENDDO
-          ENDDO
-        ENDDO
-      ENDDO
-!      
-      close(unit)
-!     call freeunit(unit)
-!    
       RETURN
-      END SUBROUTINE ReadCoef
-
-!================================================================================================
-
-	FUNCTION FSVal(omega,MaxN,FSC)
-!
-!-----------------------------------------------------------------------
-! Evaluate a  Sine/Cosine Fourier series for N terms up to MaxN
-! at angle omega, given the coefficients in FSC
-!
-!*********************** Copyright 1996, Dan Weimer/MRC ***************
-!-----------------------------------------------------------------------
-!
-!       use shr_kind_mod, only: r8 => shr_kind_r8
-        implicit none 
-!
-!-----------------------------Return Value------------------------------
-!
-        real FSVal
-!
-!------------------------------Arguments--------------------------------
-!
-	INTEGER MaxN
-!       REAL omega,FSC(0:1,0:*)
-        REAL omega,FSC(0:1,0:4)
-!
-!---------------------------Local variables-----------------------------
-!
-	INTEGER n
-	REAL Y,theta
-!
-!-----------------------------------------------------------------------
-!
-	Y=0.
-	DO n=0,MaxN
-	  theta=omega*n
-	  Y=Y + FSC(0,n)*COS(theta) + FSC(1,n)*SIN(theta)
-	ENDDO
-	FSVal=Y
-!       print*,'www00',Y,FSC
-	RETURN
-	END FUNCTION FSVal
-
-!================================================================================================
-
-	SUBROUTINE SetModel(angle,Bt,Tilt,SWVel)
-!
-!-----------------------------------------------------------------------
-! Calculate the complete set of spherical harmonic coefficients,
-! given an arbitrary IMF angle (degrees from northward toward +Y),
-! magnitude Bt (nT), dipole tilt angle (degrees),
-! and solar wind velocity (km/sec).
-! Returns the Coef in the common block SetCoef.
-!
-!*********************** Copyright 1996, Dan Weimer/MRC ***********************
-!-----------------------------------------------------------------------
-!
-!       use shr_kind_mod, only: r8 => shr_kind_r8
-!      use efield_ipe, only: Cn=>Cn,MaxL=>MaxL,MaxM=>MaxM,MaxN=>MaxN
-!     &,Coef=>coef,ML=>ML,MM=>MM1
-        implicit none 
-!
-!-------------------------------Commons---------------------------------
-!
-!       INTEGER MaxL,MaxM,MaxN
-!       REAL Cn( 0:3 , 0:1 , 0:4 , 0:1 , 0:8 , 0:3 )
-!       COMMON /AllCoefs/Cn,MaxL,MaxM,MaxN
-
-!       INTEGER ML,MM
-!       REAL Coef(0:1,0:8,0:3),pi
-!       COMMON/SetCoef/Coef,pi,ML,MM
-        real pi
-!
-!------------------------------Arguments--------------------------------
-!
-	REAL angle,Bt,Tilt,SWVel
-!
-!---------------------------Local variables-----------------------------
-!
-        integer n, k, ilimit, i, klimit, l, m, mlimit
-	REAL FSC(0:1,0:4), omega, sintilt
-!
-!-----------------------------------------------------------------------
-!
-	pi=3.141592653
-	ML=MaxL
-	MM1=MaxM
-	SinTilt=SIN(Tilt*pi/180.)
-!	SinTilt=SIND(Tilt)
-
-	omega=angle*pi/180.
-
-        fsc(1,0) = 0.
-	DO l=0,MaxL
-	  IF(l.LT.MaxM)THEN
-	    mlimit=l
-	  ELSE
-	    mlimit=MaxM
-	  ENDIF
-	  DO m=0,mlimit
-	    IF(m.LT.1)THEN
-	      klimit=0
-	    ELSE
-	      klimit=1
-	    ENDIF
-	    DO k=0,klimit
-! Retrieve the regression coefficients and evaluate the function
-! as a function of Bt,Tilt,and SWVel to get each Fourier coefficient.
-	      DO n=0,MaxN
-	        IF(n.LT.1)THEN
-	          ilimit=0
-	        ELSE
-	          ilimit=1
-	        ENDIF
-		DO i=0,ilimit
-		  FSC(i,n)=Cn(0,i,n,k,l,m) + Bt*Cn(1,i,n,k,l,m) +  
-     &	   SinTilt*Cn(2,i,n,k,l,m) + SWVel*Cn(3,i,n,k,l,m)
-		ENDDO
-	      ENDDO
-! Next evaluate the Fourier series as a function of angle.
-      	      Coef(k,l,m)=FSVal(omega,MaxN,FSC)
-	    ENDDO
-	  ENDDO
-	ENDDO
-	RETURN
-	END SUBROUTINE SetModel
-
-!================================================================================================
-
-	SUBROUTINE LEGENDRE(x,lmax,mmax,Plm)
-!
-!-----------------------------------------------------------------------
-! compute Associate Legendre Function P_l^m(x)
-! for all l up to lmax and all m up to mmax.
-! returns results in array Plm
-! if X is out of range ( abs(x)>1 ) then value is returned as if x=1.
-!
-!*********************** Copyright 1996, Dan Weimer/MRC ***********************
-!-----------------------------------------------------------------------
-!
-!       use shr_kind_mod, only: r8 => shr_kind_r8
-!       use cam_logfile,  only : iulog
-
-        implicit none 
-!
-!------------------------------Arguments--------------------------------
-!
-        integer lmax, mmax
-	real x, Plm(0:20,0:20)
-!
-!---------------------------Local variables-----------------------------
-!
-        integer m, lm2, l, iulog
-        real xx, fact
-!       iulog=14
-!
-!-----------------------------------------------------------------------
-!
-	  DO l=0,20
-	    DO m=0,20
-		Plm(l,m)=0.
-	    ENDDO
-	  ENDDO
-	xx=MIN(x,1.)
-	xx=MAX(xx,-1.)
-!         IF(lmax .LT. 0 .OR. mmax .LT. 0 .OR. mmax .GT. lmax )THEN
-!        write(iulog,*)'Bad arguments to Legendre'
-!        RETURN
-!        ENDIF
-! First calculate all Pl0 for l=0 to l
-	Plm(0,0)=1.
-	IF(lmax.GT.0)Plm(1,0)=xx
-	IF (lmax .GT. 1 )THEN
-	  DO L=2,lmax
-	    Plm(L,0)=( (2.*L-1)*xx*Plm(L-1,0) - 
-     &(L-1)*Plm(L-2,0) )/L
-	  ENDDO
-	ENDIF
-        IF (mmax .EQ. 0 ) RETURN
-	fact=SQRT( (1.-xx)*(1.+xx) )
-	DO M=1,mmax
-	  DO L=m,lmax
-	    lm2=MAX(L-2,0)
-	    Plm(L,M)=Plm(lm2,M) - ( 2*L-1)*fact*Plm(L-1,M-1)
-	  ENDDO
-	ENDDO
-
-	RETURN
-	END SUBROUTINE LEGENDRE
+      END SUBROUTINE readcoef_ipe
 
 !================================================================================================
 
@@ -2115,7 +1668,7 @@ c1000 FORMAT(3I8)
 
 ! COORDINATE TRANSFORMATION UTILITIES
 !**********************************************************************        
-	FUNCTION GET_TILT(YEAR,MONTH,DAY,HOUR)
+	FUNCTION get_tilt_ipe(YEAR,MONTH,DAY,HOUR)
 !
 !-----------------------------------------------------------------------
 !CC NCAR MODIFIED (3/96) CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
@@ -2164,14 +1717,14 @@ c1000 FORMAT(3I8)
 !-----------------------------------------------------------------
 !
 !       use shr_kind_mod, only: r8 => shr_kind_r8
-!        use efield_ipe, only:CX=>CX,ST=>ST,CT=>CT,AM=>AM
-!     &,EPOCH=>EPOCH,TH0=>TH0,PH0=>PH0,DIPOLE=>DIPOLE
+        use efield_ipe, only:CX=>CX,ST=>ST,CT=>CT,AM=>AM
+     &,EPOCH=>EPOCH,TH0=>TH0,PH0=>PH0,DIPOLE=>DIPOLE
 
         implicit none 
 !
 !-----------------------------Return Value--------------------------
 !
-        real get_tilt
+        real get_tilt_ipe
 !
 !-------------------------------Commons---------------------------------
 !
@@ -2212,8 +1765,8 @@ c1000 FORMAT(3I8)
 !
 !-------------------------External Functions----------------------------
 !
-!        integer julday_wam
-!        external julday_wam
+        integer julday_ipe
+        external julday_ipe
 !
 !-----------------------------------------------------------------------
 !
@@ -2234,22 +1787,22 @@ c1000 FORMAT(3I8)
 	  IYR=YEAR
 	ENDIF
 	UT=HOUR
-	JD=JULDAY_WAM(MONTH,DAY,IYR)
+	JD=julday_ipe(MONTH,DAY,IYR)
 	MJD=JD-2400001
 !       T0=(real(MJD,r8)-51544.5)/36525.0
 	T0=(float(MJD)-51544.5)/36525.0
 	GMSTD=100.4606184 +36000.770*T0 +3.87933E-4*T0*T0 + 
      &       15.0410686*UT
-	CALL ADJUST(GMSTD)
+	CALL adjust_ipe(GMSTD)
 	GMSTH=GMSTD*24./360.
 	ECLIP=23.439 - 0.013*T0
         MA=357.528 + 35999.050*T0 + 0.041066678*UT
-        CALL ADJUST(MA)
+        CALL adjust_ipe(MA)
         LAMD=280.460 + 36000.772*T0 + 0.041068642*UT
-        CALL ADJUST(LAMD)
+        CALL adjust_ipe(LAMD)
         SUNLON=LAMD + (1.915-0.0048*T0)*SIN(MA*pi/180.) + 0.020* 
      &     SIN(2.*MA*pi/180.)
-        CALL ADJUST(SUNLON)
+        CALL adjust_ipe(SUNLON)
 !         IF(IDBUG.NE.0)THEN
 !         WRITE(IDBUG,*) YEAR,MONTH,DAY,HOUR
 !         WRITE(IDBUG,*) 'MJD=',MJD
@@ -2409,179 +1962,17 @@ c1000 FORMAT(3I8)
 
 !CC NCAR MODIFICATION (3/96) CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 !  The next line was added to return the dipole tilt from this function call.  C
-      GET_TILT = CX(6)
+      get_tilt_ipe = CX(6)
 !CC NCAR MODIFICATION (3/96) CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 
       RETURN
-      END FUNCTION GET_TILT
+      END FUNCTION get_tilt_ipe
 
 !======================================================================
 
-      SUBROUTINE ROTATE (X,Y,Z,I)       
-!
-!-----------------------------------------------------------------------
-!     THIS SUBROUTINE APPLIES TO THE VECTOR (X,Y,Z) THE ITH ROTATION  
-!     MATRIX AM(N,M,I) GENERATED BY SUBROUTINE TRANS
-!     IF I IS NEGATIVE, THEN THE INVERSE ROTATION IS APPLIED
-!-----------------------------------------------------------------------
-!
-!     use shr_kind_mod, only: r8 => shr_kind_r8
-      implicit none 
-!
-!------------------------------Arguments--------------------------------
-!
-      integer i
-      REAL X,Y,Z
-!
-!---------------------------Local variables-----------------------------
-!
-      REAL A(3)
-!
-!-----------------------------------------------------------------------
-!
-      A(1)=X
-      A(2)=Y
-      A(3)=Z
-      CALL ROTATEV(A,A,I)
-      X=A(1)
-      Y=A(2)
-      Z=A(3)
-    
-      RETURN        
-      END SUBROUTINE ROTATE
-
-!======================================================================
-
-      SUBROUTINE ROTATEV (A,B,I)       
-!         
-!-----------------------------------------------------------------------
-!     THIS SUBROUTINE APPLIES TO THE VECTOR A(3) THE ITH ROTATION  
-!     MATRIX AM(N,M,I) GENERATED BY SUBROUTINE TRANS
-!     AND OUTPUTS THE CONVERTED VECTOR B(3), WITH NO CHANGE TO A.
-!     IF I IS NEGATIVE, THEN THE INVERSE ROTATION IS APPLIED
-!-----------------------------------------------------------------------
-!
-!     use shr_kind_mod, only: r8 => shr_kind_r8
-!     use cam_logfile,  only : iulog
-!     use abortutils,   only : endrun
-!      use efield_ipe, only:CX=>CX,ST=>ST,CT=>CT,AM=>AM
-
-      implicit none 
-!
-!-------------------------------Commons---------------------------------
-!
-!     real cx, st, ct, am
-!     COMMON/TRANSDAT/CX(9),ST(6),CT(6),AM(3,3,11)
-!
-!------------------------------Arguments--------------------------------
-!
-      integer i
-      REAL A(3),B(3)
-!
-!---------------------------Local variables-----------------------------
-!
-!      integer id, j, iulog
-      integer id, j
-      real xa, ya, za
-!     iulog=14
-!
-!-----------------------------------------------------------------------
-!
-!     IF(I.EQ.0 .OR. IABS(I).GT.11)THEN
-!     WRITE(IULOG,*)'ROTATEV CALLED WITH UNDEFINED TRANSFORMATION'
-!     CALL ENDRUN
-!     ENDIF
-
-      XA = A(1)
-      YA = A(2)
-      ZA = A(3)
-      IF(I.GT.0)THEN
-	ID=I
-        DO J=1,3
-          B(J) = XA*AM(J,1,ID) + YA*AM(J,2,ID) + ZA*AM(J,3,ID)
-        ENDDO
-      ELSE
-	ID=-I
-        DO J=1,3
-          B(J) = XA*AM(1,J,ID) + YA*AM(2,J,ID) + ZA*AM(3,J,ID)
-        ENDDO
-      ENDIF
-      RETURN        
-      END SUBROUTINE ROTATEV
-
 !================================================================================================
 
-	SUBROUTINE FROMCART(R,LAT,LONG,POS)
-!
-!-----------------------------------------------------------------------
-! CONVERT CARTESIAN COORDINATES POS(3)
-! TO SPHERICAL COORDINATES R, LATITUDE, AND LONGITUDE (DEGREES)
-!-----------------------------------------------------------------------
-!
-!       use shr_kind_mod, only: r8 => shr_kind_r8
-        implicit none 
-!
-!------------------------------Arguments--------------------------------
-!
-	REAL R, LAT, LONG, POS(3)
-!
-!---------------------------Local variables-----------------------------
-!
-        real pi
-!
-!-----------------------------------------------------------------------
-!
-!       pi=2.*ASIN(1.)
-        pi=3.141592653
-	R=SQRT(POS(1)*POS(1) + POS(2)*POS(2) + POS(3)*POS(3))
-	IF(R.EQ.0.)THEN
-	  LAT=0.
-	  LONG=0.
-	ELSE
-	  LAT=ASIN(POS(3)*pi/180./R)
-	  LONG=ATAN2(POS(2),POS(1))
-	  LONG=LONG*180./pi
-	ENDIF
-	RETURN
-	END SUBROUTINE FROMCART
-
-!================================================================================================
-
-	SUBROUTINE TOCART(R,LAT,LONG,POS)
-!
-!-----------------------------------------------------------------------
-! CONVERT SPHERICAL COORDINATES R, LATITUDE, AND LONGITUDE (DEGREES)
-! TO CARTESIAN COORDINATES POS(3)
-!-----------------------------------------------------------------------
-!
-!       use shr_kind_mod, only: r8 => shr_kind_r8
-        implicit none 
-!
-!------------------------------Arguments--------------------------------
-!
-	REAL R, LAT, LONG, POS(3)
-!
-!---------------------------Local variables-----------------------------
-!
-        real pi, stc, ctc, sf, cf
-!
-!-----------------------------------------------------------------------
-!
-!       pi=2.*ASIN(1.)
-        pi=3.141592653
-        STC = SIN(LAT*pi/180.)    
-        CTC = COS(LAT*pi/180.)    
-        SF = SIN(LONG*pi/180.)     
-        CF = COS(LONG*pi/180.)     
-        POS(1) = R*CTC*CF        
-        POS(2) = R*CTC*SF        
-        POS(3) = R*STC
-	RETURN
-	END SUBROUTINE TOCART
-
-!================================================================================================
-
-	SUBROUTINE ADJUST(ANGLE)
+	SUBROUTINE adjust_ipe(ANGLE)
 !
 !-----------------------------------------------------------------------
 !	ADJUST AN ANGLE IN DEGREES TO BE IN RANGE OF 0 TO 360.
@@ -2607,11 +1998,11 @@ c1000 FORMAT(3I8)
 	  GOTO 20
 	ENDIF
 	RETURN
-	END SUBROUTINE ADJUST
+	END SUBROUTINE adjust_ipe
 
 !================================================================================================
 
-      INTEGER FUNCTION JULDAY_WAM(MM,ID,IYYY)
+      INTEGER FUNCTION julday_ipe(MM,ID,IYYY)
 !
 !-----------------------------------------------------------------------
 !
@@ -2643,141 +2034,24 @@ c1000 FORMAT(3I8)
         JY=IYYY-1
         JM=MM+13
       ENDIF
-      JULDAY_WAM=INT(365.25*JY)+INT(30.6001*JM)+ID+1720995
+      julday_ipe=INT(365.25*JY)+INT(30.6001*JM)+ID+1720995
       IF (ID+31*(MM+12*IYYY).GE.IGREG) THEN
         JA=INT(0.01*JY)
-        JULDAY_WAM=JULDAY_WAM+2-JA+INT(0.25*JA)
+        julday_ipe=julday_ipe+2-JA+INT(0.25*JA)
       ENDIF
       RETURN
-      END FUNCTION JULDAY_WAM
+      END FUNCTION julday_ipe
 
 !================================================================================================
 
-	FUNCTION MLT(MagLong)
-!
-!-----------------------------------------------------------------------
-! given magnetic longitude in degrees, return Magnetic Local Time
-! assuming that TRANS has been called with the date & time to calculate
-! the rotation matrices.
-!
-! btf 11/06/03:
-! Call sub adjust instead of referencing it as a function
-!-----------------------------------------------------------------------
-!
-!       use shr_kind_mod, only: r8 => shr_kind_r8
-!      use efield_ipe, only: CX=>CX,ST=>ST,CT=>CT,AM=>AM
-        implicit none 
-!
-!-----------------------------Return Value------------------------------
-!
-        real mlt
-!
-!-------------------------------Commons---------------------------------
-!
-!       real cx, st, ct, am
-!       COMMON/TRANSDAT/CX(9),ST(6),CT(6),AM(3,3,11)
-
-!
-!------------------------------Arguments--------------------------------
-!
-	REAL MagLong
-!
-!---------------------------Local variables-----------------------------
-!
-	REAL angle, rotangle
-!
-!-----------------------------------------------------------------------
-!
-	RotAngle=CX(7)
-!       MLT=ADJUST(Maglong+RotAngle+180.)/15.
-        angle = Maglong+RotAngle+180.
-        call adjust(angle)
-        mlt = angle/15.
-	RETURN
-	END FUNCTION MLT
-
 !================================================================================================
 
-	FUNCTION MagLong(MLT)
-!
-!-----------------------------------------------------------------------
-! return magnetic longitude in degrees, given Magnetic Local Time
-! assuming that TRANS has been called with the date & time to calculate
-! the rotation matrices.
-!
-! btf 11/06/03:
-! Call sub adjust instead of referencing it as a function
-!-----------------------------------------------------------------------
-!
-!       use shr_kind_mod, only: r8 => shr_kind_r8
-!      use efield_ipe, only:CX=>CX,ST=>ST,CT=>CT,AM=>AM
-        implicit none 
-!
-!-----------------------------Return Value------------------------------
-!
-        real MagLong
-!
-!-------------------------------Commons---------------------------------
-!
-!       real cx, st, ct, am
-!       COMMON/TRANSDAT/CX(9),ST(6),CT(6),AM(3,3,11)
-!
-!------------------------------Arguments--------------------------------
-!
-	REAL MLT
-!
-!---------------------------Local variables-----------------------------
-!
-	REAL angle, rotangle
-!
-!-----------------------------------------------------------------------
-!
-	RotAngle=CX(7)
-	angle=MLT*15.-RotAngle-180.
-!       MagLong=ADJUST(angle)
-        call adjust(angle)
-        MagLong = angle
-	RETURN
-	END FUNCTION MagLong
-
-!================================================================================================
-
-	SUBROUTINE SunLoc(SunLat,SunLong)
-!
-!-----------------------------------------------------------------------
-! Return latitude and longitude of sub-solar point.
-! Assumes that TRANS has previously been called with the
-! date & time to calculate the rotation matrices.
-!-----------------------------------------------------------------------
-!
-!       use shr_kind_mod, only: r8 => shr_kind_r8
-!      use efield_ipe, only:CX=>CX,ST=>ST,CT=>CT,AM=>AM
-        implicit none 
-!
-!-------------------------------Commons---------------------------------
-!
-!       real cx, st, ct, am
-!       COMMON/TRANSDAT/CX(9),ST(6),CT(6),AM(3,3,11)
-!
-!------------------------------Arguments--------------------------------
-!
-	Real SunLat,SunLong
-!
-!-----------------------------------------------------------------------
-!
-	SunLong=CX(9)
-	SunLat=CX(8)
-	RETURN
-	END SUBROUTINE SunLoc
-
-!================================================================================================
-
-      SUBROUTINE GECMP (AMLA,RMLT,ET,EP)
+      SUBROUTINE gecmp_ipe (AMLA,RMLT,ET,EP)
 !
 !-----------------------------------------------------------------------
 !          Get Electric field components for the Weimer electrostatic
 !          potential model.  Before use, first load coefficients (CALL
-!          READCOEF) and initialize model conditions (CALL SETMODEL).
+!          readcoef_ipe) and initialize model conditions (CALL SETMODEL).
 !
 !          INPUTS:
 !            AMLA = Absolute value of magnetic latitude (deg)
@@ -2795,13 +2069,16 @@ c1000 FORMAT(3I8)
 !-----------------------------------------------------------------------
 !
 !     use shr_kind_mod, only: r8 => shr_kind_r8
-!      use efield_ipe, only: ALAMN =>ALAMN,ALAMX=>ALAMX,ALAMR=>ALAMR,
-!     &STPD=>STPD,STP2=>STP2,CSTP=>CSTP,SSTP=>SSTP
+      use efield_ipe, only: ALAMN =>ALAMN,ALAMX=>ALAMX,ALAMR=>ALAMR,
+     &STPD=>STPD,STP2=>STP2,CSTP=>CSTP,SSTP=>SSTP
+
+      use weimer2005_ipe,        only: EpotVal_new
+
       implicit none 
 !
 !-------------------------------Commons---------------------------------
 !
-!          CECMP contains constants initialized in READCOEF
+!          CECMP contains constants initialized in readcoef_ipe
 !     real alamn, alamx, alamr, stpd, stp2, cstp, sstp
 !     COMMON /CECMP/ ALAMN,ALAMX,ALAMR,STPD,STP2,CSTP,SSTP
 !
@@ -2820,11 +2097,6 @@ c1000 FORMAT(3I8)
       real p1, p2
       real xmlt, xmlt1, kpol, dphi, amla1
 !
-!-------------------------External Functions----------------------------
-!
-!      real epotval
-!      external epotval
-!
 !-----------------------------------------------------------------------
 !
       ET = -99999.
@@ -2842,8 +2114,9 @@ c1000 FORMAT(3I8)
 	AMLA1 = 180. - AMLA1
 	XMLT1 = XMLT1 + 12.
       ENDIF
-      P1 = EPOTVAL (AMLA1    ,XMLT1)
-      P2 = EPOTVAL (AMLA-STPD,XMLT )
+      call EpotVal_new(AMLA1    , XMLT1, P1 )
+      call EpotVal_new(AMLA-STPD, XMLT,  P2 )
+!      print *, "gecmp_ipe ", P1, P2, AMLA1, XMLT1, AMLA-STPD, XMLT
       IF (KPOL .EQ. 1) GO TO 20
       ET = (P1 - P2) / STP2
 
@@ -2856,8 +2129,8 @@ c1000 FORMAT(3I8)
 	AMLA1 = MAX (ASIN(SIN(AMLA*D2R)*CSTP) , ALAMR)
 	DPHI  = ASIN (SSTP/SIN(AMLA1))*R2D
 	AMLA1 = AMLA1*R2D
-	P1 = EPOTVAL (AMLA1,XMLT+DPHI)
-	P2 = EPOTVAL (AMLA1,XMLT-DPHI)
+        call EpotVal_new(AMLA1, XMLT+DPHI, P1 )
+        call EpotVal_new(AMLA1, XMLT-DPHI, P2 )
       ELSE
 	AMLA = 90.
 	XMLT = XMLT + 6.
@@ -2874,10 +2147,10 @@ c1000 FORMAT(3I8)
       ENDIF
 
   100 RETURN
-      END SUBROUTINE GECMP
+      END SUBROUTINE gecmp_ipe
 
 !=====================================================================
-      subroutine svdcmp( a, m, n, mp, np, w, v )
+      subroutine svdcmp_ipe( a, m, n, mp, np, w, v )
 !------------------------------------------------------------------------- 
 ! purpose: singular value decomposition
 !
@@ -2890,7 +2163,7 @@ c1000 FORMAT(3I8)
 ! v(1:n,1:n).
 !
 ! author: a. maute dec 2003      
-! (* copyright (c) 1985 numerical recipes software -- svdcmp *!
+! (* copyright (c) 1985 numerical recipes software -- svdcmp_ipe *!
 ! from numerical recipes 1986 pp. 60 or can be find on web-sites
 !------------------------------------------------------------------------- 
       implicit none
@@ -3168,14 +2441,14 @@ c1000 FORMAT(3I8)
    20 continue
       end do
       
-      end subroutine svdcmp
+      end subroutine svdcmp_ipe
 
 !-------------------------------------------------------------------------      
 ! purpose: solves a*x = b
 !
 ! method:     
 ! solves a*x = b for a vector x, where a is specified by the arrays
-! u,w,v as returned by svdcmp. m and n
+! u,w,v as returned by svdcmp_ipe. m and n
 ! are the logical dimensions of a, and will be equal for square matrices.
 ! mp and np are the physical dimensions of a. b(1:m) is the input right-hand 
 ! side. x(1:n) is the output solution vector. no input quantities are 
@@ -3186,7 +2459,7 @@ c1000 FORMAT(3I8)
 ! from numerical recipes 1986 pp. 57 or can be find on web-sites
 !-------------------------------------------------------------------------      
 
-      subroutine svbksb( u, w, v, m, n, mp, np, b, x )
+      subroutine svbksb_ipe( u, w, v, m, n, mp, np, b, x )
 !------------------------------------------------------------------------- 
 !	... dummy arguments
 !------------------------------------------------------------------------- 
@@ -3228,6 +2501,4 @@ c1000 FORMAT(3I8)
         x(j) = s
       end do
 
-      end subroutine svbksb
-
-      end module efield_ipe
+      end subroutine svbksb_ipe
