@@ -44,7 +44,7 @@ module ipeCap
       "N2_Density            "  &
       /)
   
-  integer, parameter :: exportFieldCount = 21
+  integer, parameter :: exportFieldCount = 22
   character(len=*), dimension(exportFieldCount), parameter :: &
     exportFieldNames = (/ &
       "temp_neutral          ", &
@@ -65,6 +65,7 @@ module ipeCap
       "O_plus_2P_density     ", &
       "ion_temperature       ", &
       "electron_temperature  ", &
+      "electron_density      ", &
       "eastward_exb_velocity ", &
       "northward_exb_velocity", &
       "upward_exb_velocity   "  &
@@ -694,6 +695,8 @@ module ipeCap
             modelPtr(kps:,lps:,mph:) => ipe % plasma % ion_temperature
           case ("electron_temperature")
             modelPtr(kps:,lps:,mph:) => ipe % plasma % electron_temperature
+          case ("electron_density")
+            modelPtr(kps:,lps:,mph:) => ipe % plasma % electron_density
           case ("O_plus_density")
             modelPtr(kps:,lps:,mph:) => ipe % plasma % ion_densities(1,:,:,:)
           case ("H_plus_density")
