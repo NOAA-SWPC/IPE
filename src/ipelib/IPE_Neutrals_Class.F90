@@ -46,7 +46,6 @@ MODULE IPE_Neutrals_Class
       PROCEDURE :: Update => Update_IPE_Neutrals
 
       ! PRIVATE Routines
-      PROCEDURE, PRIVATE :: :NTERFACE__FIXED_GEO_to_MID_LAT_IONOSPHERE
       PROCEDURE, PRIVATE :: IPE_Neutrals_Empirical
       PROCEDURE, PRIVATE :: IPE_Neutrals_Extrapolate
       PROCEDURE, PRIVATE :: Geographic_to_Apex_Velocity

@@ -67,7 +67,6 @@ IMPLICIT NONE
       PROCEDURE :: Build => Build_IPE_Electrodynamics
       PROCEDURE :: Trash => Trash_IPE_Electrodynamics
       PROCEDURE :: Update => Update_IPE_Electrodynamics
-      PROCEDURE :: Interpolate_to_GeographicGrid => Interpolate_to_GeographicGrid_IPE_Electrodynamics
       PROCEDURE, PRIVATE :: Empirical_E_Field_Wrapper
       PROCEDURE, PRIVATE :: Dynamo_Wrapper
       PROCEDURE, PRIVATE :: Regrid_Potential

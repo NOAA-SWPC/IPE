@@ -68,9 +68,6 @@ IMPLICIT NONE
       PROCEDURE :: ReadFile  => ipe_grid_read_file
       PROCEDURE :: WriteFile => ipe_grid_write_file
 
-      PROCEDURE :: Interpolate_to_Geographic_Grid
-      PROCEDURE :: Interpolate_2D_to_Geographic_Grid
-
       ! Functions
       PROCEDURE :: SinI
 

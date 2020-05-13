@@ -37,18 +37,6 @@ MODULE IPE_Plasma_Class
     REAL(prec), ALLOCATABLE :: ionization_rates(:,:,:,:)
     REAL(prec), ALLOCATABLE :: conductivities(:,:,:,:)
 
-    ! Interpolated Fields
-    REAL(prec), ALLOCATABLE :: geo_ion_densities(:,:,:,:)
-    REAL(prec), ALLOCATABLE :: geo_ion_velocities(:,:,:,:)
-    REAL(prec), ALLOCATABLE :: geo_ion_temperature(:,:,:)
-    REAL(prec), ALLOCATABLE :: geo_electron_density(:,:,:)
-    REAL(prec), ALLOCATABLE :: geo_electron_velocity(:,:,:,:)
-    REAL(prec), ALLOCATABLE :: geo_electron_temperature(:,:,:)
-    REAL(prec), ALLOCATABLE :: geo_ionization_rates(:,:,:,:)
-    REAL(prec), ALLOCATABLE :: geo_tec(:,:)
-    REAL(prec), ALLOCATABLE :: geo_nmf2(:,:)
-    REAL(prec), ALLOCATABLE :: geo_hmf2(:,:)
-
 
     CONTAINS
 
@@ -57,8 +45,6 @@ MODULE IPE_Plasma_Class
 
       PROCEDURE :: Update => Update_IPE_Plasma
       PROCEDURE :: Update_Halos => Update_Halos_IPE_Plasma
-      PROCEDURE :: Interpolate_to_GeographicGrid => Interpolate_to_GeographicGrid_IPE_Plasma
-      PROCEDURE :: Read_Legacy_Input => Read_Legacy_Input_IPE_Plasma
 
       ! PRIVATE Routines
       PROCEDURE, PRIVATE :: Clean_Data
@@ -180,28 +166,6 @@ CONTAINS
       plasma % ionization_rates        = 0.0_prec
       plasma % conductivities          = 0.0_prec
 
-      ALLOCATE( plasma % geo_ion_densities(1:n_ion_species,1:nlon_geo,1:nlat_geo,1:nheights_geo), &
-                plasma % geo_ion_velocities(1:n_ion_species,1:nlon_geo,1:nlat_geo,1:nheights_geo), &
-                plasma % geo_ion_temperature(1:nlon_geo,1:nlat_geo,1:nheights_geo), &
-                plasma % geo_electron_density(1:nlon_geo,1:nlat_geo,1:nheights_geo), &
-                plasma % geo_electron_velocity(1:3,1:nlon_geo,1:nlat_geo,1:nheights_geo), &
-                plasma % geo_electron_temperature(1:nlon_geo,1:nlat_geo,1:nheights_geo), &
-                plasma % geo_ionization_rates(1:4,1:nlon_geo,1:nlat_geo,1:nheights_geo), &
-                plasma % geo_tec(1:nlon_geo,1:nlat_geo), &
-                plasma % geo_nmf2(1:nlon_geo,1:nlat_geo), &
-                plasma % geo_hmf2(1:nlon_geo,1:nlat_geo) )
-
-      plasma % geo_ion_densities           = 0.0_prec
-      plasma % geo_ion_velocities          = 0.0_prec
-      plasma % geo_ion_temperature         = 0.0_prec
-      plasma % geo_electron_density        = 0.0_prec
-      plasma % geo_electron_temperature    = 0.0_prec
-      plasma % geo_electron_velocity       = 0.0_prec
-      plasma % geo_ionization_rates        = 0.0_prec
-      plasma % geo_tec                     = 0.0_prec
-      plasma % geo_nmf2                    = 0.0_prec
-      plasma % geo_hmf2                    = 0.0_prec
-
 #ifdef HAVE_MPI
       ALLOCATE( ion_requestHandle(1:16), ion_requestStats(MPI_STATUS_SIZE,1:16) )
       ion_requestHandle = 0
@@ -229,16 +193,7 @@ CONTAINS
                 plasma % electron_velocity_old, &
                 plasma % electron_temperature_old, &
                 plasma % ionization_rates, &
-                plasma % geo_ion_velocities, &
-                plasma % geo_ion_temperature, &
-                plasma % geo_electron_density, &
-                plasma % geo_electron_velocity, &
-                plasma % geo_electron_temperature, &
-                plasma % geo_ionization_rates , &
-                plasma % geo_tec, &
-                plasma % geo_nmf2, &
-                plasma % conductivities, &
-                plasma % geo_hmf2 )
+                plasma % conductivities)  
 
 #ifdef HAVE_MPI
       DEALLOCATE( ion_requestHandle, ion_requestStats )
