@@ -38,7 +38,6 @@ IMPLICIT NONE
     INTEGER    :: mp_low, mp_high, mp_halo
     REAL(prec), ALLOCATABLE :: electric_potential(:,:)
     REAL(prec), ALLOCATABLE :: electric_potential2(:,:)
-    REAL(prec), ALLOCATABLE :: mhd_electric_potential(:,:)
     REAL(prec), ALLOCATABLE :: electric_field(:,:,:)
     REAL(prec), POINTER     :: v_ExB_geographic(:,:,:,:)  ! "zonal" and "meridional" direction on the geographic grid
     REAL(prec), ALLOCATABLE :: v_ExB_apex(:,:,:) ! "zonal" and "meridional" direction ( VEXBth, VEXBe ) on the apex grid
@@ -57,7 +56,6 @@ IMPLICIT NONE
 
     ! Geographic interpolated attributes
     REAL(prec), ALLOCATABLE :: geo_electric_potential(:,:)
-    REAL(prec), ALLOCATABLE :: geo_mhd_electric_potential(:,:)
     REAL(prec), ALLOCATABLE :: geo_v_ExB_geographic(:,:,:)    ! ExB transport velocity with geographic components
     REAL(prec), ALLOCATABLE :: geo_hall_conductivity(:,:)
     REAL(prec), ALLOCATABLE :: geo_pedersen_conductivity(:,:)
@@ -68,16 +66,8 @@ IMPLICIT NONE
 
       PROCEDURE :: Build => Build_IPE_Electrodynamics
       PROCEDURE :: Trash => Trash_IPE_Electrodynamics
-
       PROCEDURE :: Update => Update_IPE_Electrodynamics
       PROCEDURE :: Interpolate_to_GeographicGrid => Interpolate_to_GeographicGrid_IPE_Electrodynamics
-
-      PROCEDURE :: Read_Geospace_Potential
-
-      PROCEDURE :: Read_MHD_Potential
-      PROCEDURE :: Write_MHD_Potential
-      PROCEDURE :: Interpolate_Geospace_to_MHDpotential
-
       PROCEDURE, PRIVATE :: Empirical_E_Field_Wrapper
       PROCEDURE, PRIVATE :: Dynamo_Wrapper
       PROCEDURE, PRIVATE :: Regrid_Potential
@@ -90,9 +80,6 @@ IMPLICIT NONE
   LOGICAL, PRIVATE :: dynamo_efield
 
   REAL(prec), PRIVATE :: theta90_rad(0:nmlat)
-  REAL(prec), PRIVATE, ALLOCATABLE :: geospace_latitude(:), geospace_longitude(:), geospace_potential(:,:)
-
-  INTEGER, PRIVATE :: n_lat_geospace, n_lon_geospace
 
 CONTAINS
 
@@ -119,7 +106,6 @@ CONTAINS
 
       ALLOCATE( eldyn % electric_potential(1:NLP,mp_low-halo:mp_high+halo), &
                 eldyn % electric_potential2(1:NLP,mp_low-halo:mp_high+halo), &
-                eldyn % mhd_electric_potential(1:NLP,mp_low-halo:mp_high+halo), &
                 eldyn % electric_field(1:2,1:NLP,mp_low:mp_high), &
                 eldyn % v_ExB_geographic(1:3,1:nFluxTube,1:NLP,mp_low:mp_high), &
                 eldyn % v_ExB_apex(1:3,1:NLP,mp_low:mp_high), &
@@ -134,7 +120,6 @@ CONTAINS
 
       eldyn % electric_potential      = 0.0_prec
       eldyn % electric_potential2     = 0.0_prec
-      eldyn % mhd_electric_potential  = 0.0_prec
       eldyn % electric_field          = 0.0_prec
       eldyn % v_ExB_geographic        = 0.0_prec
       eldyn % v_ExB_apex              = 0.0_prec
@@ -149,7 +134,6 @@ CONTAINS
 
 
       ALLOCATE( eldyn % geo_electric_potential(1:nlon_geo,1:nlat_geo), &
-                eldyn % geo_mhd_electric_potential(1:nlon_geo,1:nlat_geo), &
                 eldyn % geo_v_ExB_geographic(1:3,1:nlon_geo,1:nlat_geo), &
                 eldyn % geo_hall_conductivity(1:nlon_geo,1:nlat_geo), &
                 eldyn % geo_pedersen_conductivity(1:nlon_geo,1:nlat_geo), &
@@ -180,7 +164,6 @@ CONTAINS
 
       DEALLOCATE( eldyn % electric_potential, &
                   eldyn % electric_potential2, &
-                  eldyn % mhd_electric_potential, &
                   eldyn % electric_field, &
                   eldyn % v_ExB_geographic, &
                   eldyn % v_ExB_apex, &
@@ -199,172 +182,8 @@ CONTAINS
                   eldyn % geo_pedersen_conductivity, &
                   eldyn % geo_b_parallel_conductivity )
 
-      IF( ALLOCATED( geospace_latitude ) )  DEALLOCATE( geospace_latitude )
-      IF( ALLOCATED( geospace_longitude ) ) DEALLOCATE( geospace_longitude )
-      IF( ALLOCATED( geospace_potential ) ) DEALLOCATE( geospace_potential )
-
   END SUBROUTINE Trash_IPE_Electrodynamics
 
-
-  SUBROUTINE Read_Geospace_Potential( eldyn, filename, error )
-
-    CLASS( IPE_Electrodynamics ), INTENT(inout) :: eldyn
-    CHARACTER(*),                 INTENT(in)    :: filename
-    INTEGER,                      INTENT(out)   :: error
-
-    ! Local
-    INTEGER :: ncid, ncerr
-    INTEGER :: dimid, varid
-    INTEGER :: nFluxtube, NLP, NMP
-#ifdef HAVE_NETCDF
-    CHARACTER(NF90_MAX_NAME) :: nameHolder
-#endif
-
-    error = 0
-
-#ifdef HAVE_NETCDF
-    _ncCheck( nf90_open( TRIM(filename), NF90_NETCDF4, ncid))
-
-    ! Obtain the dimensions of the Geospace grid
-    _ncCheck( nf90_inq_dimid( ncid, "lon", dimid ) )
-    _ncCheck( nf90_inquire_dimension( ncid, dimid, nameHolder, n_lon_geospace ) )
-
-    _ncCheck( nf90_inq_dimid( ncid, "lat", dimid ) )
-    _ncCheck( nf90_inquire_dimension( ncid, dimid, nameHolder, n_lat_geospace ) )
-
-    IF( .NOT. ALLOCATED( geospace_latitude ) ) ALLOCATE( geospace_latitude(1:n_lat_geospace) )
-    IF( .NOT. ALLOCATED( geospace_longitude ) ) ALLOCATE( geospace_longitude(1:n_lat_geospace) )
-    IF( .NOT. ALLOCATED( geospace_potential ) ) ALLOCATE( geospace_potential(1:n_lon_geospace,1:n_lat_geospace) )
-
-    _ncCheck( nf90_inq_varid( ncid, "lat", varid ) )
-    _ncCheck( nf90_get_var( ncid, varid, geospace_latitude ) )
-
-    _ncCheck( nf90_inq_varid( ncid, "lon", varid ) )
-    _ncCheck( nf90_get_var( ncid, varid, geospace_longitude ) )
-
-    _ncCheck( nf90_inq_varid( ncid, "potential", varid ) )
-    _ncCheck( nf90_get_var( ncid, varid, geospace_potential ) )
-
-    _ncCheck( nf90_close( ncid ) )
-#endif
-
-  END SUBROUTINE Read_Geospace_Potential
-
-
-  SUBROUTINE Interpolate_Geospace_to_MHDpotential( eldyn, grid, time_tracker)
-
-    IMPLICIT NONE
-
-    CLASS( IPE_Electrodynamics ), INTENT(inout) :: eldyn
-    TYPE( IPE_Grid ), INTENT(in)             :: grid
-    TYPE( IPE_Time ), INTENT(in)             :: time_tracker
-
-    ! Local
-    INTEGER :: j,latidx
-    REAL(prec) :: theta110_rad,geospace_latitude_90_rad(1:n_lat_geospace)
-    REAL(prec) :: colat_local(1:n_lat_geospace)
-    REAL(prec) :: potential_local(1:n_lon_geospace,1:n_lat_geospace)
-
-    DO j = 1, n_lat_geospace
-      theta110_rad   = ( 90.0_prec - geospace_latitude(j) ) * dtr
-      geospace_latitude_90_rad(j) = ASIN(SIN(theta110_rad)*SQRT((earth_radius+90000.0_prec)/(earth_radius+110000.0_prec)))
-      IF ( theta110_rad > half_pi ) geospace_latitude_90_rad(j) = pi - geospace_latitude_90_rad(j)
-    ENDDO
-
-    DO j = 1, n_lat_geospace
-      latidx = n_lat_geospace-j+1
-      colat_local(j)= geospace_latitude_90_rad(latidx)*rtd
-      potential_local(:,j)=geospace_potential(:,latidx)
-    END DO
-
-!    CALL eldyn % Regrid_Potential( grid, time_tracker, potential_local, geospace_longitude, colat_local, 1, n_lon_geospace, n_lat_geospace )
-
-!    eldyn % mhd_electric_potential= eldyn % electric_potential
-
-  END SUBROUTINE Interpolate_Geospace_to_MHDpotential
-
-
-  SUBROUTINE Write_MHD_Potential( eldyn, grid, time_tracker, filename, error )
-
-    IMPLICIT NONE
-
-    CLASS( IPE_Electrodynamics ), INTENT(in)  :: eldyn
-    TYPE( IPE_Grid ),             INTENT(in)  :: grid
-    TYPE( IPE_Time ),             INTENT(in)  :: time_tracker
-    CHARACTER(*),                 INTENT(in)  :: filename
-    INTEGER,                      INTENT(out) :: error
-    ! Local
-    REAL(prec) :: time
-    INTEGER :: NF90_PREC
-    INTEGER :: ncid, ncerr
-    INTEGER :: x_dimid, y_dimid, time_dimid, time_varid
-    INTEGER :: mhd_phi_varid
-    INTEGER :: recStart(1:3), recCount(1:3)
-
-
-    error = 0
-
-#ifdef HAVE_NETCDF
-    recStart = (/ 1, 1, 1 /)
-    recCount = (/ grid % NLP, grid % NMP, 1 /)
-
-    time = time_tracker % Calculate_Date_Difference( 2000, 1, 1, 0, 0 )
-    IF( prec == sp )THEN
-      NF90_PREC = NF90_FLOAT
-    ELSE
-      NF90_PREC = NF90_DOUBLE
-    ENDIF
-
-    _ncCheck( nf90_create( TRIM(filename), NF90_NETCDF4, ncid))
-
-    _ncCheck( nf90_def_dim( ncid, "lp", grid % NLP, x_dimid ) )
-    _ncCheck( nf90_def_dim( ncid, "mp", grid % NMP, y_dimid ) )
-    _ncCheck( nf90_def_dim( ncid, "time", NF90_UNLIMITED, time_dimid ) )
-
-    _ncCheck( nf90_def_var( ncid, "time", NF90_PREC, time_dimid, time_varid ) )
-    _ncCheck( nf90_put_att( ncid, time_varid, "long_name", "minutes since 2000-1-1 00:00 UT" ) )
-    _ncCheck( nf90_put_att( ncid, time_varid, "units", "minutes" ) )
-
-    _ncCheck( nf90_def_var( ncid, "mhd_phi", NF90_PREC, (/ x_dimid, y_dimid, time_dimid /) ,mhd_phi_varid ) )
-    _ncCheck( nf90_put_att( ncid, mhd_phi_varid, "long_name", "Electric Potential - MHD Component" ) )
-    _ncCheck( nf90_put_att( ncid, mhd_phi_varid, "units", "[Unknown]" ) )
-
-    _ncCheck( nf90_enddef(ncid) )
-
-    _ncCheck( nf90_put_var( ncid, time_varid, time ) )
-    _ncCheck( nf90_put_var( ncid, mhd_phi_varid, eldyn % mhd_electric_potential ) )
-
-    _ncCheck( nf90_close( ncid ) )
-#endif
-
-  END SUBROUTINE Write_MHD_Potential
-
-
-  SUBROUTINE Read_MHD_Potential( eldyn, filename, error )
-
-    CLASS( IPE_Electrodynamics ), INTENT(inout) :: eldyn
-    CHARACTER(*),                 INTENT(in)    :: filename
-    INTEGER,                      INTENT(out)   :: error
-
-    ! Local
-    INTEGER :: ncid, ncerr
-    INTEGER :: dimid, varid
-#ifdef HAVE_NETCDF
-    CHARACTER(NF90_MAX_NAME) :: nameHolder
-#endif
-
-    error = 0
-
-#ifdef HAVE_NETCDF
-    _ncCheck( nf90_open( TRIM(filename), NF90_NETCDF4, ncid))
-
-    _ncCheck( nf90_inq_varid( ncid, "mhd_phi", varid ) )
-    _ncCheck( nf90_get_var( ncid, varid, eldyn % mhd_electric_potential) )
-
-    _ncCheck( nf90_close( ncid ) )
-#endif
-
-  END SUBROUTINE Read_MHD_Potential
 
 
   SUBROUTINE Update_IPE_Electrodynamics( eldyn, grid, forcing, time_tracker, plasma, mpi_layer)
@@ -396,28 +215,6 @@ CONTAINS
       IF( mpi_layer % rank_id == 0 )THEN
         print *,'TZU-WEI calling empirical E field'
       ENDIF
-
-
-!      IF( geospace )THEN
-
-!        CALL  eldyn % Read_Geospace_Potential( filename )
-!        CALL  eldyn % Regrid_Geospace(  )
-!#ifdef DEBUG
-!        CALL eldyn % Write_MHD_Potential( )
-!#endif
-!        CALL eldyn % Merge_Geospace_Potential
-
-!      ELSEIF( openggcm )THEN
-
-!        CALL  eldyn % Read_OpenGGCM_Potential( filename )
-!        CALL  eldyn % Regrid_OpenGGCM(  )
-!#ifdef DEBUG
-!        CALL eldyn % Write_MHD_Potential( )
-!#endif
-!        CALL eldyn % Merge_OpenGGCM_Potential
-
-!      ENDIF
-
 
       ! Calculate the potential gradient in IPE coordinates.
       CALL eldyn % Calculate_Potential_Gradient( grid )
@@ -887,19 +684,6 @@ CONTAINS
     sunlons = xmlon*dtr
 
   END SUBROUTINE sunloc
-
-
-  SUBROUTINE Interpolate_to_GeographicGrid_IPE_Electrodynamics( eldyn, grid )
-
-    IMPLICIT NONE
-
-    CLASS( IPE_Electrodynamics ), INTENT(inout) :: eldyn
-    TYPE( IPE_Grid ), INTENT(in)         :: grid
-
-    CALL grid % Interpolate_2D_to_Geographic_Grid( eldyn % electric_potential, eldyn % geo_electric_potential )
-    CALL grid % Interpolate_2D_to_Geographic_Grid( eldyn % mhd_electric_potential, eldyn % geo_mhd_electric_potential )
-
-  END SUBROUTINE Interpolate_to_GeographicGrid_IPE_Electrodynamics
 
 
   SUBROUTINE Dynamo_Wrapper(eldyn,grid,forcing,time_tracker, plasma, mpi_layer)
