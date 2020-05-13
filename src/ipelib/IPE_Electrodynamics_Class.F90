@@ -906,7 +906,6 @@ CONTAINS
 
     use module_init_cons!,only:init_cons
     use module_init_heelis!,only:init_heelis
-    use module_readin_ascii!,only:readin_ascii
     use module_highlat!,only: highlat
     use module_sub_dynamo!,only: dynamo
     use params_module
@@ -956,9 +955,6 @@ CONTAINS
     year=2000
 
     CALL sunloc( year, time_tracker % day_of_year, time_tracker % utime, sunlons )
-!!---
-!!! read in integrals
-!        call readin_ascii
 
     DO i = 1, grid % NLP
       mlat_plas  = 90. - grid % magnetic_colatitude(1,i)*rtd
