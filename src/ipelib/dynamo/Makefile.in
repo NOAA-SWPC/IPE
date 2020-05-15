@@ -114,7 +114,6 @@ am_libdynamo_a_OBJECTS = libdynamo_a-cons_module.$(OBJEXT) \
 	libdynamo_a-module_init_heelis.$(OBJEXT) \
 	libdynamo_a-module_magfield.$(OBJEXT) \
 	libdynamo_a-module_potm.$(OBJEXT) \
-	libdynamo_a-module_readin_ascii.$(OBJEXT) \
 	libdynamo_a-module_rhspde.$(OBJEXT) \
 	libdynamo_a-module_stencil.$(OBJEXT) \
 	libdynamo_a-module_stencmd.$(OBJEXT) \
@@ -127,8 +126,7 @@ am_libdynamo_a_OBJECTS = libdynamo_a-cons_module.$(OBJEXT) \
 	libdynamo_a-module_weimer2005Ipe.$(OBJEXT) \
 	libdynamo_a-mudcom.$(OBJEXT) libdynamo_a-mud.$(OBJEXT) \
 	libdynamo_a-mudmod.$(OBJEXT) libdynamo_a-muh2cr.$(OBJEXT) \
-	libdynamo_a-params.$(OBJEXT) libdynamo_a-readin.$(OBJEXT) \
-	libdynamo_a-util.$(OBJEXT)
+	libdynamo_a-params.$(OBJEXT) libdynamo_a-util.$(OBJEXT)
 libdynamo_a_OBJECTS = $(am_libdynamo_a_OBJECTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -312,9 +310,9 @@ noinst_LIBRARIES = libdynamo.a
 libdynamo_a_SOURCES = cons_module.f dynamo_module.f heelis_module.f module_ceee.f module_clearcee.f \
 	module_cnm.f module_cnmmod.f module_colath.f module_divide.f module_edges.f module_flwv32.f \
 	module_highlat.f module_htrpex.f module_init_cons.f module_init_heelis.f module_magfield.f \
-	module_potm.f module_readin_ascii.f module_rhspde.f module_stencil.f module_stencmd.f \
+	module_potm.f module_rhspde.f module_stencil.f module_stencmd.f \
 	module_stenmd.f module_stenmod.f module_sub_dynamo.f module_sub_heelis.f module_threed.f \
-	module_transf.f module_weimer2005Ipe.f mudcom.f mud.f mudmod.f muh2cr.f params.f readin.f util.f
+	module_transf.f module_weimer2005Ipe.f mudcom.f mud.f mudmod.f muh2cr.f params.f  util.f
 
 libdynamo_a_FFLAGS = $(FC_MODINC) .
 EXTRA_DIST = apex_sunloc.f module_cal_monthday.f module_check_err.f module_eldyn.f module_nc_close.f \
@@ -478,12 +476,6 @@ libdynamo_a-module_potm.o: module_potm.f
 libdynamo_a-module_potm.obj: module_potm.f
 	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_potm.obj `if test -f 'module_potm.f'; then $(CYGPATH_W) 'module_potm.f'; else $(CYGPATH_W) '$(srcdir)/module_potm.f'; fi`
 
-libdynamo_a-module_readin_ascii.o: module_readin_ascii.f
-	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_readin_ascii.o `test -f 'module_readin_ascii.f' || echo '$(srcdir)/'`module_readin_ascii.f
-
-libdynamo_a-module_readin_ascii.obj: module_readin_ascii.f
-	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_readin_ascii.obj `if test -f 'module_readin_ascii.f'; then $(CYGPATH_W) 'module_readin_ascii.f'; else $(CYGPATH_W) '$(srcdir)/module_readin_ascii.f'; fi`
-
 libdynamo_a-module_rhspde.o: module_rhspde.f
 	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_rhspde.o `test -f 'module_rhspde.f' || echo '$(srcdir)/'`module_rhspde.f
 
@@ -573,12 +565,6 @@ libdynamo_a-params.o: params.f
 
 libdynamo_a-params.obj: params.f
 	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-params.obj `if test -f 'params.f'; then $(CYGPATH_W) 'params.f'; else $(CYGPATH_W) '$(srcdir)/params.f'; fi`
-
-libdynamo_a-readin.o: readin.f
-	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-readin.o `test -f 'readin.f' || echo '$(srcdir)/'`readin.f
-
-libdynamo_a-readin.obj: readin.f
-	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-readin.obj `if test -f 'readin.f'; then $(CYGPATH_W) 'readin.f'; else $(CYGPATH_W) '$(srcdir)/readin.f'; fi`
 
 libdynamo_a-util.o: util.f
 	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-util.o `test -f 'util.f' || echo '$(srcdir)/'`util.f
@@ -811,8 +797,6 @@ libdynamo_a-module_init_heelis.$(OBJEXT): libdynamo_a-cons_module.$(OBJEXT) libd
 libdynamo_a-module_potm.$(OBJEXT): libdynamo_a-cons_module.$(OBJEXT) libdynamo_a-dynamo_module.$(OBJEXT) \
 	libdynamo_a-heelis_module.$(OBJEXT) libdynamo_a-module_flwv32.$(OBJEXT) libdynamo_a-module_magfield.$(OBJEXT) \
 	libdynamo_a-params.$(OBJEXT)
-libdynamo_a-module_readin_ascii.$(OBJEXT): libdynamo_a-dynamo_module.$(OBJEXT) libdynamo_a-params.$(OBJEXT) \
-	libdynamo_a-readin.$(OBJEXT)
 libdynamo_a-module_rhspde.$(OBJEXT): libdynamo_a-cons_module.$(OBJEXT) libdynamo_a-dynamo_module.$(OBJEXT)
 libdynamo_a-module_stencil.$(OBJEXT): libdynamo_a-module_cnm.$(OBJEXT) libdynamo_a-module_htrpex.$(OBJEXT)
 libdynamo_a-module_stencmd.$(OBJEXT): libdynamo_a-module_cnm.$(OBJEXT) libdynamo_a-module_cnmmod.$(OBJEXT) \
