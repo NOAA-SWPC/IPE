@@ -1085,10 +1085,6 @@ CONTAINS
 
             DO 300 i = 1, grid % flux_tube_max(lp)
 
-! only do convection for points over 200km.....
-
-              if(grid % altitude(i,lp).ge.200000.0_prec) then
-
               ! q interpolation
               q_value = grid % q_factor(i,lp,mp)
               DO mpx = 1, 2
@@ -1121,6 +1117,17 @@ CONTAINS
 
                     ENDIF
                   ENDDO
+!
+! GHGM - Below the bottom of the tube at the Northern end
+! the Q interpolation factors are greater than 1 (incorrect).
+! The following resets these values so the interpolation comes from the point
+! at 90km
+!
+                  if((abs(i_comp_weight(1)).gt.1).and.(abs(i_comp_weight(2)).gt.1)) then
+                      i_comp_weight(1) = 0.0
+                      i_comp_weight(2) = 1.0
+                  endif
+
 
                   B(lpx,mpx) = grid % magnetic_field_strength(isouth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(1) +&
                                grid % magnetic_field_strength(inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
@@ -1174,10 +1181,6 @@ CONTAINS
 !             plasma % electron_temperature(i,lp,mp) = electron_temperature_int
               plasma % ion_temperature(i,lp,mp) = ion_temperature_int*( ksi_fac**(4.0_prec/3.0_prec) )
               plasma % electron_temperature(i,lp,mp) = electron_temperature_int*( ksi_fac**(4.0_prec/3.0_prec) )
-
-
-
-              endif     ! if(grid % altitude(i,lp).ge.200000.0_prec)
 
  300        CONTINUE  !  i = 1, grid % flux_tube_max(lp)
 
