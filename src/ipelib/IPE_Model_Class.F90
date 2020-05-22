@@ -65,8 +65,6 @@ CONTAINS
     CHARACTER(200) :: init_file
     LOGICAL        :: fileExists
 
-!   INTEGER, DIMENSION(3) :: global_dims, local_dims, local_start
-
     init_success = .false.
 
     CALL ipe % mpi_layer % Initialize( comm = mpi_comm )
@@ -139,16 +137,6 @@ CONTAINS
                                mp_low    = ipe % mpi_layer % mp_low, &
                                mp_high   = ipe % mpi_layer % mp_high, &
                                halo      = ipe % mpi_layer % mp_halo_size )
-
-
-    ! Setup data decomposition for common disk I/O
-!   global_dims = (/ ipe % grid % nFluxtube, ipe % grid % NLP, ipe % grid % NMP /)
-!   local_dims  = (/ ipe % grid % nFluxtube, ipe % grid % NLP, ipe % mpi_layer % mp_high - ipe % mpi_layer % mp_low + 1 /)
-!   local_start = (/ 1, 1, ipe % mpi_layer % mp_low /)
-
-!   CALL ipe % io % domain(global_dims, local_start, local_dims)
-!   IF (ipe % io % err % check(msg="Failed to setup I/O data decomposition", &
-!     file=__FILE__, line=__LINE__)) RETURN
 
     init_success = .true.
 
@@ -512,12 +500,6 @@ CONTAINS
       (/ ipe % grid % nFluxtube, ipe % grid % NLP, ipe % mpi_layer % mp_high - ipe % mpi_layer % mp_low + 1 /) )
     IF (ipe % io % err % check(msg="Failed to setup I/O data decomposition", &
       file=__FILE__, line=__LINE__)) RETURN
-    ! Create groups
-!   DO item = 1, num_groups
-!     CALL ipe % io % grp_build(groups(item))
-!     IF (ipe % io % err % check(msg="Unable to create group "//groups(item), &
-!       file=__FILE__, line=__LINE__)) RETURN
-!   END DO
 
     ! Write individual datasets
     ! -- Ion densities

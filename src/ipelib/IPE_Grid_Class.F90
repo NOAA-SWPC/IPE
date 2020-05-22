@@ -815,10 +815,6 @@ CONTAINS
     if (io % err % check(msg="Unable to create file "//trim(filename), &
       file=__FILE__,line=__LINE__)) return
 
-    ! -- create group
-!   call io % grp_build("apex_grid")
-!   if (io % err % check(msg="Error creating group /apex_grid",file=__FILE__,line=__LINE__)) return
-
     ! -- write apex 3D variables
 
     ! -- geographic colatitude
