@@ -44,7 +44,7 @@ IMPLICIT NONE
 !        CALL ipe % eldyn % Write_NetCDF( ipe % time_tracker, "eldyn.apex."//ipe % time_tracker % DateStamp( )//".nc", rc )
 #endif
 
-        CALL ipe % Write_to_HDF5( "IPE_State.apex."//ipe % time_tracker % DateStamp( )//".h5", rc )
+        CALL ipe % Write( "IPE_State.apex."//ipe % time_tracker % DateStamp( )//".h5", rc )
         IF( ipe % mpi_layer % rank_id == 0 )THEN
           write(6,*) '***********************************************'
           write(6,*) '*                                             *'

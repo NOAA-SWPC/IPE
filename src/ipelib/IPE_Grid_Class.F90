@@ -2,16 +2,15 @@
 
 MODULE IPE_Grid_Class
 
-USE IPE_Precision
-USE IPE_Constants_Dictionary
-USE IPE_Common_Routines
-USE IPE_Model_Parameters_Class
-USE IPE_MPI_Layer_Class
-USE IPE_IO_Class
+  USE IPE_Precision
+  USE IPE_Constants_Dictionary
+  USE IPE_Common_Routines
+  USE IPE_Model_Parameters_Class
+  USE IPE_MPI_Layer_Class
 
-USE HDF5
+  USE COMIO
 
-IMPLICIT NONE
+  IMPLICIT NONE
 
   TYPE IPE_Grid
     INTEGER :: nFluxTube, NLP, NMP, NPTS2D
@@ -480,7 +479,7 @@ CONTAINS
 
   subroutine ipe_grid_read_file(grid, io, filename, rc)
     class(IPE_Grid)               :: grid
-    class(IPE_IO)                 :: io
+    class(COMIO_T)                :: io
     character(len=*), intent(in)  :: filename
     integer,          intent(out) :: rc
 
@@ -488,7 +487,7 @@ CONTAINS
     integer :: i, j, is, ie, js, je
     integer :: mp_beg, mp_end
 
-    integer, dimension(3) :: fdims, gdims, moffset, mcount
+    integer, dimension(3) :: fdims, gdims, mstart, mcount
 
     character(len=34) :: dset_name
 
@@ -507,51 +506,51 @@ CONTAINS
     mcount(1:2)  = fdims(1:2)
     mcount(3)    = mp_end - mp_beg + 1
 
-    moffset(1:2) = 0
-    moffset(3)   = mp_beg - 1
+    mstart(1:2) = 1
+    mstart(3)   = mp_beg
 
     ! -- assume io has been initialized
 
     ! -- use same domain as parent
-    call io % domain_set(fdims, moffset, mcount)
-    if (io % error_check(msg="Unable to setup I/O data decomposition",file=__FILE__,line=__LINE__)) return
+    call io % domain(fdims, mstart, mcount)
+    if (io % err % check(msg="Unable to setup I/O data decomposition",file=__FILE__,line=__LINE__)) return
 
     ! -- open grid file for reading
-    call io % file_open(filename, "r")
-    if (io % error_check(msg="Unable to open file "//filename, &
+    call io % open(filename, "r")
+    if (io % err % check(msg="Unable to open file "//filename, &
       file=__FILE__,line=__LINE__)) return
 
     ! -- read apex 3D variables
 
     ! -- geographic colatitude
     dset_name = "/apex_grid/colatitude"
-    call io % dset_read(dset_name, grid % colatitude(:,:,mp_beg:mp_end))
-    if (io % error_check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % read(dset_name, grid % colatitude(:,:,mp_beg:mp_end))
+    if (io % err % check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
     ! -- geographic longitude
     dset_name = "/apex_grid/longitude"
-    call io % dset_read(dset_name, grid % longitude(:,:,mp_beg:mp_end))
-    if (io % error_check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % read(dset_name, grid % longitude(:,:,mp_beg:mp_end))
+    if (io % err % check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
     ! -- gravity
     dset_name = "/apex_grid/gravity"
-    call io % dset_read(dset_name, grid % grx(:,:,mp_beg:mp_end))
-    if (io % error_check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % read(dset_name, grid % grx(:,:,mp_beg:mp_end))
+    if (io % err % check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
     ! -- foot point distance
     dset_name = "/apex_grid/foot_point_distance"
-    call io % dset_read(dset_name, grid % foot_point_distance(:,:,mp_beg:mp_end))
-    if (io % error_check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % read(dset_name, grid % foot_point_distance(:,:,mp_beg:mp_end))
+    if (io % err % check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
     ! -- magnetic field strength
     dset_name = "/apex_grid/magnetic_field_strength"
-    call io % dset_read(dset_name, grid % magnetic_field_strength(:,:,mp_beg:mp_end))
-    if (io % error_check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % read(dset_name, grid % magnetic_field_strength(:,:,mp_beg:mp_end))
+    if (io % err % check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
     ! -- Q value
     dset_name = "/apex_grid/q"
-    call io % dset_read(dset_name, grid % q_factor(:,:,mp_beg:mp_end))
-    if (io % error_check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % read(dset_name, grid % q_factor(:,:,mp_beg:mp_end))
+    if (io % err % check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
     ! -- L magnitude
     dset_name = ""
@@ -562,8 +561,8 @@ CONTAINS
     do j = js, je
       do i = is, ie
         write(dset_name, '("/apex_grid/l_magnitude_",2i0)') i, j
-        call io % dset_read(dset_name, grid % l_magnitude(i,j,:,:,mp_beg:mp_end))
-        if (io % error_check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+        call io % read(dset_name, grid % l_magnitude(i,j,:,:,mp_beg:mp_end))
+        if (io % err % check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
       end do
     end do
 
@@ -576,8 +575,8 @@ CONTAINS
     do j = js, je
       do i = is, ie
         write(dset_name, '("/apex_grid/apex_e_",2i0)') i, j
-        call io % dset_read(dset_name, grid % apex_e_vectors(i,j,:,:,mp_beg:mp_end))
-        if (io % error_check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+        call io % read(dset_name, grid % apex_e_vectors(i,j,:,:,mp_beg:mp_end))
+        if (io % err % check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
       end do
     end do
 
@@ -590,66 +589,66 @@ CONTAINS
     do j = js, je
       do i = is, ie
         write(dset_name, '("/apex_grid/apex_d_",2i0)') i, j
-        call io % dset_read(dset_name, grid % apex_d_vectors(i,j,:,:,mp_beg:mp_end))
-        if (io % error_check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+        call io % read(dset_name, grid % apex_d_vectors(i,j,:,:,mp_beg:mp_end))
+        if (io % err % check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
       end do
     end do
 
     ! -- apex d1xd2 mag
     dset_name = "/apex_grid/d1xd2_mag"
-    call io % dset_read(dset_name, grid % d1xd2_magnitude(:,:,mp_beg:mp_end))
-    if (io % error_check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % read(dset_name, grid % d1xd2_magnitude(:,:,mp_beg:mp_end))
+    if (io % err % check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
     ! -- apex 2d variables
     ! -- reset domain
-    call io % domain_set(fdims(2:3), moffset(2:3), mcount(2:3))
-    if (io % error_check(msg="Unable to setup 2D apex I/O decomposition",file=__FILE__,line=__LINE__)) return
+    call io % domain(fdims(2:3), mstart(2:3), mcount(2:3))
+    if (io % err % check(msg="Unable to setup 2D apex I/O decomposition",file=__FILE__,line=__LINE__)) return
 
     dset_name = "/apex_grid/apex_be3"
-    call io % dset_read(dset_name, grid % apex_be3(:,mp_beg:mp_end))
-    if (io % error_check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % read(dset_name, grid % apex_be3(:,mp_beg:mp_end))
+    if (io % err % check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
     ! -- reset domain
-    call io % domain_set(fdims(1:2), moffset(1:2), mcount(1:2))
-    if (io % error_check(msg="Unable to setup 2D apex I/O decomposition",file=__FILE__,line=__LINE__)) return
+    call io % domain(fdims(1:2), mstart(1:2), mcount(1:2))
+    if (io % err % check(msg="Unable to setup 2D apex I/O decomposition",file=__FILE__,line=__LINE__)) return
 
     dset_name = "/apex_grid/altitude"
-    call io % dset_read(dset_name, grid % altitude)
-    if (io % error_check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % read(dset_name, grid % altitude)
+    if (io % err % check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
     dset_name = "/apex_grid/m_colat"
-    call io % dset_read(dset_name, grid % magnetic_colatitude)
-    if (io % error_check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % read(dset_name, grid % magnetic_colatitude)
+    if (io % err % check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
     dset_name = "/apex_grid/r_meter"
-    call io % dset_read(dset_name, grid % r_meter)
-    if (io % error_check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % read(dset_name, grid % r_meter)
+    if (io % err % check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
 
     ! -- apex 1d variables
     ! -- reset domain
-    call io % domain_set(fdims(2:2), moffset(2:2), mcount(2:2))
-    if (io % error_check(msg="Unable to setup 1D apex I/O decomposition",file=__FILE__,line=__LINE__)) return
+    call io % domain(fdims(2:2), mstart(2:2), mcount(2:2))
+    if (io % err % check(msg="Unable to setup 1D apex I/O decomposition",file=__FILE__,line=__LINE__)) return
 
     dset_name = "/apex_grid/p_value"
-    call io % dset_read(dset_name, grid % p_value)
-    if (io % error_check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % read(dset_name, grid % p_value)
+    if (io % err % check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
     dset_name = "/apex_grid/tube_midpoint"
-    call io % dset_read(dset_name, grid % flux_tube_midpoint)
-    if (io % error_check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % read(dset_name, grid % flux_tube_midpoint)
+    if (io % err % check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
     dset_name = "/apex_grid/tube_max"
-    call io % dset_read(dset_name, grid % flux_tube_max)
-    if (io % error_check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % read(dset_name, grid % flux_tube_max)
+    if (io % err % check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
     dset_name = "/apex_grid/southern_top"
-    call io % dset_read(dset_name, grid % southern_top_index)
-    if (io % error_check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % read(dset_name, grid % southern_top_index)
+    if (io % err % check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
     dset_name = "/apex_grid/northern_top"
-    call io % dset_read(dset_name, grid % northern_top_index)
-    if (io % error_check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % read(dset_name, grid % northern_top_index)
+    if (io % err % check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
     ! -- periodic boundary conditions for B and q_factor if needed
     if (grid % mp_halo > 0) then
@@ -659,50 +658,50 @@ CONTAINS
       ! -- left boundary
       if (mp_beg == 1) then
         ! -- reset domain
-        moffset(3) = grid % NMP - grid % mp_halo
-        call io % domain_set(fdims, moffset, mcount)
-        if (io % error_check(msg="Unable to apex I/O halo decomposition",file=__FILE__,line=__LINE__)) return
+        mstart(3) = grid % NMP - grid % mp_halo + 1
+        call io % domain(fdims, mstart, mcount)
+        if (io % err % check(msg="Unable to apex I/O halo decomposition",file=__FILE__,line=__LINE__)) return
 
         ! -- magnetic field strength
         dset_name = "/apex_grid/magnetic_field_strength"
-        call io % dset_read(dset_name, grid % magnetic_field_strength(:,:,mp_beg-grid % mp_halo:mp_beg-1))
-        if (io % error_check(msg="Unable to read dataset", file=__FILE__,line=__LINE__)) return
+        call io % read(dset_name, grid % magnetic_field_strength(:,:,mp_beg-grid % mp_halo:mp_beg-1))
+        if (io % err % check(msg="Unable to read dataset", file=__FILE__,line=__LINE__)) return
 
         ! -- Q value
         dset_name = "/apex_grid/q"
-        call io % dset_read(dset_name, grid % q_factor(:,:,mp_beg-grid % mp_halo:mp_beg-1))
-        if (io % error_check(msg="Unable to read dataset", file=__FILE__,line=__LINE__)) return
+        call io % read(dset_name, grid % q_factor(:,:,mp_beg-grid % mp_halo:mp_beg-1))
+        if (io % err % check(msg="Unable to read dataset", file=__FILE__,line=__LINE__)) return
 
       end if
 
       ! -- right boundary
       if (mp_end == grid % NMP) then
         ! -- reset domain
-        moffset(3) = 0
-        call io % domain_set(fdims, moffset, mcount)
-        if (io % error_check(msg="Unable to apex I/O halo decomposition",file=__FILE__,line=__LINE__)) return
+        mstart(3) = 1
+        call io % domain(fdims, mstart, mcount)
+        if (io % err % check(msg="Unable to apex I/O halo decomposition",file=__FILE__,line=__LINE__)) return
 
         ! -- magnetic field strength
         dset_name = "/apex_grid/magnetic_field_strength"
-        call io % dset_read(dset_name, grid % magnetic_field_strength(:,:,mp_end+1:mp_end+grid % mp_halo))
-        if (io % error_check(msg="Unable to read dataset", file=__FILE__,line=__LINE__)) return
+        call io % read(dset_name, grid % magnetic_field_strength(:,:,mp_end+1:mp_end+grid % mp_halo))
+        if (io % err % check(msg="Unable to read dataset", file=__FILE__,line=__LINE__)) return
 
         ! -- Q value
         dset_name = "/apex_grid/q"
-        call io % dset_read(dset_name, grid % q_factor(:,:,mp_end+1:mp_end+grid % mp_halo))
-        if (io % error_check(msg="Unable to read dataset", file=__FILE__,line=__LINE__)) return
+        call io % read(dset_name, grid % q_factor(:,:,mp_end+1:mp_end+grid % mp_halo))
+        if (io % err % check(msg="Unable to read dataset", file=__FILE__,line=__LINE__)) return
 
       end if
 
     end if
 
     ! -- read geographic 3D variables
-    fdims   = (/ grid % nheights_geo, grid % nlat_geo, grid % nlon_geo /)
-    mcount  = fdims
-    moffset = 0
+    fdims  = (/ grid % nheights_geo, grid % nlat_geo, grid % nlon_geo /)
+    mcount = fdims
+    mstart = 1
 
-    call io % domain_set(fdims, moffset, mcount)
-    if (io % error_check(msg="Unable to setup I/O geographic data decomposition",file=__FILE__,line=__LINE__)) return
+    call io % domain(fdims, mstart, mcount)
+    if (io % err % check(msg="Unable to setup I/O geographic data decomposition",file=__FILE__,line=__LINE__)) return
 
     ! -- fac
     dset_name = ""
@@ -710,8 +709,8 @@ CONTAINS
     ie = ubound(grid % facfac_interface, dim=1)
     do i = is, ie
       write(dset_name, '("/apex_grid/fac_",i0)') i
-      call io % dset_read(dset_name, grid % facfac_interface(i,:,:,:))
-      if (io % error_check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+      call io % read(dset_name, grid % facfac_interface(i,:,:,:))
+      if (io % err % check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
     end do
 
     ! -- dd
@@ -720,8 +719,8 @@ CONTAINS
     ie = ubound(grid % dd_interface, dim=1)
     do i = is, ie
       write(dset_name, '("/apex_grid/dd_",i0)') i
-      call io % dset_read(dset_name, grid % dd_interface(i,:,:,:))
-      if (io % error_check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+      call io % read(dset_name, grid % dd_interface(i,:,:,:))
+      if (io % err % check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
     end do
 
     ! -- ii1
@@ -730,8 +729,8 @@ CONTAINS
     ie = ubound(grid % ii1_interface, dim=1)
     do i = is, ie
       write(dset_name, '("/apex_grid/ii1_",i0)') i
-      call io % dset_read(dset_name, grid % ii1_interface(i,:,:,:))
-      if (io % error_check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+      call io % read(dset_name, grid % ii1_interface(i,:,:,:))
+      if (io % err % check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
     end do
 
     ! -- ii2
@@ -740,8 +739,8 @@ CONTAINS
     ie = ubound(grid % ii2_interface, dim=1)
     do i = is, ie
       write(dset_name, '("/apex_grid/ii2_",i0)') i
-      call io % dset_read(dset_name, grid % ii2_interface(i,:,:,:))
-      if (io % error_check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+      call io % read(dset_name, grid % ii2_interface(i,:,:,:))
+      if (io % err % check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
     end do
 
     ! -- ii3
@@ -750,8 +749,8 @@ CONTAINS
     ie = ubound(grid % ii3_interface, dim=1)
     do i = is, ie
       write(dset_name, '("/apex_grid/ii3_",i0)') i
-      call io % dset_read(dset_name, grid % ii3_interface(i,:,:,:))
-      if (io % error_check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+      call io % read(dset_name, grid % ii3_interface(i,:,:,:))
+      if (io % err % check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
     end do
 
     ! -- ii4
@@ -760,13 +759,13 @@ CONTAINS
     ie = ubound(grid % ii4_interface, dim=1)
     do i = is, ie
       write(dset_name, '("/apex_grid/ii4_",i0)') i
-      call io % dset_read(dset_name, grid % ii4_interface(i,:,:,:))
-      if (io % error_check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+      call io % read(dset_name, grid % ii4_interface(i,:,:,:))
+      if (io % err % check(msg="Unable to read dataset "//dset_name, file=__FILE__,line=__LINE__)) return
     end do
 
     ! -- close grid file
-    call io % file_close()
-    if (io % error_check(msg="Unable to close grid file "//filename, file=__FILE__,line=__LINE__)) return
+    call io % close()
+    if (io % err % check(msg="Unable to close grid file "//filename, file=__FILE__,line=__LINE__)) return
 
     rc = 0
 
@@ -775,7 +774,7 @@ CONTAINS
 
   subroutine ipe_grid_write_file(grid, io, filename, rc)
     class(IPE_Grid)               :: grid
-    class(IPE_IO)                 :: io
+    class(COMIO_T)                :: io
     character(len=*), intent(in)  :: filename
     integer,          intent(out) :: rc
 
@@ -783,7 +782,7 @@ CONTAINS
     integer :: i, j, is, ie, js, je
     integer :: mp_beg, mp_end
 
-    integer, dimension(3) :: fdims, gdims, moffset, mcount
+    integer, dimension(3) :: fdims, gdims, mstart, mcount
 
     character(len=34) :: dset_name
 
@@ -802,55 +801,55 @@ CONTAINS
     mcount(1:2)  = fdims(1:2)
     mcount(3)    = mp_end - mp_beg + 1
 
-    moffset(1:2) = 0
-    moffset(3)   = mp_beg - 1
+    mstart(1:2) = 1
+    mstart(3)   = mp_beg
 
     ! -- assume io has been initialized
 
     ! -- use same domain as parent
-    call io % domain_set(fdims, moffset, mcount)
-    if (io % error_check(msg="Unable to setup I/O data decomposition",file=__FILE__,line=__LINE__)) return
+    call io % domain(fdims, mstart, mcount)
+    if (io % err % check(msg="Unable to setup I/O data decomposition",file=__FILE__,line=__LINE__)) return
 
     ! -- open grid file for writing
-    call io % file_open(filename, "c")
-    if (io % error_check(msg="Unable to create file "//trim(filename), &
+    call io % open(filename, "c")
+    if (io % err % check(msg="Unable to create file "//trim(filename), &
       file=__FILE__,line=__LINE__)) return
 
     ! -- create group
-    call io % grp_build("apex_grid")
-    if (io % error_check(msg="Error creating group /apex_grid",file=__FILE__,line=__LINE__)) return
+!   call io % grp_build("apex_grid")
+!   if (io % err % check(msg="Error creating group /apex_grid",file=__FILE__,line=__LINE__)) return
 
     ! -- write apex 3D variables
 
     ! -- geographic colatitude
     dset_name = "/apex_grid/colatitude"
-    call io % dset_write(dset_name, grid % colatitude(:,:,mp_beg:mp_end))
-    if (io % error_check(msg="Unable to write dataset "//dset_name,file=__FILE__,line=__LINE__)) return
+    call io % write(dset_name, grid % colatitude(:,:,mp_beg:mp_end))
+    if (io % err % check(msg="Unable to write dataset "//dset_name,file=__FILE__,line=__LINE__)) return
 
     ! -- geographic longitude
     dset_name = "/apex_grid/longitude"
-    call io % dset_write(dset_name, grid % longitude(:,:,mp_beg:mp_end))
-    if (io % error_check(msg="Unable to write dataset "//dset_name,file=__FILE__,line=__LINE__)) return
+    call io % write(dset_name, grid % longitude(:,:,mp_beg:mp_end))
+    if (io % err % check(msg="Unable to write dataset "//dset_name,file=__FILE__,line=__LINE__)) return
 
     ! -- gravity
     dset_name = "/apex_grid/gravity"
-    call io % dset_write(dset_name, grid % grx(:,:,mp_beg:mp_end))
-    if (io % error_check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % write(dset_name, grid % grx(:,:,mp_beg:mp_end))
+    if (io % err % check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
     ! -- foot point distance
     dset_name = "/apex_grid/foot_point_distance"
-    call io % dset_write(dset_name, grid % foot_point_distance(:,:,mp_beg:mp_end))
-    if (io % error_check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % write(dset_name, grid % foot_point_distance(:,:,mp_beg:mp_end))
+    if (io % err % check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
     ! -- magnetic field strength
     dset_name = "/apex_grid/magnetic_field_strength"
-    call io % dset_write(dset_name, grid % magnetic_field_strength(:,:,mp_beg:mp_end))
-    if (io % error_check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % write(dset_name, grid % magnetic_field_strength(:,:,mp_beg:mp_end))
+    if (io % err % check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
     ! -- Q value
     dset_name = "/apex_grid/q"
-    call io % dset_write(dset_name, grid % q_factor(:,:,mp_beg:mp_end))
-    if (io % error_check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % write(dset_name, grid % q_factor(:,:,mp_beg:mp_end))
+    if (io % err % check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
     ! -- L magnitude
     dset_name = ""
@@ -861,8 +860,8 @@ CONTAINS
     do j = js, je
       do i = is, ie
         write(dset_name, '("/apex_grid/l_magnitude_",2i0)') i, j
-        call io % dset_write(dset_name, grid % l_magnitude(i,j,:,:,mp_beg:mp_end))
-        if (io % error_check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+        call io % write(dset_name, grid % l_magnitude(i,j,:,:,mp_beg:mp_end))
+        if (io % err % check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
       end do
     end do
 
@@ -875,8 +874,8 @@ CONTAINS
     do j = js, je
       do i = is, ie
         write(dset_name, '("/apex_grid/apex_e_",2i0)') i, j
-        call io % dset_write(dset_name, grid % apex_e_vectors(i,j,:,:,mp_beg:mp_end))
-        if (io % error_check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+        call io % write(dset_name, grid % apex_e_vectors(i,j,:,:,mp_beg:mp_end))
+        if (io % err % check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
       end do
     end do
 
@@ -889,24 +888,24 @@ CONTAINS
     do j = js, je
       do i = is, ie
         write(dset_name, '("/apex_grid/apex_d_",2i0)') i, j
-        call io % dset_write(dset_name, grid % apex_d_vectors(i,j,:,:,mp_beg:mp_end))
-        if (io % error_check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+        call io % write(dset_name, grid % apex_d_vectors(i,j,:,:,mp_beg:mp_end))
+        if (io % err % check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
       end do
     end do
 
     ! -- apex d1xd2 mag
     dset_name = "/apex_grid/d1xd2_mag"
-    call io % dset_write(dset_name, grid % d1xd2_magnitude(:,:,mp_beg:mp_end))
-    if (io % error_check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % write(dset_name, grid % d1xd2_magnitude(:,:,mp_beg:mp_end))
+    if (io % err % check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
     ! -- apex 2d variables
     ! -- reset domain
-    call io % domain_set(fdims(2:3), moffset(2:3), mcount(2:3))
-    if (io % error_check(msg="Unable to setup 2D apex I/O decomposition",file=__FILE__,line=__LINE__)) return
+    call io % domain(fdims(2:3), mstart(2:3), mcount(2:3))
+    if (io % err % check(msg="Unable to setup 2D apex I/O decomposition",file=__FILE__,line=__LINE__)) return
 
     dset_name = "/apex_grid/apex_be3"
-    call io % dset_write(dset_name, grid % apex_be3(:,mp_beg:mp_end))
-    if (io % error_check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % write(dset_name, grid % apex_be3(:,mp_beg:mp_end))
+    if (io % err % check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
     ! -- the following datasets are available on all processses, so can be written just by one process
     ! -- to increase performance, pause output from all other processes
@@ -914,53 +913,53 @@ CONTAINS
 
     ! -- apex 2d variables
     ! -- reset domain
-    call io % domain_set(fdims(1:2), moffset(1:2), mcount(1:2))
-    if (io % error_check(msg="Unable to setup 2D apex I/O decomposition",file=__FILE__,line=__LINE__)) return
+    call io % domain(fdims(1:2), mstart(1:2), mcount(1:2))
+    if (io % err % check(msg="Unable to setup 2D apex I/O decomposition",file=__FILE__,line=__LINE__)) return
 
     dset_name = "/apex_grid/altitude"
-    call io % dset_write(dset_name, grid % altitude)
-    if (io % error_check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % write(dset_name, grid % altitude)
+    if (io % err % check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
     dset_name = "/apex_grid/m_colat"
-    call io % dset_write(dset_name, grid % magnetic_colatitude)
-    if (io % error_check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % write(dset_name, grid % magnetic_colatitude)
+    if (io % err % check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
     dset_name = "/apex_grid/r_meter"
-    call io % dset_write(dset_name, grid % r_meter)
-    if (io % error_check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % write(dset_name, grid % r_meter)
+    if (io % err % check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
     ! -- apex 1d variables
     ! -- reset domain
-    call io % domain_set(fdims(2:2), moffset(2:2), mcount(2:2))
-    if (io % error_check(msg="Unable to setup 1D apex I/O decomposition",file=__FILE__,line=__LINE__)) return
+    call io % domain(fdims(2:2), mstart(2:2), mcount(2:2))
+    if (io % err % check(msg="Unable to setup 1D apex I/O decomposition",file=__FILE__,line=__LINE__)) return
 
     dset_name = "/apex_grid/p_value"
-    call io % dset_write(dset_name, grid % p_value)
-    if (io % error_check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % write(dset_name, grid % p_value)
+    if (io % err % check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
     dset_name = "/apex_grid/tube_midpoint"
-    call io % dset_write(dset_name, grid % flux_tube_midpoint)
-    if (io % error_check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % write(dset_name, grid % flux_tube_midpoint)
+    if (io % err % check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
     dset_name = "/apex_grid/tube_max"
-    call io % dset_write(dset_name, grid % flux_tube_max)
-    if (io % error_check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % write(dset_name, grid % flux_tube_max)
+    if (io % err % check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
     dset_name = "/apex_grid/southern_top"
-    call io % dset_write(dset_name, grid % southern_top_index)
-    if (io % error_check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+    call io % write(dset_name, grid % southern_top_index)
+    if (io % err % check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
 
     dset_name = "/apex_grid/northern_top"
-    call io % dset_write(dset_name, grid % northern_top_index)
-    if (io % error_check(msg="Unable to write dataset", file=__FILE__,line=__LINE__)) return
+    call io % write(dset_name, grid % northern_top_index)
+    if (io % err % check(msg="Unable to write dataset", file=__FILE__,line=__LINE__)) return
 
     ! -- geographic 3D variables
-    fdims   = (/ grid % nheights_geo, grid % nlat_geo, grid % nlon_geo /)
-    mcount  = fdims
-    moffset = 0
+    fdims  = (/ grid % nheights_geo, grid % nlat_geo, grid % nlon_geo /)
+    mcount = fdims
+    mstart = 1
 
-    call io % domain_set(fdims, moffset, mcount)
-    if (io % error_check(msg="Unable to setup I/O geographic data decomposition",file=__FILE__,line=__LINE__)) return
+    call io % domain(fdims, mstart, mcount)
+    if (io % err % check(msg="Unable to setup I/O geographic data decomposition",file=__FILE__,line=__LINE__)) return
 
     ! -- fac
     dset_name = ""
@@ -968,8 +967,8 @@ CONTAINS
     ie = ubound(grid % facfac_interface, dim=1)
     do i = is, ie
       write(dset_name, '("/apex_grid/fac_",i0)') i
-      call io % dset_write(dset_name, grid % facfac_interface(i,:,:,:))
-      if (io % error_check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+      call io % write(dset_name, grid % facfac_interface(i,:,:,:))
+      if (io % err % check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
     end do
 
     ! -- dd
@@ -978,8 +977,8 @@ CONTAINS
     ie = ubound(grid % dd_interface, dim=1)
     do i = is, ie
       write(dset_name, '("/apex_grid/dd_",i0)') i
-      call io % dset_write(dset_name, grid % dd_interface(i,:,:,:))
-      if (io % error_check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+      call io % write(dset_name, grid % dd_interface(i,:,:,:))
+      if (io % err % check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
     end do
 
     ! -- ii1
@@ -988,8 +987,8 @@ CONTAINS
     ie = ubound(grid % ii1_interface, dim=1)
     do i = is, ie
       write(dset_name, '("/apex_grid/ii1_",i0)') i
-      call io % dset_write(dset_name, grid % ii1_interface(i,:,:,:))
-      if (io % error_check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+      call io % write(dset_name, grid % ii1_interface(i,:,:,:))
+      if (io % err % check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
     end do
 
     ! -- ii2
@@ -998,8 +997,8 @@ CONTAINS
     ie = ubound(grid % ii2_interface, dim=1)
     do i = is, ie
       write(dset_name, '("/apex_grid/ii2_",i0)') i
-      call io % dset_write(dset_name, grid % ii2_interface(i,:,:,:))
-      if (io % error_check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+      call io % write(dset_name, grid % ii2_interface(i,:,:,:))
+      if (io % err % check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
     end do
 
     ! -- ii3
@@ -1008,8 +1007,8 @@ CONTAINS
     ie = ubound(grid % ii3_interface, dim=1)
     do i = is, ie
       write(dset_name, '("/apex_grid/ii3_",i0)') i
-      call io % dset_write(dset_name, grid % ii3_interface(i,:,:,:))
-      if (io % error_check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+      call io % write(dset_name, grid % ii3_interface(i,:,:,:))
+      if (io % err % check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
     end do
 
     ! -- ii4
@@ -1018,16 +1017,16 @@ CONTAINS
     ie = ubound(grid % ii4_interface, dim=1)
     do i = is, ie
       write(dset_name, '("/apex_grid/ii4_",i0)') i
-      call io % dset_write(dset_name, grid % ii4_interface(i,:,:,:))
-      if (io % error_check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
+      call io % write(dset_name, grid % ii4_interface(i,:,:,:))
+      if (io % err % check(msg="Unable to write dataset "//dset_name, file=__FILE__,line=__LINE__)) return
     end do
 
     ! -- restore output from all processes
     call io % pause(.false.)
 
     ! -- close grid file
-    call io % file_close()
-    if (io % error_check(msg="Unable to close grid file "//filename, file=__FILE__,line=__LINE__)) return
+    call io % close()
+    if (io % err % check(msg="Unable to close grid file "//filename, file=__FILE__,line=__LINE__)) return
 
     rc = 0
 

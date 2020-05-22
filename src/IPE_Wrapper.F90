@@ -160,7 +160,7 @@ CONTAINS
     IF( MOD( ipe % time_tracker % elapsed_sec, ipe % parameters % file_output_frequency ) == 0.0_prec )THEN
 
       hdf5_file = "IPE_State.apex."//ipe % time_tracker % DateStamp( )//".h5"
-      CALL ipe % Write_to_HDF5( hdf5_file, error )
+      CALL ipe % Write( hdf5_file, error )
       IF ( error /= 0 ) THEN
         CALL ESMF_LogSetError(ESMF_RC_FILE_WRITE, msg="Error writing to HDF5 file "//hdf5_file, &
           line=__LINE__, &

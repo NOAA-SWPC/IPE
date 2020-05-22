@@ -81,8 +81,8 @@ DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ar-lib.m4 \
 	$(top_srcdir)/m4/ax_compiler_vendor.m4 \
+	$(top_srcdir)/m4/ax_lib_comio.m4 \
 	$(top_srcdir)/m4/ax_lib_esmf.m4 \
-	$(top_srcdir)/m4/ax_lib_hdf5.m4 \
 	$(top_srcdir)/m4/fc_features.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
@@ -132,7 +132,6 @@ am_libipe_a_OBJECTS = libipe_a-IPE_Common_Routines.$(OBJEXT) \
 	libipe_a-IPE_Electrodynamics_Class.$(OBJEXT) \
 	libipe_a-IPE_Forcing_Class.$(OBJEXT) \
 	libipe_a-IPE_Grid_Class.$(OBJEXT) \
-	libipe_a-IPE_IO_Class.$(OBJEXT) \
 	libipe_a-IPE_Model_Class.$(OBJEXT) \
 	libipe_a-IPE_Model_Parameters_Class.$(OBJEXT) \
 	libipe_a-IPE_MPI_Layer_Class.$(OBJEXT) \
@@ -263,7 +262,12 @@ AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
-CPP = @CPP@
+COMIO_CONFIG = @COMIO_CONFIG@
+COMIO_FC = @COMIO_FC@
+COMIO_FFLAGS = @COMIO_FFLAGS@
+COMIO_FLIBS = @COMIO_FLIBS@
+COMIO_LDFLAGS = @COMIO_LDFLAGS@
+COMIO_VERSION = @COMIO_VERSION@
 CPPFLAGS = @CPPFLAGS@
 CYGPATH_W = @CYGPATH_W@
 DEFS = @DEFS@
@@ -271,7 +275,6 @@ DEPDIR = @DEPDIR@
 ECHO_C = @ECHO_C@
 ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
-EGREP = @EGREP@
 ESMFMKFILE = @ESMFMKFILE@
 ESMF_FC = @ESMF_FC@
 ESMF_FCFLAGS = @ESMF_FCFLAGS@
@@ -287,18 +290,6 @@ FC_MODEXT = @FC_MODEXT@
 FC_MODINC = @FC_MODINC@
 FFLAGS = @FFLAGS@
 GREP = @GREP@
-H5CC = @H5CC@
-H5FC = @H5FC@
-HDF5_CC = @HDF5_CC@
-HDF5_CFLAGS = @HDF5_CFLAGS@
-HDF5_CPPFLAGS = @HDF5_CPPFLAGS@
-HDF5_FC = @HDF5_FC@
-HDF5_FFLAGS = @HDF5_FFLAGS@
-HDF5_FLIBS = @HDF5_FLIBS@
-HDF5_LDFLAGS = @HDF5_LDFLAGS@
-HDF5_LIBS = @HDF5_LIBS@
-HDF5_TYPE = @HDF5_TYPE@
-HDF5_VERSION = @HDF5_VERSION@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -378,7 +369,7 @@ SUBDIRS = dynamo empirical_efield flip msise00 .
 lib_LIBRARIES = libipe.a
 libipe_a_SOURCES = IPE_Common_Routines.F90 IPE_Constants_Dictionary.F90 \
 	IPE_Electrodynamics_Class.F90 IPE_Forcing_Class.F90 IPE_Grid_Class.F90 \
-	IPE_IO_Class.F90 IPE_Macros.inc IPE_Model_Class.F90 IPE_Model_Parameters_Class.F90 \
+	IPE_Macros.inc IPE_Model_Class.F90 IPE_Model_Parameters_Class.F90 \
 	IPE_MPI_Layer_Class.F90 IPE_Neutrals_Class.F90 IPE_Plasma_Class.F90 \
 	IPE_Precision.F90 IPE_Time_Class.F90
 
@@ -505,12 +496,6 @@ libipe_a-IPE_Grid_Class.o: IPE_Grid_Class.F90
 
 libipe_a-IPE_Grid_Class.obj: IPE_Grid_Class.F90
 	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libipe_a_FCFLAGS) $(FCFLAGS) -c -o libipe_a-IPE_Grid_Class.obj `if test -f 'IPE_Grid_Class.F90'; then $(CYGPATH_W) 'IPE_Grid_Class.F90'; else $(CYGPATH_W) '$(srcdir)/IPE_Grid_Class.F90'; fi`
-
-libipe_a-IPE_IO_Class.o: IPE_IO_Class.F90
-	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libipe_a_FCFLAGS) $(FCFLAGS) -c -o libipe_a-IPE_IO_Class.o `test -f 'IPE_IO_Class.F90' || echo '$(srcdir)/'`IPE_IO_Class.F90
-
-libipe_a-IPE_IO_Class.obj: IPE_IO_Class.F90
-	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libipe_a_FCFLAGS) $(FCFLAGS) -c -o libipe_a-IPE_IO_Class.obj `if test -f 'IPE_IO_Class.F90'; then $(CYGPATH_W) 'IPE_IO_Class.F90'; else $(CYGPATH_W) '$(srcdir)/IPE_IO_Class.F90'; fi`
 
 libipe_a-IPE_Model_Class.o: IPE_Model_Class.F90
 	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libipe_a_FCFLAGS) $(FCFLAGS) -c -o libipe_a-IPE_Model_Class.o `test -f 'IPE_Model_Class.F90' || echo '$(srcdir)/'`IPE_Model_Class.F90
@@ -855,18 +840,14 @@ libipe_a-IPE_Forcing_Class.$(OBJEXT): libipe_a-IPE_Common_Routines.$(OBJEXT) \
 	libipe_a-IPE_Precision.$(OBJEXT)
 
 libipe_a-IPE_Grid_Class.$(OBJEXT): IPE_Macros.inc libipe_a-IPE_Common_Routines.$(OBJEXT) \
-	libipe_a-IPE_Constants_Dictionary.$(OBJEXT) libipe_a-IPE_IO_Class.$(OBJEXT) \
-	libipe_a-IPE_Model_Parameters_Class.$(OBJEXT) libipe_a-IPE_MPI_Layer_Class.$(OBJEXT) \
-	libipe_a-IPE_Precision.$(OBJEXT)
-
-libipe_a-IPE_IO_Class.$(OBJEXT): libipe_a-IPE_Precision.$(OBJEXT)
+	libipe_a-IPE_Constants_Dictionary.$(OBJEXT) libipe_a-IPE_Model_Parameters_Class.$(OBJEXT) \
+	libipe_a-IPE_MPI_Layer_Class.$(OBJEXT) libipe_a-IPE_Precision.$(OBJEXT)
 
 libipe_a-IPE_Model_Class.$(OBJEXT): IPE_Macros.inc libipe_a-IPE_Electrodynamics_Class.$(OBJEXT) \
 	libipe_a-IPE_Forcing_Class.$(OBJEXT) libipe_a-IPE_Grid_Class.$(OBJEXT) \
-	libipe_a-IPE_IO_Class.$(OBJEXT) libipe_a-IPE_Model_Parameters_Class.$(OBJEXT) \
-	libipe_a-IPE_MPI_Layer_Class.$(OBJEXT) libipe_a-IPE_Neutrals_Class.$(OBJEXT) \
-	libipe_a-IPE_Plasma_Class.$(OBJEXT) libipe_a-IPE_Precision.$(OBJEXT) \
-	libipe_a-IPE_Time_Class.$(OBJEXT)
+	libipe_a-IPE_Model_Parameters_Class.$(OBJEXT) libipe_a-IPE_MPI_Layer_Class.$(OBJEXT) \
+	libipe_a-IPE_Neutrals_Class.$(OBJEXT) libipe_a-IPE_Plasma_Class.$(OBJEXT) \
+	libipe_a-IPE_Precision.$(OBJEXT) libipe_a-IPE_Time_Class.$(OBJEXT)
 
 libipe_a-IPE_Model_Parameters_Class.$(OBJEXT): libipe_a-IPE_Common_Routines.$(OBJEXT) \
 	libipe_a-IPE_Constants_Dictionary.$(OBJEXT) libipe_a-IPE_MPI_Layer_Class.$(OBJEXT) \

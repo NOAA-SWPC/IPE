@@ -20,22 +20,8 @@ AC_ARG_ENABLE([coupling],
   [],[enable_coupling=yes])
 AM_CONDITIONAL([COUPLED], [test x$enable_coupling = xyes])
 
-# Checks for required libraries
-ext_libs=""
-# - Parallel HDF5
-AX_LIB_HDF5([parallel])
-AS_IF([test "x$with_hdf5" = x],
-  [AC_MSG_ERROR([Unable to find parallel  HDF5 library])],
-  [ext_libs="${ext_libs} HDF5"])
-
-# - ESMF
-AC_LANG_PUSH([Fortran])
-AX_LIB_ESMF([$enable_coupling])
-AS_IF([test "$with_esmf" = no],
-  [AS_IF([test "$enable_coupled" = yes],
-     [AC_MSG_ERROR([Unable to find required ESMF library])],[])],
-  [ext_libs="${ext_libs} ESMF"])
 # Looks for Fortran compiler
+AC_LANG_PUSH([Fortran])
 # Assume we are cross compiling by default to prevent issues on WCOSS-Cray
 save_cross_compiling=${cross_compiling}
 cross_compiling=yes
@@ -146,9 +132,23 @@ AC_FC_LINE_LENGTH([unlimited])
 AC_FC_MODULE_EXTENSION
 AC_FC_MODULE_FLAG
 
-# Adds ESMF include paths
+# Checks for required libraries
+ext_libs=""
+# - COMIO
+AX_LIB_COMIO
+AS_IF([test "x$with_comio" = x],
+  [AC_MSG_ERROR([Unable to find required COMIO library])],
+  [ext_libs="${ext_libs} COMIO"])
+
+# - ESMF
+AX_LIB_ESMF
+AS_IF([test "$with_esmf" = no],
+  [AC_MSG_ERROR([Unable to find required ESMF library])],
+  [ext_libs="${ext_libs} ESMF"])
+
+# Adds library include paths
 fc_inc=
-for incpath in ${HDF5_FFLAGS} ${ESMF_FCFLAGS}
+for incpath in ${COMIO_FFLAGS} ${ESMF_FCFLAGS}
 do
   incpath=`echo "${incpath}" | $SED -e's/^-@<:@A-Z,a-z@:>@*\//\//g'`
   fc_inc="${fc_inc}${FC_MODINC}${incpath} "
@@ -180,8 +180,8 @@ done
 AC_LANG_POP
 
 # Set linker flags
-LIBS="${LIBS} ${HDF5_FLIBS}"
-LDFLAGS="${LDFLAGS} ${HDF5_LDFLAGS}"
+LIBS="${LIBS} ${COMIO_FLIBS}"
+LDFLAGS="${LDFLAGS} ${COMIO_LDFLAGS}"
 
 IPE_DEP_SHRD_PATH="`echo ${LDFLAGS} | $SED -e's/-L//g'`"
 IPE_DEP_SHRD_LIBS="`echo ${LIBS} | $SED -e's/-l//g'`"
@@ -220,12 +220,11 @@ AS_ECHO("  LDFLAGS = ${LDFLAGS}")
 AS_ECHO("  LIBS    = ${LIBS}")
 AS_ECHO("")
 AS_ECHO("Libraries required:")
-AS_ECHO("* HDF5")
-AS_ECHO("  Version: ${HDF5_VERSION}")
-AS_ECHO("  Type   : ${HDF5_TYPE}")
-AS_ECHO("  FC     : ${HDF5_FC}")
-AS_ECHO("  FFLAGS : ${HDF5_FFLAGS}")
-AS_ECHO("  FLIBS  : ${HDF5_FLIBS}")
+AS_ECHO("* COMIO")
+AS_ECHO("  Version: ${COMIO_VERSION}")
+AS_ECHO("  FC     : ${COMIO_FC}")
+AS_ECHO("  FCFLAGS: ${COMIO_FFLAGS}")
+AS_ECHO("  FLIBS  : ${COMIO_FLIBS}")
 AS_IF([test "$with_esmf" = yes], [dnl
   AS_ECHO("* ESMF")
   AS_ECHO("  Version: ${ESMF_VERSION}")

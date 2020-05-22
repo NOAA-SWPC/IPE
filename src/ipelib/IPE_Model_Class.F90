@@ -2,24 +2,20 @@
 
 MODULE IPE_Model_Class
 
-USE IPE_Precision
-USE IPE_Model_Parameters_Class
-USE IPE_Time_Class
-USE IPE_Grid_Class
-USE IPE_Neutrals_Class
-USE IPE_Forcing_Class
-USE IPE_Plasma_Class
-USE IPE_Electrodynamics_Class
-USE IPE_MPI_Layer_Class
-USE IPE_IO_Class
+  USE IPE_Precision
+  USE IPE_Model_Parameters_Class
+  USE IPE_Time_Class
+  USE IPE_Grid_Class
+  USE IPE_Neutrals_Class
+  USE IPE_Forcing_Class
+  USE IPE_Plasma_Class
+  USE IPE_Electrodynamics_Class
+  USE IPE_MPI_Layer_Class
 
-#ifdef HAVE_NETCDF
-USE netcdf
-#endif
-USE HDF5
+  USE COMIO
 
 
-IMPLICIT NONE
+  IMPLICIT NONE
 
 
   ! The IPE_Model serves as a wrapper for all of the underlying attributes.
@@ -37,17 +33,17 @@ IMPLICIT NONE
     TYPE( IPE_Plasma )           :: plasma
     TYPE( IPE_Electrodynamics )  :: eldyn
     TYPE( IPE_MPI_Layer )        :: mpi_layer
-    TYPE( IPE_IO )               :: io
+    CLASS( COMIO_T ), POINTER    :: io => NULL()
 
     CONTAINS
 
       PROCEDURE :: Build => Build_IPE_Model
       PROCEDURE :: Trash => Trash_IPE_Model
 
-      PROCEDURE :: Update => Update_IPE_Model
+      PROCEDURE :: Update     => Update_IPE_Model
       PROCEDURE :: Initialize => Initialize_IPE_Model
-      PROCEDURE :: Write_to_HDF5
-      PROCEDURE :: Read_from_HDF5
+      PROCEDURE :: Write      => Write_IPE_State
+      PROCEDURE :: Read       => Read_IPE_State
 
   END TYPE IPE_Model
 
@@ -69,7 +65,7 @@ CONTAINS
     CHARACTER(200) :: init_file
     LOGICAL        :: fileExists
 
-    INTEGER, DIMENSION(3) :: global_dims, local_dims, local_offsets
+!   INTEGER, DIMENSION(3) :: global_dims, local_dims, local_start
 
     init_success = .false.
 
@@ -86,13 +82,14 @@ CONTAINS
 
     ! Initialize I/O
     IF ( ipe % mpi_layer % enabled ) THEN
-      CALL ipe % io % build(comm=ipe % mpi_layer % mpi_communicator, &
-                            info=ipe % mpi_layer % mpi_info)
-      IF (ipe % io % error_check(msg="Failed to initialize I/O layer", &
+      ipe % io => COMIO_T(fmt=COMIO_FMT_HDF5, &
+                          comm=ipe % mpi_layer % mpi_communicator, &
+                          info=ipe % mpi_layer % mpi_info)
+      IF (ipe % io % err % check(msg="Failed to initialize I/O layer", &
         file=__FILE__, line=__LINE__)) RETURN
     ELSE
-      CALL ipe % io % build()
-      IF (ipe % io % error_check(msg="Failed to initialize I/O layer", &
+      ipe % io => COMIO_T(fmt=COMIO_FMT_HDF5)
+      IF (ipe % io % err % check(msg="Failed to initialize I/O layer", &
         file=__FILE__, line=__LINE__)) RETURN
     END IF
 
@@ -145,13 +142,13 @@ CONTAINS
 
 
     ! Setup data decomposition for common disk I/O
-    global_dims = (/ ipe % grid % nFluxtube, ipe % grid % NLP, ipe % grid % NMP /)
-    local_dims  = (/ ipe % grid % nFluxtube, ipe % grid % NLP, ipe % mpi_layer % mp_high - ipe % mpi_layer % mp_low + 1 /)
-    local_offsets = (/ 0, 0, ipe % mpi_layer % mp_low - 1 /)
+!   global_dims = (/ ipe % grid % nFluxtube, ipe % grid % NLP, ipe % grid % NMP /)
+!   local_dims  = (/ ipe % grid % nFluxtube, ipe % grid % NLP, ipe % mpi_layer % mp_high - ipe % mpi_layer % mp_low + 1 /)
+!   local_start = (/ 1, 1, ipe % mpi_layer % mp_low /)
 
-    CALL ipe % io % domain_set(global_dims, local_offsets, local_dims)
-    IF (ipe % io % error_check(msg="Failed to setup I/O data decomposition", &
-      file=__FILE__, line=__LINE__)) RETURN
+!   CALL ipe % io % domain(global_dims, local_start, local_dims)
+!   IF (ipe % io % err % check(msg="Failed to setup I/O data decomposition", &
+!     file=__FILE__, line=__LINE__)) RETURN
 
     init_success = .true.
 
@@ -170,7 +167,7 @@ CONTAINS
     CALL ipe % plasma   % Trash( )
     CALL ipe % eldyn    % Trash( )
 
-    CALL ipe % io       % Trash( )
+    CALL ipe % io       % Shutdown( )
 
     CALL ipe % mpi_layer % Finalize( )
 
@@ -237,7 +234,7 @@ CONTAINS
 
     success = .false.
 
-    CALL ipe % Read_from_HDF5( filename, error )
+    CALL ipe % Read( filename, error )
     IF ( error /= 0 ) RETURN
 
     CALL ipe % plasma % Calculate_Field_Line_Integrals( ipe % grid, ipe % neutrals, ipe % mpi_layer )
@@ -247,7 +244,7 @@ CONTAINS
   END SUBROUTINE Initialize_IPE_Model
 
 
-  SUBROUTINE Read_from_HDF5( ipe, filename, error )
+  SUBROUTINE Read_IPE_State( ipe, filename, error )
 
     IMPLICIT NONE
 
@@ -312,41 +309,48 @@ CONTAINS
     ENDIF
 
     ! Open HDF5 input file
-    CALL ipe % io % file_open(filename, "r")
-    IF (ipe % io % error_check(msg="Failed to open file "//filename, &
+    CALL ipe % io % open(filename, "r")
+    IF (ipe % io % err % check(msg="Failed to open file "//filename, &
+      file=__FILE__, line=__LINE__)) RETURN
+
+    ! Setup common data decomposition for datasets
+    CALL ipe % io % domain( (/ ipe % grid % nFluxtube, ipe % grid % NLP, ipe % grid % NMP /), &
+      (/ 1, 1, ipe % mpi_layer % mp_low /), &
+      (/ ipe % grid % nFluxtube, ipe % grid % NLP, ipe % mpi_layer % mp_high - ipe % mpi_layer % mp_low + 1 /) )
+    IF (ipe % io % err % check(msg="Failed to setup I/O data decomposition", &
       file=__FILE__, line=__LINE__)) RETURN
 
     ! Read individual datasets
     ! -- Ion densities
     DO item = 1, num_ion_densities
-      CALL ipe % io % dset_read(ion_densities(item), &
+      CALL ipe % io % read(ion_densities(item), &
         ipe % plasma % ion_densities(item,:,:,       &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-      IF (ipe % io % error_check(msg="Failed to read dataset "//ion_densities(item), &
+      IF (ipe % io % err % check(msg="Failed to read dataset "//ion_densities(item), &
         file=__FILE__, line=__LINE__)) RETURN
     END DO
     ! -- Ion velocities
     DO item = 1, num_ion_velocities
-      CALL ipe % io % dset_read(ion_velocities(item), &
+      CALL ipe % io % read(ion_velocities(item), &
         ipe % plasma % ion_velocities(item,:,:,        &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-      IF (ipe % io % error_check(msg="Failed to read dataset "//ion_velocities(item), &
+      IF (ipe % io % err % check(msg="Failed to read dataset "//ion_velocities(item), &
         file=__FILE__, line=__LINE__)) RETURN
     END DO
     ! -- Plasma temperatures
     DO item = 1, num_plasma_datasets
       SELECT CASE (item)
       CASE (1)
-        CALL ipe % io % dset_read(plasma_datasets(item), &
+        CALL ipe % io % read(plasma_datasets(item), &
           ipe % plasma % ion_temperature(:,:,            &
           ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-        IF (ipe % io % error_check(msg="Failed to read dataset "//plasma_datasets(item), &
+        IF (ipe % io % err % check(msg="Failed to read dataset "//plasma_datasets(item), &
           file=__FILE__, line=__LINE__)) RETURN
       CASE (2)
-        CALL ipe % io % dset_read(plasma_datasets(item), &
+        CALL ipe % io % read(plasma_datasets(item), &
           ipe % plasma % electron_temperature(:,:,            &
           ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-        IF (ipe % io % error_check(msg="Failed to read dataset "//plasma_datasets(item), &
+        IF (ipe % io % err % check(msg="Failed to read dataset "//plasma_datasets(item), &
           file=__FILE__, line=__LINE__)) RETURN
       END SELECT
     END DO
@@ -357,54 +361,54 @@ CONTAINS
 
     ! -- Read neutral datasets if requested
     IF( ipe % parameters % read_apex_neutrals )THEN
-      CALL ipe % io % dset_read("/apex/o_density", &
+      CALL ipe % io % read("/apex/o_density", &
         ipe % neutrals % oxygen(:,:,                &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-      IF (ipe % io % error_check(msg="Failed to read dataset /apex/o_density", &
+      IF (ipe % io % err % check(msg="Failed to read dataset /apex/o_density", &
         file=__FILE__, line=__LINE__)) RETURN
 
-      CALL ipe % io % dset_read("/apex/h_density", &
+      CALL ipe % io % read("/apex/h_density", &
         ipe % neutrals % hydrogen(:,:,              &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-      IF (ipe % io % error_check(msg="Failed to read dataset /apex/h_density", &
+      IF (ipe % io % err % check(msg="Failed to read dataset /apex/h_density", &
         file=__FILE__, line=__LINE__)) RETURN
 
-      CALL ipe % io % dset_read("/apex/he_density", &
+      CALL ipe % io % read("/apex/he_density", &
         ipe % neutrals % helium(:,:,                 &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-      IF (ipe % io % error_check(msg="Failed to read dataset /apex/he_density", &
+      IF (ipe % io % err % check(msg="Failed to read dataset /apex/he_density", &
         file=__FILE__, line=__LINE__)) RETURN
 
-      CALL ipe % io % dset_read("/apex/n_density", &
+      CALL ipe % io % read("/apex/n_density", &
         ipe % neutrals % nitrogen(:,:,              &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-      IF (ipe % io % error_check(msg="Failed to read dataset /apex/n_density", &
+      IF (ipe % io % err % check(msg="Failed to read dataset /apex/n_density", &
         file=__FILE__, line=__LINE__)) RETURN
 
-      CALL ipe % io % dset_read("/apex/o2_density", &
+      CALL ipe % io % read("/apex/o2_density", &
         ipe % neutrals % molecular_oxygen(:,:,       &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-      IF (ipe % io % error_check(msg="Failed to read dataset /apex/o2_density", &
+      IF (ipe % io % err % check(msg="Failed to read dataset /apex/o2_density", &
         file=__FILE__, line=__LINE__)) RETURN
 
-      CALL ipe % io % dset_read("/apex/n2_density", &
+      CALL ipe % io % read("/apex/n2_density", &
         ipe % neutrals % molecular_nitrogen(:,:,       &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-      IF (ipe % io % error_check(msg="Failed to read dataset /apex/n2_density", &
+      IF (ipe % io % err % check(msg="Failed to read dataset /apex/n2_density", &
         file=__FILE__, line=__LINE__)) RETURN
 
-      CALL ipe % io % dset_read("/apex/neutral_temperature", &
+      CALL ipe % io % read("/apex/neutral_temperature", &
         ipe % neutrals % temperature(:,:,                     &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-      IF (ipe % io % error_check(msg="Failed to read dataset /apex/neutral_temperature", &
+      IF (ipe % io % err % check(msg="Failed to read dataset /apex/neutral_temperature", &
         file=__FILE__, line=__LINE__)) RETURN
 
       ! Read neutral velocities on apex grid
       DO item = 1, num_apex_velocities
-        CALL ipe % io % dset_read(apex_velocities(item), &
+        CALL ipe % io % read(apex_velocities(item), &
           ipe % neutrals % velocity_apex(item,:,:,         &
           ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-        IF (ipe % io % error_check(msg="Failed to read dataset "//apex_velocities(item), &
+        IF (ipe % io % err % check(msg="Failed to read dataset "//apex_velocities(item), &
           file=__FILE__, line=__LINE__)) RETURN
       END DO
     END IF
@@ -412,24 +416,24 @@ CONTAINS
     ! Read neutral velocities on geographic grid, if requested
     IF( ipe % parameters % read_geographic_neutrals )THEN
       DO item = 1, num_geo_datasets
-        CALL ipe % io % dset_read(geo_datasets(item), &
+        CALL ipe % io % read(geo_datasets(item), &
           ipe % neutrals % velocity_geographic(item,:,:, &
           ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-        IF (ipe % io % error_check(msg="Failed to read dataset "//geo_datasets(item), &
+        IF (ipe % io % err % check(msg="Failed to read dataset "//geo_datasets(item), &
           file=__FILE__, line=__LINE__)) RETURN
       END DO
     END IF
 
     ! Close HDF5 file
-    CALL ipe % io % file_close()
-    IF (ipe % io % error_check(msg="Failed to close file "//filename, &
+    CALL ipe % io % close()
+    IF (ipe % io % err % check(msg="Failed to close file "//filename, &
       file=__FILE__, line=__LINE__)) RETURN
 
     error = 0
 
-  END SUBROUTINE Read_from_HDF5
+  END SUBROUTINE Read_IPE_State
 
-  SUBROUTINE Write_to_HDF5( ipe, filename, error )
+  SUBROUTINE Write_IPE_State( ipe, filename, error )
 
     IMPLICIT NONE
 
@@ -498,48 +502,54 @@ CONTAINS
     ENDIF
 
     ! Create HDF5 input file
-    CALL ipe % io % file_open(filename, "c")
-    IF (ipe % io % error_check(msg="Unable to open file "//filename, &
+    CALL ipe % io % open(filename, "c")
+    IF (ipe % io % err % check(msg="Unable to open file "//filename, &
       file=__FILE__, line=__LINE__)) RETURN
 
+    ! Setup common data decomposition for datasets
+    CALL ipe % io % domain( (/ ipe % grid % nFluxtube, ipe % grid % NLP, ipe % grid % NMP /), &
+      (/ 1, 1, ipe % mpi_layer % mp_low /), &
+      (/ ipe % grid % nFluxtube, ipe % grid % NLP, ipe % mpi_layer % mp_high - ipe % mpi_layer % mp_low + 1 /) )
+    IF (ipe % io % err % check(msg="Failed to setup I/O data decomposition", &
+      file=__FILE__, line=__LINE__)) RETURN
     ! Create groups
-    DO item = 1, num_groups
-      CALL ipe % io % grp_build(groups(item))
-      IF (ipe % io % error_check(msg="Unable to create group "//groups(item), &
-        file=__FILE__, line=__LINE__)) RETURN
-    END DO
+!   DO item = 1, num_groups
+!     CALL ipe % io % grp_build(groups(item))
+!     IF (ipe % io % err % check(msg="Unable to create group "//groups(item), &
+!       file=__FILE__, line=__LINE__)) RETURN
+!   END DO
 
     ! Write individual datasets
     ! -- Ion densities
     DO item = 1, num_ion_densities
-      CALL ipe % io % dset_write(ion_densities(item), &
+      CALL ipe % io % write(ion_densities(item), &
         ipe % plasma % ion_densities(item,:,:,       &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-      IF (ipe % io % error_check(msg="Unable to write dataset "//ion_densities(item), &
+      IF (ipe % io % err % check(msg="Unable to write dataset "//ion_densities(item), &
         file=__FILE__, line=__LINE__)) RETURN
     END DO
     ! -- Ion velocities
     DO item = 1, num_ion_velocities
-      CALL ipe % io % dset_write(ion_velocities(item), &
+      CALL ipe % io % write(ion_velocities(item), &
         ipe % plasma % ion_velocities(item,:,:,        &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-      IF (ipe % io % error_check(msg="Unable to write dataset "//ion_velocities(item), &
+      IF (ipe % io % err % check(msg="Unable to write dataset "//ion_velocities(item), &
         file=__FILE__, line=__LINE__)) RETURN
     END DO
     ! -- Plasma temperatures
     DO item = 1, num_plasma_datasets
       SELECT CASE (item)
       CASE (1)
-        CALL ipe % io % dset_write(plasma_datasets(item), &
+        CALL ipe % io % write(plasma_datasets(item), &
           ipe % plasma % ion_temperature(:,:,            &
           ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-        IF (ipe % io % error_check(msg="Unable to write dataset "//plasma_datasets(item), &
+        IF (ipe % io % err % check(msg="Unable to write dataset "//plasma_datasets(item), &
           file=__FILE__, line=__LINE__)) RETURN
       CASE (2)
-        CALL ipe % io % dset_write(plasma_datasets(item), &
+        CALL ipe % io % write(plasma_datasets(item), &
           ipe % plasma % electron_temperature(:,:,            &
           ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-        IF (ipe % io % error_check(msg="Unable to write dataset "//plasma_datasets(item), &
+        IF (ipe % io % err % check(msg="Unable to write dataset "//plasma_datasets(item), &
           file=__FILE__, line=__LINE__)) RETURN
       END SELECT
     END DO
@@ -548,60 +558,60 @@ CONTAINS
     IF( ipe % parameters % write_apex_neutrals )THEN
 
       dset_name = "/apex/o_density"
-      CALL ipe % io % dset_write(dset_name, &
+      CALL ipe % io % write(dset_name, &
         ipe % neutrals % oxygen(:,:,        &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-      IF (ipe % io % error_check(msg="Unable to write dataset "//dset_name, &
+      IF (ipe % io % err % check(msg="Unable to write dataset "//dset_name, &
         file=__FILE__, line=__LINE__)) RETURN
 
       dset_name = "/apex/h_density"
-      CALL ipe % io % dset_write(dset_name, &
+      CALL ipe % io % write(dset_name, &
         ipe % neutrals % hydrogen(:,:,      &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-      IF (ipe % io % error_check(msg="Unable to write dataset "//dset_name, &
+      IF (ipe % io % err % check(msg="Unable to write dataset "//dset_name, &
         file=__FILE__, line=__LINE__)) RETURN
 
       dset_name = "/apex/he_density"
-      CALL ipe % io % dset_write(dset_name, &
+      CALL ipe % io % write(dset_name, &
         ipe % neutrals % helium(:,:,        &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-      IF (ipe % io % error_check(msg="Unable to write dataset "//dset_name, &
+      IF (ipe % io % err % check(msg="Unable to write dataset "//dset_name, &
         file=__FILE__, line=__LINE__)) RETURN
 
       dset_name = "/apex/n_density"
-      CALL ipe % io % dset_write(dset_name, &
+      CALL ipe % io % write(dset_name, &
         ipe % neutrals % nitrogen(:,:,      &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-      IF (ipe % io % error_check(msg="Unable to write dataset "//dset_name, &
+      IF (ipe % io % err % check(msg="Unable to write dataset "//dset_name, &
         file=__FILE__, line=__LINE__)) RETURN
 
       dset_name = "/apex/o2_density"
-      CALL ipe % io % dset_write(dset_name,    &
+      CALL ipe % io % write(dset_name,    &
         ipe % neutrals % molecular_oxygen(:,:, &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-      IF (ipe % io % error_check(msg="Unable to write dataset "//dset_name, &
+      IF (ipe % io % err % check(msg="Unable to write dataset "//dset_name, &
         file=__FILE__, line=__LINE__)) RETURN
 
       dset_name = "/apex/n2_density"
-      CALL ipe % io % dset_write(dset_name,      &
+      CALL ipe % io % write(dset_name,      &
         ipe % neutrals % molecular_nitrogen(:,:, &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-      IF (ipe % io % error_check(msg="Unable to write dataset "//dset_name, &
+      IF (ipe % io % err % check(msg="Unable to write dataset "//dset_name, &
         file=__FILE__, line=__LINE__)) RETURN
 
       dset_name = "/apex/neutral_temperature"
-      CALL ipe % io % dset_write(dset_name, &
+      CALL ipe % io % write(dset_name, &
         ipe % neutrals % temperature(:,:,   &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-      IF (ipe % io % error_check(msg="Unable to write dataset "//dset_name, &
+      IF (ipe % io % err % check(msg="Unable to write dataset "//dset_name, &
         file=__FILE__, line=__LINE__)) RETURN
 
       ! Read neutral velocities on apex grid
       DO item = 1, num_apex_velocities
-        CALL ipe % io % dset_write(apex_velocities(item), &
+        CALL ipe % io % write(apex_velocities(item), &
           ipe % neutrals % velocity_apex(item,:,:,         &
           ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-        IF (ipe % io % error_check(msg="Unable to write dataset "//apex_velocities(item), &
+        IF (ipe % io % err % check(msg="Unable to write dataset "//apex_velocities(item), &
           file=__FILE__, line=__LINE__)) RETURN
       END DO
     END IF
@@ -609,22 +619,22 @@ CONTAINS
     ! Read neutral velocities on geographic grid, if requested
     IF( ipe % parameters % write_geographic_neutrals )THEN
       DO item = 1, num_geo_datasets
-        CALL ipe % io % dset_write(geo_datasets(item), &
+        CALL ipe % io % write(geo_datasets(item), &
           ipe % neutrals % velocity_geographic(item,:,:, &
           ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-        IF (ipe % io % error_check(msg="Unable to write dataset "//geo_datasets(item), &
+        IF (ipe % io % err % check(msg="Unable to write dataset "//geo_datasets(item), &
           file=__FILE__, line=__LINE__)) RETURN
       END DO
     END IF
 
     ! Close HDF5 file
-    CALL ipe % io % file_close()
-    IF (ipe % io % error_check(msg="Unable to close file "//filename, &
+    CALL ipe % io % close()
+    IF (ipe % io % err % check(msg="Unable to close file "//filename, &
       file=__FILE__, line=__LINE__)) RETURN
 
     error = 0
 
-  END SUBROUTINE Write_to_HDF5
+  END SUBROUTINE Write_IPE_State
 
 
 END MODULE IPE_Model_Class
