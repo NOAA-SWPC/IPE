@@ -1,5 +1,3 @@
-#include "IPE_Macros.inc"
-
 MODULE IPE_Grid_Class
 
   USE IPE_Precision

@@ -1,5 +1,3 @@
-#include "IPE_Macros.inc"
-
 MODULE IPE_Model_Class
 
   USE IPE_Precision
@@ -73,10 +71,6 @@ CONTAINS
     IF ( .NOT. init_success ) RETURN
 
     init_success = .false.
-
-!   CALL ipe % mpi_layer % Set_Domain( ipe % parameters % NLP, &
-!                                      ipe % parameters % NMP, error )
-!   IF ( error /= 0 ) RETURN
 
     ! Initialize I/O
     IF ( ipe % mpi_layer % enabled ) THEN

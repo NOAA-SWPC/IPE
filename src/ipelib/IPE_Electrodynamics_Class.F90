@@ -1,5 +1,3 @@
-#include "IPE_Macros.inc"
-
 MODULE IPE_Electrodynamics_Class
 
 
