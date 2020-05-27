@@ -74,9 +74,9 @@ CONTAINS
 
     init_success = .false.
 
-    CALL ipe % mpi_layer % Set_Domain( ipe % parameters % NLP, &
-                                       ipe % parameters % NMP, error )
-    IF ( error /= 0 ) RETURN
+!   CALL ipe % mpi_layer % Set_Domain( ipe % parameters % NLP, &
+!                                      ipe % parameters % NMP, error )
+!   IF ( error /= 0 ) RETURN
 
     ! Initialize I/O
     IF ( ipe % mpi_layer % enabled ) THEN
@@ -101,14 +101,9 @@ CONTAINS
 
     ! ////// grid ////// !
 
-
-    CALL ipe % grid % Create( ipe % mpi_layer, ipe % parameters )
-
-    CALL ipe % grid % ReadFile( ipe % io, "IPE_Grid.h5", error )
-    IF ( error /= 0 ) RETURN
-
-    CALL ipe % grid % Initialize( ipe % parameters, error )
-    IF ( error /= 0 ) RETURN
+    CALL ipe % grid % Build( ipe % io, ipe % mpi_layer, ipe % parameters, "IPE_Grid.h5", error )
+    IF (ipe % io % err % check(error /= 0, msg="Failed to initialize grid", &
+      file=__FILE__, line=__LINE__)) RETURN
 
     ! ////// neutrals ////// !
 

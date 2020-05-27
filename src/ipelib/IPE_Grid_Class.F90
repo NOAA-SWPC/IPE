@@ -54,17 +54,12 @@ MODULE IPE_Grid_Class
     CONTAINS
 
       PROCEDURE :: Build  => Build_IPE_Grid
-      PROCEDURE :: Create => ipe_grid_build
       PROCEDURE :: Trash  => Trash_IPE_Grid
 
-      PROCEDURE :: Initialize => Initialize_IPE_Grid
-
       ! -- Legacy I/O -- !
-      PROCEDURE :: Read_IPE_Grid
       PROCEDURE :: Calculate_Grid_Attributes_From_Legacy_Input
       ! ---------------- !
 
-      PROCEDURE :: ReadFile  => ipe_grid_read_file
       PROCEDURE :: WriteFile => ipe_grid_write_file
 
       ! Functions
@@ -76,46 +71,52 @@ REAL(prec), PARAMETER, PRIVATE :: dlonm90km = 4.5_prec
 
 CONTAINS
 
-  subroutine ipe_grid_build( grid, mpl, params )
-    class( IPE_Grid )                          :: grid
-    class( IPE_MPI_Layer ),        intent(in)  :: mpl
-    type ( IPE_Model_Parameters ), intent(in)  :: params
+  SUBROUTINE Build_IPE_Grid( grid, io, mpl, params, filename, rc )
+    CLASS(IPE_Grid)                              :: grid
+    CLASS(COMIO_T)                               :: io
+    CLASS( IPE_MPI_Layer ),        INTENT(inout) :: mpl
+    TYPE ( IPE_Model_Parameters ), INTENT(in)    :: params
+    CHARACTER(len=*),              INTENT(in)    :: filename
+    INTEGER,                       INTENT(out)   :: rc
 
-    ! -- begin
+    rc = -1
 
-    call Build_IPE_Grid( grid,               &
-                         params % nFluxTube, &
-                         params % NLP,       &
-                         params % NMP,       &
-                         params % NPTS2D,    &
-                         mpl % mp_low,       &
-                         mpl % mp_high,      &
-                         mpl % mp_halo_size )
+    CALL ipe_grid_read_file(grid, io, mpl, filename, rc)
+    IF (io % err % check(rc /= 0, &
+      msg="Unable to read grid from file "//filename, &
+      file=__FILE__,line=__LINE__)) RETURN
 
-  end subroutine ipe_grid_build
+    CALL Initialize_IPE_Grid( grid, params, rc )
+    IF (io % err % check(rc /= 0, &
+      msg="Unable to initialize grid", &
+      file=__FILE__,line=__LINE__)) RETURN
 
-  SUBROUTINE Build_IPE_Grid( grid, nFluxTube, NLP, NMP, NPTS2D, mp_low, mp_high, halo )
+    rc = 0
+
+  END SUBROUTINE Build_IPE_Grid
+
+  SUBROUTINE Allocate_IPE_Grid( grid, rc )
 
     IMPLICIT NONE
 
-    CLASS( IPE_Grid ), INTENT(out) :: grid
-    INTEGER, INTENT(in)            :: nFluxTube
-    INTEGER, INTENT(in)            :: NLP
-    INTEGER, INTENT(in)            :: NMP
-    INTEGER, INTENT(in)            :: NPTS2D
-    INTEGER, INTENT(in)            :: mp_low, mp_high, halo
+    CLASS( IPE_Grid ), INTENT(inout) :: grid
+    INTEGER,           INTENT(out)   :: rc
 
     ! Local
-    INTEGER :: i
+    INTEGER :: i, stat
+    INTEGER :: nFluxTube, NLP, NMP
+    INTEGER :: mp_low, mp_high, halo
 
-    grid % nFluxTube = nFluxTube
-    grid % NLP       = NLP
-    grid % NMP       = NMP
-    grid % NPTS2D    = NPTS2D
+    ! Begin
+    rc = 0
 
-    grid % mp_low    = mp_low
-    grid % mp_high   = mp_high
-    grid % mp_halo   = halo
+    nFluxTube = grid % nFluxTube
+    NLP       = grid % NLP
+    NMP       = grid % NMP
+
+    mp_low  = grid % mp_low
+    mp_high = grid % mp_high
+    halo    = grid % mp_halo
 
     grid % nheights_geo = nheights_geo
     grid % nlat_geo     = nlat_geo
@@ -149,7 +150,8 @@ CONTAINS
               grid % ii4_interface(1:3,1:nheights_geo,1:nlat_geo,1:nlon_geo), &
               grid % latitude_geo(1:nlat_geo), &
               grid % longitude_geo(1:nlon_geo), &
-              grid % altitude_geo(1:nheights_geo) )
+              grid % altitude_geo(1:nheights_geo), stat=stat )
+    if (stat /= 0) return
 
     grid % altitude                = 0.0_prec
     grid % colatitude              = 0.0_prec
@@ -197,7 +199,7 @@ CONTAINS
       grid % altitude_geo(i) = REAL( (i-1)*5, prec ) + 90.0_prec
     ENDDO
 
-  END SUBROUTINE Build_IPE_Grid
+  END SUBROUTINE Allocate_IPE_Grid
 
 
   SUBROUTINE Trash_IPE_Grid( grid )
@@ -239,17 +241,17 @@ CONTAINS
   END SUBROUTINE Trash_IPE_Grid
 
 
-  SUBROUTINE Initialize_IPE_Grid( grid, params, error )
+  SUBROUTINE Initialize_IPE_Grid( grid, params, rc )
 
     IMPLICIT NONE
 
     CLASS( IPE_Grid ),             INTENT(inout) :: grid
     TYPE ( IPE_Model_Parameters ), INTENT(in)    :: params
-    INTEGER,                       INTENT(out)   :: error
+    INTEGER,                       INTENT(out)   :: rc
 
     INTEGER :: im, in, is, lp, jtop
 
-    error = 0
+    rc = 0
 
     ! -- compute northern, southern, and midpoint (apex) index along magnetic field line
     ! -- NOTE: field lines are assumed to be symmetrical around midpoint
@@ -271,7 +273,7 @@ CONTAINS
           grid % northern_top_index(lp) = jtop + in - 1
           grid % southern_top_index(lp) = is - jtop + 1
         ELSE
-          error = -1
+          rc = -1
           RETURN
         ENDIF
       ELSE
@@ -281,11 +283,11 @@ CONTAINS
 
     ENDDO
 
-    grid % npts2d = params % npts2d
+!   grid % npts2d = params % npts2d
 
   END SUBROUTINE Initialize_IPE_Grid
 
-
+#if 0
   SUBROUTINE Read_IPE_Grid( grid, filename )
 
     IMPLICIT NONE
@@ -475,50 +477,76 @@ CONTAINS
     CALL grid % Calculate_Grid_Attributes_From_Legacy_Input( )
 
   END SUBROUTINE Read_IPE_Grid
+#endif
 
-
-  subroutine ipe_grid_read_file(grid, io, filename, rc)
-    class(IPE_Grid)               :: grid
-    class(COMIO_T)                :: io
-    character(len=*), intent(in)  :: filename
-    integer,          intent(out) :: rc
+  subroutine ipe_grid_read_file(grid, io, mpl, filename, rc)
+    class(IPE_Grid)                   :: grid
+    class(COMIO_T)                    :: io
+    class(IPE_MPI_Layer)              :: mpl
+    character(len=*),     intent(in)  :: filename
+    integer,              intent(out) :: rc
 
     ! -- local
     integer :: i, j, is, ie, js, je
-    integer :: mp_beg, mp_end
+    integer :: mp_beg, mp_end, n, rank
 
-    integer, dimension(3) :: fdims, gdims, mstart, mcount
+    integer, dimension(3) :: gdims, mstart, mcount
+    integer, dimension(:), pointer :: fdims => null()
 
     character(len=34) :: dset_name
 
     ! -- begin
     rc = -1
 
-    ! -- setup data decomposition arrays
-    fdims(1) = grid % nFluxTube
-    fdims(2) = grid % NLP
-    fdims(3) = grid % NMP
-
-
-    mp_beg = max( 1,          grid % mp_low  - grid % mp_halo )
-    mp_end = min( grid % NMP, grid % mp_high + grid % mp_halo )
-
-    mcount(1:2)  = fdims(1:2)
-    mcount(3)    = mp_end - mp_beg + 1
-
-    mstart(1:2) = 1
-    mstart(3)   = mp_beg
-
-    ! -- assume io has been initialized
-
-    ! -- use same domain as parent
-    call io % domain(fdims, mstart, mcount)
-    if (io % err % check(msg="Unable to setup I/O data decomposition",file=__FILE__,line=__LINE__)) return
-
     ! -- open grid file for reading
     call io % open(filename, "r")
     if (io % err % check(msg="Unable to open file "//filename, &
       file=__FILE__,line=__LINE__)) return
+
+    ! -- retrieve domain dimensions from longitude variable
+    nullify(fdims)
+    dset_name = "/apex_grid/longitude"
+    call io % domain(dset_name, fdims)
+    if (io % err % check(msg="Unable to retrieve domain dimensions from file "//filename, &
+      file=__FILE__,line=__LINE__)) return
+
+    ! -- domaain must be 3D
+    if (io % err % check(size(fdims) /= 3, msg="Input grid domain must be 3D", &
+      file=__FILE__,line=__LINE__)) return
+
+    ! -- setup data decomposition arrays
+    grid % nFluxTube = fdims(1)
+    grid % NLP       = fdims(2)
+    grid % NMP       = fdims(3)
+
+    ! -- setup domain decomposition across MPI tasks
+    call mpl % Set_Domain( grid % NLP, grid % NMP, rc )
+    if (io % err % check(rc /= 0, &
+      msg="Unable to setup domain decomposition over MPI", &
+      file=__FILE__,line=__LINE__)) return
+
+    grid % mp_low  = mpl % mp_low
+    grid % mp_high = mpl % mp_high
+    grid % mp_halo = mpl % mp_halo_size
+
+    ! -- allocate internal arrays
+    call Allocate_IPE_Grid( grid, rc )
+    if (io % err % check(rc /= 0, &
+      msg="Unable to allocate mmeory for grid", &
+      file=__FILE__,line=__LINE__)) return
+
+    ! -- setup local domain
+    mp_beg = max( 1,          grid % mp_low  - grid % mp_halo )
+    mp_end = min( grid % NMP, grid % mp_high + grid % mp_halo )
+
+    mcount(1:2) = fdims(1:2)
+    mcount(3)   = mp_end - mp_beg + 1
+
+    mstart(1:2) = 1
+    mstart(3)   = mp_beg
+
+    call io % domain(fdims, mstart, mcount)
+    if (io % err % check(msg="Unable to setup I/O data decomposition",file=__FILE__,line=__LINE__)) return
 
     ! -- read apex 3D variables
 
