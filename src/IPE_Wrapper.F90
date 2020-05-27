@@ -55,9 +55,7 @@ CONTAINS
       rcToReturn=rc) ) RETURN  ! bail out
 
     ! Build IPE
-    PRINT*, ' IPE : Initializing IPE'
     CALL ipe % Build( init_success, mpi_comm = mpicomm )
-    PRINT*, ' IPE : Done Initializing IPE'
 
     IF( .not. init_success )THEN
       CALL ESMF_LogSetError(ESMF_RC_INTNRL_BAD, msg="Error building IPE", &
