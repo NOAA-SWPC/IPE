@@ -13,7 +13,7 @@ MODULE IPE_Grid_Class
   IMPLICIT NONE
 
   TYPE IPE_Grid
-    INTEGER :: nFluxTube, NLP, NMP, NPTS2D
+    INTEGER :: nFluxTube, NLP, NMP
     INTEGER :: mp_low, mp_high, mp_halo
     INTEGER :: nheights_geo, nlat_geo, nlon_geo
 
@@ -56,10 +56,6 @@ MODULE IPE_Grid_Class
       PROCEDURE :: Build  => Build_IPE_Grid
       PROCEDURE :: Trash  => Trash_IPE_Grid
 
-      ! -- Legacy I/O -- !
-      PROCEDURE :: Calculate_Grid_Attributes_From_Legacy_Input
-      ! ---------------- !
-
       PROCEDURE :: WriteFile => ipe_grid_write_file
 
       ! Functions
@@ -94,6 +90,7 @@ CONTAINS
     rc = 0
 
   END SUBROUTINE Build_IPE_Grid
+
 
   SUBROUTINE Allocate_IPE_Grid( grid, rc )
 
@@ -283,201 +280,8 @@ CONTAINS
 
     ENDDO
 
-!   grid % npts2d = params % npts2d
-
   END SUBROUTINE Initialize_IPE_Grid
 
-#if 0
-  SUBROUTINE Read_IPE_Grid( grid, filename )
-
-    IMPLICIT NONE
-
-    CLASS( IPE_Grid ), INTENT(inout) :: grid
-    CHARACTER(*), INTENT(in)         :: filename
-
-    ! Local
-    INTEGER    :: i, lp, mp , istop
-    INTEGER    :: fUnit, ii, NMP, NLP, NPTS2D, MaxFluxTube
-    INTEGER    :: jmin(1:grid % NMP,1:grid % NLP)
-    INTEGER    :: jmax(1:grid % NMP,1:grid % NLP)
-    REAL(prec) ::  Be3_all1(1:grid % NMP, 1:grid % NLP)
-    REAL(prec) ::  Be3_all2(1:grid % NMP, 1:grid % NLP)
-    REAL(prec), ALLOCATABLE ::  dum0(:,:)
-    REAL(prec), ALLOCATABLE ::  dum1(:,:)
-    REAL(prec), ALLOCATABLE ::  dum2(:,:)
-    REAL(prec), ALLOCATABLE ::  dum3(:,:)
-    REAL(prec), ALLOCATABLE ::  dum4(:,:,:)
-    REAL(prec), ALLOCATABLE ::  dum5(:,:,:)
-    REAL(prec), ALLOCATABLE ::  dum6(:,:,:)
-
-
-    ! Place all of these dummies on the heap so that we don't wind up
-    ! with a stack overflow. For typical values of NPTS2D, NLP, NMP,
-    ! the "dum*" arrays will easily take up 100's of MB.
-
-    ALLOCATE( dum0(1:grid % NPTS2D,1:grid % NMP), &
-              dum1(1:grid % NPTS2D,1:grid % NMP), &
-              dum2(1:grid % NPTS2D,1:grid % NMP), &
-              dum3(1:grid % NPTS2D,1:grid % NMP), &
-              dum4(1:3,1:grid % NPTS2D,1:grid % NMP), &
-              dum5(1:3,1:grid % NPTS2D,1:grid % NMP), &
-              dum6(1:3,1:grid % NPTS2D,1:grid % NMP) )
-
-    OPEN( UNIT   = NewUnit(fUnit), &
-          FILE   = TRIM(filename), &
-          STATUS = 'OLD', &
-          FORM   = 'FORMATTED', &
-          ACTION = 'READ' )
-
-    READ( fUnit, * ) jmin, jmax
-
-    DO lp = 1, grid % NLP
-
-      grid % flux_tube_max(lp) = jmax(1,lp) - jmin(1,lp) + 1
-
-    ENDDO
-
-    MaxFluxTube = maxval(grid % flux_tube_max)
-
-    ! Just in case we set up the grid initially with the improper number of
-    ! flux tube points, we'll reset the grid here.
-    IF( MaxFluxTube /= grid % nFluxTube )THEN
-
-      NLP = grid % NLP
-      NMP = grid % NMP
-      NPTS2D = grid % NPTS2D
-
-      CALL grid % Trash( )
-      CALL grid % Build( MaxFluxTube, NLP, NMP, NPTS2D, 1, NMP, 1 )
-
-    ENDIF
-
-   ! grid % flux_tube_max = grid % flux_tube_max - jmin(1,:) + 1
-    DO lp = 1, grid % NLP
-
-      grid % flux_tube_midpoint(lp) = 1 + ( grid % flux_tube_max(lp) - 1)/2
-
-    ENDDO
-
-    READ( fUnit, * ) dum0, dum1, dum2, dum3
-
-      DO i = 1, grid % flux_tube_max(lp)
-
-        ii = jmin(1,lp) + (i-1)
-        grid % r_meter(i,lp) =  dum0(ii,1)
-        grid % altitude(i,lp) = grid % r_meter(i,lp) - earth_radius
-
-      ENDDO
-
-    DO mp = 1, grid % NMP
-      DO lp = 1, grid % NLP
-
-        DO i = 1, grid % flux_tube_max(lp)
-
-          ii = jmin(1,lp) + (i-1)
-          grid % colatitude(i,lp,mp) = dum1(ii,mp)
-          grid % longitude(i,lp,mp)  = dum2(ii,mp)
-          grid % q_factor(i,lp,mp)   = dum3(ii,mp)
-
-        ENDDO
-
-      ENDDO
-    ENDDO
-
-
-    READ( fUnit, * ) dum0
-
-    DO lp = 1, grid % NLP
-      DO i = 1, grid % flux_tube_max(lp)
-
-        ii = jmin(1,lp) + (i-1)
-        grid % magnetic_colatitude(i,lp) = dum0(ii,1)
-
-      ENDDO
-    ENDDO
-
-    READ( fUnit, * ) dum0, dum1
-
-    DO mp = 1, grid % NMP
-      DO lp = 1, grid % NLP
-        DO i = 1, grid % flux_tube_max(lp)
-
-          ii = jmin(1,lp) + (i-1)
-          grid % foot_point_distance(i,lp,mp)     = dum0(ii,mp)
-          grid % magnetic_field_strength(i,lp,mp) = dum1(ii,mp)
-
-        ENDDO
-      ENDDO
-    ENDDO
-
-
-    READ( fUnit, * ) dum4, dum5, dum6
-
-    DO mp = 1, grid % NMP
-      DO lp = 1, grid % NLP
-        DO i = 1, grid % flux_tube_max(lp)
-
-          ii = jmin(1,lp) + (i-1)
-          grid % apex_d_vectors(1,1,i,lp,mp) = dum4(1,ii,mp) !D1
-          grid % apex_d_vectors(2,1,i,lp,mp) = dum4(2,ii,mp)
-          grid % apex_d_vectors(3,1,i,lp,mp) = dum4(3,ii,mp)
-
-          grid % apex_d_vectors(1,2,i,lp,mp) = dum5(1,ii,mp) !D2
-          grid % apex_d_vectors(2,2,i,lp,mp) = dum5(2,ii,mp)
-          grid % apex_d_vectors(3,2,i,lp,mp) = dum5(3,ii,mp)
-
-          grid % apex_d_vectors(1,3,i,lp,mp) = dum6(1,ii,mp) !D3
-          grid % apex_d_vectors(2,3,i,lp,mp) = dum6(2,ii,mp)
-          grid % apex_d_vectors(3,3,i,lp,mp) = dum6(3,ii,mp)
-
-        ENDDO
-      ENDDO
-    ENDDO
-
-
-    READ( fUnit, * ) dum4, dum5
-
-    DO mp = 1, grid % NMP
-      DO lp = 1, grid % NLP
-        DO i = 1, grid % flux_tube_max(lp)
-
-          ii = jmin(1,lp) + (i-1)
-          grid % apex_e_vectors(1,1,i,lp,mp) = dum4(1,ii,mp)
-          grid % apex_e_vectors(2,1,i,lp,mp) = dum4(2,ii,mp)
-          grid % apex_e_vectors(3,1,i,lp,mp) = dum4(3,ii,mp)
-
-          grid % apex_e_vectors(1,2,i,lp,mp) = dum5(1,ii,mp)
-          grid % apex_e_vectors(2,2,i,lp,mp) = dum5(2,ii,mp)
-          grid % apex_e_vectors(3,2,i,lp,mp) = dum5(3,ii,mp)
-
-        ENDDO
-      ENDDO
-    ENDDO
-
-    READ( fUnit, * ) Be3_all1, Be3_all2
-
-    DO mp=1, grid % NMP
-      DO lp=1, grid % NLP
-
-        grid % apex_be3(lp,mp) = Be3_all1(mp,lp)
-
-      ENDDO
-    ENDDO
-
-    CLOSE( fUnit )
-
-    DEALLOCATE( dum0,&
-                dum1,&
-                dum2,&
-                dum3,&
-                dum4,&
-                dum5,&
-                dum6 )
-
-    CALL grid % Calculate_Grid_Attributes_From_Legacy_Input( )
-
-  END SUBROUTINE Read_IPE_Grid
-#endif
 
   subroutine ipe_grid_read_file(grid, io, mpl, filename, rc)
     class(IPE_Grid)                   :: grid
@@ -1057,115 +861,6 @@ CONTAINS
   end subroutine ipe_grid_write_file
 
 
-  SUBROUTINE Calculate_Grid_Attributes_From_Legacy_Input( grid )
-
-    IMPLICIT NONE
-
-    CLASS( IPE_Grid ) :: grid
-
-    ! Local
-    INTEGER    :: i, lp, mp, ii
-    REAL(prec) :: a(1:3), b(1:3), c(1:3)
-    REAL(prec) :: bhat(1:3), ufac
-
-    DO lp = 1, grid % NLP
-
-      ! "PValue" calculation
-      grid % p_value(lp) = grid % r_meter(1,lp)/( earth_radius*(SIN(grid % magnetic_colatitude(1,lp) ))**2 )
-
-      ! Calculate the northern top index
-      DO i= 1, grid % flux_tube_midpoint(lp)
-
-        grid % northern_top_index(lp) = i
-
-        IF ( grid % altitude(i,lp) <= mesh_height_max .AND. grid % altitude(i+1,lp) > mesh_height_max )THEN
-          EXIT
-        ENDIF
-
-      ENDDO
-
-      ! Calculate the southern top index
-      DO i = grid % flux_tube_max(lp), grid % flux_tube_midpoint(lp), -1
-
-        grid % southern_top_index(lp) = i
-
-        IF ( grid % altitude(i,lp) <= mesh_height_max .AND. grid % altitude(i-1,lp) > mesh_height_max )THEN
-          EXIT
-        ENDIF
-
-      ENDDO
-
-    ENDDO
-
-    DO mp = 1, grid % NMP
-
-
-      DO lp = 1, grid % NLP
-        DO i = 1, grid % flux_tube_max(lp)
-
-          IF( Almost_Equal( grid % apex_d_vectors(1,1,i,lp,mp), 0.0_prec ) .AND. &
-              Almost_Equal( grid % apex_d_vectors(1,2,i,lp,mp), 0.0_prec ) )THEN
-
-             ii = i-1
-
-             IF( i /= grid % flux_tube_midpoint(lp) ) then
-
-               PRINT*, ' '
-               PRINT*, '  Module IPE_Grid_Class : S/R Calculate_Grid_Attributes_From_Legacy_Input'
-               PRINT*, '    WARNING : Invalid apex_d_vectors'
-               PRINT*, ' '
-
-             ENDIF
-
-          ELSE
-
-            ii = i
-
-          ENDIF
-
-          ! calculate D from eq 3.15: | d1 X d2 |
-          a(1) = grid % apex_d_vectors(1,1,ii,lp,mp)
-          a(2) = grid % apex_d_vectors(2,1,ii,lp,mp)
-          a(3) = grid % apex_d_vectors(3,1,ii,lp,mp)
-
-          b(1) = grid % apex_d_vectors(1,2,ii,lp,mp)
-          b(2) = grid % apex_d_vectors(2,2,ii,lp,mp)
-          b(3) = grid % apex_d_vectors(3,2,ii,lp,mp)
-
-          c(1) = a(2)*b(3) - a(3)*b(2)
-          c(2) = a(3)*b(1) - a(1)*b(3)
-          c(3) = a(1)*b(2) - a(2)*b(1)
-
-          grid % d1xd2_magnitude(i,lp,mp) = SQRT ( c(1)**2 + c(2)**2 + c(3)**2 )
-
-          bhat(1) = grid % apex_d_vectors(1,3,ii,lp,mp)*grid % d1xd2_magnitude(i,lp,mp)
-          bhat(2) = grid % apex_d_vectors(2,3,ii,lp,mp)*grid % d1xd2_magnitude(i,lp,mp)
-          bhat(3) = grid % apex_d_vectors(3,3,ii,lp,mp)*grid % d1xd2_magnitude(i,lp,mp)
-
-          ufac  = SQRT(bhat(1)**2 + bhat(2)**2)
-
-          !(1) magnetic eastward exactly horizontal
-          !    l_e = bhat x k /|bhat x k|
-          IF( ufac > 0.0_prec ) THEN
-            grid % l_magnitude(1,1,i,lp,mp) =  bhat(2)/ufac
-            grid % l_magnitude(2,1,i,lp,mp) = -bhat(1)/ufac
-            grid % l_magnitude(3,1,i,lp,mp) =  0.0_prec
-          ENDIF
-
-          ! l_u = l_e x bhat
-          grid % l_magnitude(1,2,i,lp,mp) = grid % l_magnitude(2,1,i,lp,mp)*bhat(3) - grid % l_magnitude(3,1,i,lp,mp)*bhat(2)
-          grid % l_magnitude(2,2,i,lp,mp) = grid % l_magnitude(3,1,i,lp,mp)*bhat(1) - grid % l_magnitude(1,1,i,lp,mp)*bhat(3)
-          grid % l_magnitude(3,2,i,lp,mp) = grid % l_magnitude(1,1,i,lp,mp)*bhat(2) - grid % l_magnitude(2,1,i,lp,mp)*bhat(1)
-
-          grid % grx(i,lp,mp) = ( G0*earth_radius**2 )/( grid % r_meter(i,lp)**2 )!*grid % sinI(i,lp,mp)
-
-        ENDDO
-      ENDDO
-    ENDDO
-
-  END SUBROUTINE Calculate_Grid_Attributes_From_Legacy_Input
-
-
   REAL(prec) FUNCTION SinI( grid, i, lp, mp )
     IMPLICIT NONE
     CLASS( IPE_Grid ) :: grid
@@ -1173,9 +868,9 @@ CONTAINS
     ! Local
     REAL(prec) :: dotprod
 
-    dotprod = SQRT( grid % apex_d_vectors(1,3,i,lp,mp)**2 + &
-                    grid % apex_d_vectors(2,3,i,lp,mp)**2 + &
-                    grid % apex_d_vectors(3,3,i,lp,mp)**2  )
+    dotprod = SQRT( grid % apex_d_vectors(1,3,i,lp,mp) * grid % apex_d_vectors(1,3,i,lp,mp) + &
+                    grid % apex_d_vectors(2,3,i,lp,mp) * grid % apex_d_vectors(2,3,i,lp,mp) + &
+                    grid % apex_d_vectors(3,3,i,lp,mp) * grid % apex_d_vectors(3,3,i,lp,mp) )
 
     IF( Almost_Equal( dotprod, 0.0_prec )) THEN
 
