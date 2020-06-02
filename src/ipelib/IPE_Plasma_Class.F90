@@ -224,13 +224,11 @@ CONTAINS
     INTEGER :: mpiError
 #endif
 
-! GHGM no transport for first call .....
-      if(time_tracker % utime.gt.0.00001) then
       CALL plasma % Test_Transport_Time_step( grid, v_ExB, time_step, mpi_layer, &
                                               max_transport_convection_ratio_local )
-!     write(6,7999) mpi_layer % rank_id , grid % mp_low, grid % mp_high, max_transport_convection_ratio_local, &
-!                                          v_ExB(1,5:7,grid % mp_low), v_ExB(2,5:7,grid % mp_high)     
-!7999 format('GHGM convect ratio ', 3i4 , f12.1, 6e10.2)
+      write(6,7999) time_tracker % utime, mpi_layer % rank_id , grid % mp_low, grid % mp_high, max_transport_convection_ratio_local, &
+                                           v_ExB(1,5:7,grid % mp_low), v_ExB(2,5:7,grid % mp_high)     
+ 7999 format('GHGM convect ratio ', f7.1, 3i4 , f12.1, 6e10.2)
 
 #ifdef HAVE_MPI
       CALL MPI_ALLREDUCE( max_transport_convection_ratio_local, &
@@ -291,8 +289,6 @@ CONTAINS
         CALL plasma % Cross_Flux_Tube_Transport( grid, v_ExB, transport_time_step2, mpi_layer )
 
       ENDDO
-! GHGM no transport for first call .....
-      endif  ! if(time_tracker % utime.gt.0.00001) then
 
       CALL plasma % Auroral_Precipitation( grid, &
                                            neutrals, &
