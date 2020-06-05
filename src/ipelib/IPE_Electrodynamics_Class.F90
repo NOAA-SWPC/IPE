@@ -13,22 +13,6 @@ USE IPE_Plasma_Class
 USE efield_ipe
 USE dynamo_module
 
-#ifdef HAVE_NETCDF
-USE netcdf
-#endif
-!
-!! For the TIEGCM Wrapper
-!USE module_init_cons
-!USE cons_module
-!USE magfield_module
-!USE dynamo_module
-!USE module_sub_dynamo
-!USE module_highlat
-!USE module_init_heelis
-
-
-
-
 IMPLICIT NONE
 
   TYPE IPE_Electrodynamics
