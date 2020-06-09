@@ -226,9 +226,9 @@ CONTAINS
 
       CALL plasma % Test_Transport_Time_step( grid, v_ExB, time_step, mpi_layer, &
                                               max_transport_convection_ratio_local )
-      write(6,7999) time_tracker % utime, mpi_layer % rank_id , grid % mp_low, grid % mp_high, max_transport_convection_ratio_local, &
-                                           v_ExB(1,5:7,grid % mp_low), v_ExB(2,5:7,grid % mp_high)     
- 7999 format('GHGM convect ratio ', f7.1, 3i4 , f12.1, 6e10.2)
+!     write(6,7999) time_tracker % utime, mpi_layer % rank_id , grid % mp_low, grid % mp_high, max_transport_convection_ratio_local, &
+!                                          v_ExB(1,5:7,grid % mp_low), v_ExB(2,5:7,grid % mp_high)     
+!7999 format('GHGM convect ratio ', f7.1, 3i4 , f12.1, 6e10.2)
 
 #ifdef HAVE_MPI
       CALL MPI_ALLREDUCE( max_transport_convection_ratio_local, &
@@ -911,6 +911,7 @@ CONTAINS
     REAL(prec) :: r, B_int, max_phi, ksi_fac
     REAL(prec) :: B(1:2,1:2), velocity(1:n_conv_spec,1:2,1:2), density(1:n_conv_spec,1:2,1:2), temperature(1:2,1:2), e_temperature(1:2,1:2)
     REAL(prec) :: coslam, sinim
+    REAL(prec) :: z , z_factor
     INTEGER    :: lp_t0(1:2)
     INTEGER    :: mp_t0(1:2)
     INTEGER    :: lp_min, mp_min, isouth, inorth, ii, ispecial
@@ -967,18 +968,18 @@ CONTAINS
           ENDIF
 
           IF( lp_min == 0 )THEN
-            write(6,*) 'GHGM Need to expand search ', mp , lp
+!           write(6,*) 'GHGM Need to expand search ', mp , lp
 
             if((lp.ge.3).and.(lp.le.grid % NLP - 2)) then ! Make sure lp is within bounds                   
 
             ! Check poleward
             IF( theta_t0 <= colat_90km(lp-1) .AND. theta_t0 >= colat_90km(lp-2) )THEN
               lp_min = lp - 1
-              write(6,*) 'GHGM 2 poleward ', mp , lp
+!             write(6,*) 'GHGM 2 poleward ', mp , lp
             ! Check equatorward
             ELSEIF( theta_t0 <= colat_90km(lp+2) .AND. theta_t0 >= colat_90km(lp+1) )THEN
               lp_min = lp + 2
-              write(6,*) 'GHGM 2 equatorward ', mp , lp
+!             write(6,*) 'GHGM 2 equatorward ', mp , lp
             ENDIF
 
           endif ! Make sure lp is within bounds
@@ -986,17 +987,17 @@ CONTAINS
           ENDIF
 
           IF( lp_min == 0 )THEN
-            write(6,*) 'GHGM Still didnt get it trying again ', mp , lp
+!           write(6,*) 'GHGM Still didnt get it trying again ', mp , lp
 
             if((lp.ge.4).and.(lp.le.grid % NLP - 3)) then ! Make sure lp is within bounds                   
 
             IF( theta_t0 <= colat_90km(lp-2) .AND. theta_t0 >= colat_90km(lp-3) )THEN
               lp_min = lp - 2
-              write(6,*) 'GHGM 3 poleward ', mp , lp
+!             write(6,*) 'GHGM 3 poleward ', mp , lp
             ! Check equatorward
             ELSEIF( theta_t0 <= colat_90km(lp+3) .AND. theta_t0 >= colat_90km(lp+2) )THEN
               lp_min = lp + 3
-              write(6,*) 'GHGM 3 equatorward ', mp , lp
+!             write(6,*) 'GHGM 3 equatorward ', mp , lp
             ENDIF
 
           endif ! Make sure lp is within bounds
@@ -1170,6 +1171,25 @@ CONTAINS
               ELSE
                 ksi_fac = grid % magnetic_field_strength(i,lp,mp)/B_int
               ENDIF
+
+              z = grid % altitude(i,lp)/1000.0_prec
+              if ((z.lt.200.0).and.(z.gt.100.0)) then
+              z_factor = (z - 100.0) / 100.0
+              ion_densities_int(1:n_conv_spec) = (z_factor * (ion_densities_int(1:n_conv_spec) - plasma % ion_densities_old(1:n_conv_spec,i,lp,mp))) &
+                                               + plasma % ion_densities_old(1:n_conv_spec,i,lp,mp)          
+              ion_velocities_int(1:n_conv_spec) = (z_factor * (ion_velocities_int(1:n_conv_spec) - plasma % ion_velocities_old(1:n_conv_spec,i,lp,mp))) &
+                                               + plasma % ion_velocities_old(1:n_conv_spec,i,lp,mp)          
+              ion_temperature_int = (z_factor * (ion_temperature_int - plasma % ion_temperature_old(i,lp,mp))) &
+                                               + plasma % ion_temperature_old(i,lp,mp)         
+              electron_temperature_int = (z_factor * (electron_temperature_int - plasma % electron_temperature_old(i,lp,mp))) &
+                                               + plasma % electron_temperature_old(i,lp,mp)         
+              endif
+              if (z.lt.100.0) then
+                 ion_densities_int(1:n_conv_spec) = plasma % ion_densities_old(1:n_conv_spec,i,lp,mp)          
+                 ion_velocities_int(1:n_conv_spec) = plasma % ion_velocities_old(1:n_conv_spec,i,lp,mp)          
+                 ion_temperature_int = plasma % ion_temperature_old(i,lp,mp)          
+                 electron_temperature_int = plasma % electron_temperature_old(i,lp,mp)          
+              endif
 
               plasma % ion_densities(1:n_conv_spec,i,lp,mp) = ion_densities_int(1:n_conv_spec)*( ksi_fac**2 )
               plasma % ion_velocities(1:n_conv_spec,i,lp,mp) = ion_velocities_int(1:n_conv_spec)
@@ -1635,7 +1655,6 @@ CONTAINS
             plasma % electron_temperature(i,lp,mp) = TE_TIX(3,i)
 
           ENDDO
-
 
       ENDDO
     ENDDO
