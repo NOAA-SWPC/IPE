@@ -14,7 +14,7 @@ if [[ -e /scratch1 ]] ; then
   module load anaconda
 elif [[ -e /gpfs/dell2 ]] ; then
   ## WCOSS DELL P3 GRID LOCATION
-  IPE_GRID=/gpfs/dell2/emc/modeling/noscrub/Adam.Kubaryk/refactored_ipe_input_decks/IPE_Grid.h5
+  IPE_GRID=/gpfs/dell2/swpc/noscrub/Adam.Kubaryk/refactored_ipe_input_decks/IPE_Grid.h5
   ## MODULEFILE LOAD
   module load python/2.7.14
 fi
