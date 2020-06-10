@@ -1355,6 +1355,8 @@ CONTAINS
     REAL(dp) :: SZA(1:grid % nFluxTube)
     REAL(dp) :: dotprod, sini
     REAL(sp) :: F107D, F107A
+    CHARACTER(len=95) :: ERRMSG
+    LOGICAL, EXTERNAL :: CTIP_CHECK_EFLAG
 
       F107D = forcing % f107( forcing % current_index )
       F107A = forcing % f107_81day_avg( forcing % current_index )
@@ -1481,6 +1483,7 @@ CONTAINS
                         NHEAT(1:JMAXX), & !.. OUT: array, Neutral heating rate (eV/cm^3/s)
                         EFLAG,mp,lp,nflag_t(lp,mp),nflag_d(lp,mp) ) !.. OUT: 2D array, Error Flags
 
+          IF ( CTIP_CHECK_EFLAG( ERRMSG, EFLAG ) ) CALL ipe_warning_log( msg=ERRMSG, line=__LINE__, file=__FILE__ )
 
           DO i=1, grid % flux_tube_max(lp)
 
