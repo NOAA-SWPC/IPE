@@ -216,17 +216,17 @@ C////////////main calculations  begin here ////////////
       DO J=JMIN,JMAX
         PRED(J)=0.0D0
         IF(Z(J).LE.ZPROD) THEN
+
           CALL PEPRIM(FLDIM,I_energy,J,XN,HE(J),PRED,E(I_energy),
      >      DELTE(I_energy),COLUM,RJOX,RJN2,RJO2,RJHE)
-            if(isnan(PRED(J))) then
-              write(6,*) 'GHGM PRED 1 ',mp,lp,j
-              stop
-            endif
+
           !.. add electron quenching of N(2D) to primary prod
           IF(E(I_energy).LE.3.AND.E(I_energy).GT.2) THEN
             !.. Needed for updated electron heating in CTIPe
+
             CALL CMINOR(0,J,0,IHEPLS,INPLS,INNO,FD,7,N,temp_ti_te,
      >                  Z,EFLAG,mp,lp)
+
             PRED(J)=PRED(J)+EQN2D(J)
           ENDIF
           !.. Total energy deposition to photoelectrons
@@ -286,22 +286,19 @@ C////////////main calculations  begin here ////////////
      >                 (T2(j_low_S)-T1(j_low_S))
        PHIUP(j_low_N)=PHIDWN(j_low_N)
        PHIUP(j_low_S)=PHIDWN(j_low_S)
-       if(isnan(PHIUP(j_low_N))) then
-         write(6,*) 'YAGA 1 ', mp,lp,j_low_n
-         write(6,*) j_low_N,I_energy,PRED(j_low_N),
-     >              PRODWN(I_energy,j_low_N),
-     >              T2(j_low_N),T1(j_low_N)               
-       endif
-       if(isnan(PHIUP(j_low_S))) write(6,*) 'YAGA 2 ', mp,lp,j_low_n
 
-       if(phidwn(j_low_N).lt.0.0) write(6,255) mp,lp,j_low_n,z(j_low_n),
-     >                            phidwn(j_low_n)
-       if(phidwn(j_low_S).lt.0.0) write(6,256) mp,lp,j_low_s,z(j_low_s),
-     >                            phidwn(j_low_s)
-       if(phiup(j_low_N).lt.0.0) write(6,257) mp,lp,j_low_n,z(j_low_n),
-     >                            phiup(j_low_n)
-       if(phiup(j_low_S).lt.0.0) write(6,258) mp,lp,j_low_s,z(j_low_s),
-     >                            phiup(j_low_s)
+       if(phidwn(j_low_N).lt.0.0) then
+         write(6,255) mp,lp,j_low_n,z(j_low_n),phidwn(j_low_n)
+       endif
+       if(phidwn(j_low_S).lt.0.0) then
+         write(6,256) mp,lp,j_low_s,z(j_low_s),phidwn(j_low_s)
+       endif
+       if(phiup(j_low_N).lt.0.0) then
+         write(6,257) mp,lp,j_low_n,z(j_low_n),phiup(j_low_n)
+       endif
+       if(phiup(j_low_S).lt.0.0) then
+         write(6,258) mp,lp,j_low_s,z(j_low_s),phiup(j_low_s)
+       endif
 
       ENDDO
 
@@ -322,22 +319,13 @@ C////////////main calculations  begin here ////////////
 
       DO iteration=1,2
 
-        if(isnan(phiup(j120S+1))) write(6,*) 'GHGM its A ', j120S+1,
-     >                            iteration
-
         CALL TRIS1(FLDIM,1,j120N,j1000N,I_energy,BM,Z,
      >             JMAX,PRED,IPAS,FPAS,PHIDWN,
      >             PHIUP,T1,T2,DS,PRODUP,PRODWN,mp,lp)
 
-        if(isnan(phiup(j120S+1))) write(6,*) 'GHGM its B ', j120S+1,
-     >                            iteration, mp,lp
-
         CALL TRISM1(FLDIM,-1,j1000S,j120S,I_energy,j1000N,BM,Z,
      >              JMAX,PRED,IPASC,FPAS,
      >              PHIDWN,PHIUP,T1,T2,DS,PRODUP,PRODWN,mp,lp,iteration)
-
-        if(isnan(phiup(j120S+1))) write(6,*) 'GHGM its C ', j120S+1,
-     >                            iteration
 
       ENDDO
 
@@ -369,9 +357,6 @@ C////////////main calculations  begin here ////////////
       !.. Save total flux and fluxes for cascade calculation
       DO J=JMIN,JMAX
         FYSUM(J)=(PHIUP(J)+PHIDWN(J))
-        if(isnan(FYSUM(J))) write(6,3777) mp,lp,j,
-     >     z(j),PHIUP(J),PHIDWN(J),i_energy,e(i_energy)
- 3777   format('GHGM FYSUM NaN ',3i6,f10.0,2e12.4,i6,f10.1)
         !.. electron heating. Add extra heat from pitch angle trapping
         EHT(3,J)=EHT(3,J)+FYSUM(J)*DELTE(I_energy)*TSIGNE(J)
         IF(Z(J).GT.Z(IPAS)) EHT(3,J)=EHT(3,J)+EHPAS
@@ -401,10 +386,6 @@ c        IF(IABS(J-j_apex).LT.Z(IPAS)) EHT(3,J)=EHT(3,J)+EHPAS
           DO IS=1,3
             PRION=PHISUM*SIGION(IS)*XN(IS,J)
             DO IK=1,6
-              if(isnan(prion)) write(6,*) 'GHGM PRION ',is,ik,
-     >           phisum,sigion(is),xn(is,j),j,fysum(j),
-     >           delte(I_energy),I_energy
-              if(isnan(prion)) write(6,*) 'GHGM SPRD ',is,ik
               PEPION(IS,IK,J)=PEPION(IS,IK,J)+PRION*SPRD(IS,IK)
             ENDDO
           ENDDO
@@ -704,12 +685,6 @@ C...... al for O2, and N2, and He
 	!.. primary production rates
       PRED(J)=(RJOX(IE)*XN(1,J)+RJN2(IE)*XN(3,J)+RJO2(IE)*XN(2,J)
      > +1.0*RJHE(IE)*HE)*1.0E-9*AFAC*FLXFAC
-      if(isnan(PRED(J))) then
-        write(6,*) 'GHGM bugger ',j , ie , RJOX(IE),XN(1,J),
-     >             RJN2(IE),XN(3,J),RJO2(IE),XN(2,J),
-     >             RJHE(IE),HE,AFAC,FLXFAC
-        stop
-      endif
 
       RETURN
       END
@@ -760,7 +735,8 @@ C..... of Nagy and Banks. This is for the Northern Hemisphere
       !.. tridiagonal_solver solver for one hemisphere, PHIUP is solved analytically to upper
       !.. bdy in conjugate h-s, PHIUP for c.h.s is found using tridiagonal_solver, then
       !.. PHIDWN is solved analytically back along the field line
-      DO J=j120N,j1000N
+!     DO J=j120N,j1000N
+      DO J=j120N,j1000N + 1
         DELZ=DS(J)+DS(J+1)                            ! ds(i)+ds(i+1)
         DLB=(BM(J+1)-BM(J-1))/(BM(J)*DELZ)            ! (dB)/(B*ds)
         DSLB=2.*((BM(J+1)/DS(J+1)+BM(J-1)/DS(J))/DELZ
@@ -854,14 +830,14 @@ C..... of Nagy and Banks. This is for the Southern Hemisphere
       !.. END OF D.E. COEFFS - CONJUGATE SOLUTIONS 
       D(j1000S)=D(j1000S)-A(j1000S)*PHIUP(j1000S-1)
       D(j120S)=D(j120S)-C(j120S)*PHIUP(j120S+1)
-      if(isnan(PHIUP(j1000S-1))) write(6,*) 'GHGM isnan 1000S ',
-     >                           j1000S - 1
-      if(isnan(PHIUP(j120S+1))) write(6,*) 'GHGM isnan 120S ', j120S+1
       CALL tridiagonal_solver(FLDIM,PHIUP,j1000S,j120S,A,B,C,D,
      >                        mp,lp,2,ie)
 
       !.. PHIDWN IS EVALUATED ANALYTICALLY   ::::
-      DO J=1,JMAX-j1000N-1
+! GHGM this is wrong ?? out by 1 ....
+! replaced with the line below
+!     DO J=1,JMAX-j1000N-1
+      DO J=1,JMAX-j1000N
         K=JMAX-J
         R1=(T1(K)*PHIUP(K)+(PRED(K)+2.*PRODWN(IE,K))/2.)/T2(K)/BM(K)
         T2DS=T2(K)*DS(K+1)
@@ -907,7 +883,7 @@ C......  And Wilkes, Applied Numerical Methods, Wiley, 1969, page 446
         if(isnan(delta(j))) write(6,7777) mp,lp,k,j,num,
      >    first,last,i_which_call,
      >    GAMMA1(J),C(J),DELTA(J+1),ALPHA(J),ie
- 7777 format('GHGM tridiagonal solver ',8i6,4e12.4,i6)
+ 7777 format('nan GHGM tridiagonal solver ',8i6,4e12.4,i6)
       ENDDO
         RETURN
         END
