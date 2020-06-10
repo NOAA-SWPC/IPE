@@ -197,7 +197,14 @@ CONTAINS
 
       call ipe % forcing % Update_Current_Index( ipe % parameters, ipe % time_tracker % elapsed_sec )
 
-      CALL ipe % neutrals % Update( ipe % parameters, ipe % grid, ipe % time_tracker, ipe % forcing, ipe % mpi_layer )
+      CALL ipe % neutrals % Update( ipe % parameters, &
+                                    ipe % grid, &
+                                    ipe % time_tracker, &
+                                    ipe % forcing, &
+                                    ipe % mpi_layer, &
+                                    rc = localrc )
+      IF ( ipe_error_check( localrc, msg="Failed to update neutrals", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
       CALL ipe % eldyn % Update( ipe % grid, &
                                  ipe % forcing, &
