@@ -195,6 +195,7 @@ CONTAINS
     TYPE( IPE_MPI_Layer ), INTENT(in)  :: mpi_layer
     ! Local
     INTEGER :: lp, mp
+    INTEGER :: elapsed_hours, elapsed_minutes
     REAL(prec) :: max_v_exb_local
     REAL(prec) :: max_v_exb
 #ifdef HAVE_MPI
@@ -205,7 +206,14 @@ CONTAINS
 
       CALL eldyn % Dynamo_Wrapper(grid, forcing, time_tracker, plasma, mpi_layer )
       IF( mpi_layer % rank_id == 0 )THEN
-        print *,'Dynamo E field ', int(time_tracker % elapsed_sec / 60), ' mins UT'
+        elapsed_hours = int(time_tracker % elapsed_sec / 3660)
+        elapsed_minutes = (int(time_tracker % elapsed_sec / 60)) - (elapsed_hours * 60)                                                              
+       write(6,*) '*********************************'
+        print *,'peee Calling Dynamo E field, elapsed time = ', elapsed_hours, elapsed_minutes, &
+                int(time_tracker % elapsed_sec / 60)
+        write(798,*) 'peee Calling Dynamo E field, elapsed time = ', elapsed_hours, elapsed_minutes, &
+                int(time_tracker % elapsed_sec / 60)
+       write(6,*) '*********************************'
       ENDIF
 
     ELSE
