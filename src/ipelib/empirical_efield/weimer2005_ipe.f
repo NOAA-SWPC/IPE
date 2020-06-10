@@ -1,6 +1,8 @@
 !-----------------------------------------------------------------------
       module weimer2005_ipe
 
+      use ipe_error_module
+
       implicit none
 !
 ! Data read from W05scEpot.dat or W05scBpot.dat:
@@ -35,55 +37,63 @@
 
       contains
 !-----------------------------------------------------------------------
-       subroutine weimer05(epoto)
-        implicit none
+      subroutine weimer05(epoto,rc)
+      implicit none
 
-!   integer, parameter :: 180 = 180
-! 
 ! Args:
-!  real, intent(in)  :: angle, bt, swvel, swden, tilt
+      real,              intent(out) :: epoto(2,22,180)
+      integer, optional, intent(out) :: rc
 
+! Local:
       real, parameter :: angle= 0.0, bt= 4.3368, swvel=343.66
       real, parameter :: swden= 5.0, tilt  = 0.0
 
-      real, intent(out) :: epoto(2,22,180)
+      integer :: lrc
+      real    :: sangle, stilt
 
-
-! Local:
-      real              :: sangle, stilt
+      if (present(rc)) rc = IPE_SUCCESS
 
       epoto = 0.0
 !
 ! for northern hemisphere:  tilt,  angle
-      call SetModel_new(angle,bt,tilt,swvel,swden)
-      call get_elec_field(epoto(1,1:22,1:180))
+      call SetModel_new(angle,bt,tilt,swvel,swden,rc=lrc)
+      if (ipe_error_check(lrc,msg="call to SetModel_new (NE) failed",
+     &  rc=rc)) return
+      call get_elec_field(epoto(1,1:22,1:180),rc=lrc)
+      if (ipe_error_check(lrc,msg="call to get_elec_field (NE) failed",
+     &  rc=rc)) return
 !
-
 ! for southern hemisphere:  -tilt, BY will be 360-BY(north)
       sangle = mod(360.0-angle, 360.0)
       stilt  = -tilt
-      call SetModel_new(sangle,bt,stilt,swvel,swden)
-      call get_elec_field(epoto(2,1:22,1:180))
+      call SetModel_new(sangle,bt,stilt,swvel,swden,rc=lrc)
+      if (ipe_error_check(lrc,msg="call to SetModel_new (SE) failed",
+     &  rc=rc)) return
+      call get_elec_field(epoto(2,1:22,1:180),rc=lrc)
+      if (ipe_error_check(lrc,msg="call to get_elec_field (SE) failed",
+     &  rc=rc)) return
 
       end subroutine weimer05
 !-----------------------------------------------------------------------
-      subroutine get_elec_field(epot)
-        implicit none
+      subroutine get_elec_field(epot,rc)
+      implicit none
 ! 
 ! Args:
-! real, intent(out) :: ex(22,180), ey(22,180)
-      real, intent(out) :: epot(22,180)
+      real,              intent(out) :: epot(22,180)
+      integer, optional, intent(out) :: rc
 ! Local: 
       real, parameter   :: fill = 1.0e36
       real, parameter   :: radi = 6371.e3, pi=3.14159265358979323846
 !  real, parameter   :: dellat = 1.0, dellt = 0.10, delmlt = 1.20
       real, parameter   :: dellat = 1.0, dellt = 0.10, delmlt = 0.133333333333
-      integer           :: l, m
+      integer           :: l, m, lrc
       real              :: rad2deg
       real              :: gmlt, gmlte, gmltw, dely
       real              :: glat, glatu, glatd, delx
       real              :: epotu, epotd, epote, epotw
       real              :: epx, epy, phir, cphi, sphi
+
+      if (present(rc)) rc = IPE_SUCCESS
 
       rad2deg = pi/180.00
       delx = radi * 2.0 * dellat * rad2deg 
@@ -100,30 +110,37 @@
           glatd = glat - dellat
           dely  = radi*cos(glat*rad2deg)*2.0*dellt*15.0*rad2deg
 
-          call EpotVal_new(glat,  gmlt, epot(m,l))
+          call EpotVal_new(glat,  gmlt, epot(m,l), rc=lrc)
+          if (ipe_error_check(lrc,msg="call to EpotVal_new failed",
+     &      rc=rc)) return
 
         enddo lat_loop
       enddo mlt_loop
 
       end subroutine get_elec_field
 !-----------------------------------------------------------------------
-      subroutine SetModel_new(angle,bt,tilt,swvel,swden)
+      subroutine SetModel_new(angle,bt,tilt,swvel,swden,rc)
         implicit none
 !
 ! Args:
 !
 ! file_path: directory in which to find data file (must have "/" at end)
 !
-        real,intent(in) :: angle,bt,tilt,swvel,swden
+        real,            intent(in)  :: angle,bt,tilt,swvel,swden
+        integer,optional,intent(out) :: rc
 !
 ! Local:
         integer :: i,j
         real :: pi,stilt,stilt2,sw,swp,swe,c0,rang,cosa,sina,cos2a,sin2a
         real :: cfits(d1_pot,csize),a(d1_pot)
+
+        if (present(rc)) rc = IPE_SUCCESS
 !
         if (trim(model) /= 'epot'.and.trim(model) /= 'bpot') then
 !          write(iulog,"('>>> model=',a)") trim(model)
-          stop 'SetModel_new' 
+          call ipe_error_set(msg="SetModel_new: unsuported model "//
+     c      model, rc=rc)
+          return
         endif
 !
 ! Read data:
@@ -218,20 +235,22 @@
           bndyfitr = bndyfitr+x(i)*c(i)
         enddo
 
-
       end subroutine setboundary
 !-----------------------------------------------------------------------
-      subroutine EpotVal_new(lat,mlt,epot)
+      subroutine EpotVal_new(lat,mlt,epot,rc)
         implicit none
 !
 ! Args:
-        real,intent(in) :: lat,mlt
-        real,intent(out) :: epot
+        real,            intent(in)  :: lat,mlt
+        real,            intent(out) :: epot
+        integer,optional,intent(out) :: rc
 !
 ! Local:
-        integer :: inside,j,m,mm,skip
+        integer :: inside,j,m,mm,skip,lrc
         real :: z,phir,plm,colat,nlm
         real :: phim(2),cospm(2),sinpm(2)
+
+        if (present(rc)) rc = IPE_SUCCESS
 !
 ! checkinputs returns inside=1 if lat is inside model boundary,
 ! inside=0 otherwise. Phir and colat are also returned by checkinputs.
@@ -267,7 +286,9 @@
           m = ms(j)
           if (ab(j)==1) then
 
-            plm = scplm(j,colat,nlm) ! scplm function is in this module
+            plm = scplm(j,colat,nlm,rc=lrc) ! scplm function is in this module
+            if (ipe_error_check(lrc,msg="call to plm failed",rc=rc))
+     c        return
 
             skip = 0
             if (m == 0) then
@@ -282,17 +303,20 @@
         epot = z 
       end subroutine EpotVal_new
 !-----------------------------------------------------------------------
-      subroutine mpfac(lat,mlt,mpmpfac)
+      subroutine mpfac(lat,mlt,mpmpfac,rc)
         implicit none
 !
 ! Args:
-        real,intent(in) :: lat,mlt
-        real,intent(out) :: mpmpfac
+        real,            intent(in)  :: lat,mlt
+        real,            intent(out) :: mpmpfac
+        integer,optional,intent(out) :: rc
 !
 ! Local:
-        integer :: j,m,inside,skip
+        integer :: j,m,inside,skip,lrc
         real :: phim(2),cospm(2),sinpm(2),cfactor
         real :: re,z,phir,plm,colat,nlm,pi
+
+        if (present(rc)) rc = IPE_SUCCESS
 !
         re = 6371.2 + 110. ! km radius (allow default ht=110)
 !
@@ -320,7 +344,9 @@
           if (ls(j) >= 11) exit jloop
           m = ms(j)
           if (ab(j) == 1) then
-            plm = scplm(j,colat,nlm) ! colat and nlm are returned (both reals)
+            plm = scplm(j,colat,nlm,rc=lrc) ! colat and nlm are returned (both reals)
+            if (ipe_error_check(lrc,msg="call to scplm failed",rc=rc))
+     c        return
             plm = plm*(nlm*(nlm+1.))
 !
 ! bsphc was calculated in SetModel_new (when SetModel_new called with 'bpot')
@@ -338,13 +364,14 @@
         mpmpfac = z
       end subroutine mpfac
 !-----------------------------------------------------------------------
-      real function scplm(indx,colat,nlm)
+      real function scplm(indx,colat,nlm,rc)
         implicit none
 !
 ! Args:
-        integer,intent(in) :: indx
-        real,intent(in) :: colat
-        real,intent(out) :: nlm
+        integer,         intent(in)  :: indx
+        real,            intent(in)  :: colat
+        real,            intent(out) :: nlm
+        integer,optional,intent(out) :: rc
 !
 ! Local:
         integer,save :: tablesize
@@ -353,15 +380,14 @@
         real :: cth(mxtablesize)
         real,save :: prevth0=1.e36
 
+        if (present(rc)) rc = IPE_SUCCESS
+
         scplm = 0.
         th0 = bndyfitr
         if (prevth0 /= th0) then
           tablesize = 3*nint(th0)
-          if (tablesize > mxtablesize) then 
-!            write(iulog,"('>>> tablesize > mxtablesize: tablesize=',i5,
-!     c           ' mxtablesize=',i5,' tn0=',e12.4)") tablesize,mxtablesize,th0
-            stop 'tablesize'
-          endif
+          if (ipe_status_check(tablesize <= mxtablesize,
+     c      msg="tablesize exceeds mxtablesize", rc=rc)) return
  
           do i=1,tablesize
             colattable(i) = float(i-1)*(th0/float(tablesize-1))
@@ -401,9 +427,6 @@
         call interpol_quad(plmtable(1:tablesize,indx),
      c      colattable(1:tablesize),colata,output)
         scplm = output(1)
-
-!   write(iulog,"('scplm: indx=',i3,' scplm=',e12.4,' plmtable=',/,(6e12.4))") &
-!     indx,scplm,plmtable(1:tablesize,indx)
 
       end function scplm
 !-----------------------------------------------------------------------
@@ -690,7 +713,7 @@
       enddo
       end function factorial
 !-----------------------------------------------------------------------
-      subroutine read_potential(infile)
+      subroutine read_potential(infile,rc)
 !
 ! Read ascii data file W05scEpot.dat or W05scBpot.dat, written by 
 !   pro write_potential (write_data.pro)
@@ -698,30 +721,39 @@
       implicit none
 !
 ! Args:
-      character(len=*),intent(in) :: infile
+      character(len=*),  intent(in)  :: infile
+      integer, optional, intent(out) :: rc
 !
 ! Local:
 !
       character(len=16) :: fname
+      character(len=1024) :: errmsg
       integer :: i,lu=20
       integer :: csize_rd,d1_rd,d2_rd
       integer :: iulog=6, ios
 !
+      if (present(rc)) rc = IPE_SUCCESS
+!
       open(lu,file=infile,status='old', ACCESS ='SEQUENTIAL',
      &     iostat=ios)
-        if(ios.gt.0) then
-         write(iulog,*)
-     &'read error in opening file ', infile, 
-     &' unit ', lu
-        end if
+      if (ipe_iostatus_check(ios,msg="error opening file "//infile,
+     &  rc=rc)) return
 
-      read(lu,"(a)") fname
-      read(lu,"(28i3)") ab
-      read(lu,"(3i3)") csize_rd,d1_rd,d2_rd
+      read(lu,"(a)",iostat=ios) fname
+      if (ipe_iostatus_check(ios,msg="error reading filename",
+     &  rc=rc)) return
+      read(lu,"(28i3)",iostat=ios) ab
+      if (ipe_iostatus_check(ios,msg="error reading ab",
+     &  rc=rc)) return
+      read(lu,"(3i3)",iostat=ios) csize_rd,d1_rd,d2_rd
+      if (ipe_iostatus_check(ios,
+     &  msg="error reading csize_rd,d1_rd,d2_rd",rc=rc)) return
       if (csize_rd /= csize) then
-        write(iulog,"('>>> read_potential: file ',a,': 
+        write(errmsg,"('>>> read_potential: file ',a,':
      c     incompatable csize: ',
      c     'csize_rd=',i4,' csize=',i4)") fname,csize_rd,csize
+        call ipe_error_set(msg=errmsg, rc=rc)
+        return
       endif
 !      if (d1_rd /= d1_pot) then
 !        write(iulog,"('>>> read_potential: file ',a,': 
@@ -734,20 +766,34 @@
 !     c   'd2_rd=',i4,' d2_pot=',i4)") fname,d2_rd,d2_pot
 !      endif
       do i=1,csize
-        read(lu,"(6e20.9)") alschfits(:,i)
+        read(lu,"(6e20.9)",iostat=ios) alschfits(:,i)
+        if (ipe_iostatus_check(ios,msg="error reading alschfits",
+     &    rc=rc)) return
       enddo
-      read(lu,"(2f10.3)") ex_pot
-      read(lu,"(28i3)") ls
-      read(lu,"(2i3)") maxl_pot,maxm_pot
-      read(lu,"(28i3)") ms
+      read(lu,"(2f10.3)",iostat=ios) ex_pot
+      if (ipe_iostatus_check(ios,msg="error reading ex_pot",
+     &  rc=rc)) return
+      read(lu,"(28i3)",iostat=ios) ls
+      if (ipe_iostatus_check(ios,msg="error reading ls",
+     &  rc=rc)) return
+      read(lu,"(2i3)",iostat=ios) maxl_pot,maxm_pot
+      if (ipe_iostatus_check(ios,msg="error reading maxl_pot,maxm_pot",
+     &  rc=rc)) return
+      read(lu,"(28i3)",iostat=ios) ms
+      if (ipe_iostatus_check(ios,msg="error reading ms",
+     &  rc=rc)) return
 
       do i=1,csize
-        read(lu,"(6e20.9)") schfits(:,i)
+        read(lu,"(6e20.9)",iostat=ios) schfits(:,i)
+        if (ipe_iostatus_check(ios,msg="error reading schfits",
+     &    rc=rc)) return
       enddo
-      close(lu)
+      close(lu,iostat=ios)
+      if (ipe_iostatus_check(ios,msg="error closing file "//infile,
+     &  rc=rc)) return
       end subroutine read_potential
 !-----------------------------------------------------------------------
-      subroutine read_schatable(infile)
+      subroutine read_schatable(infile,rc)
 !
 ! Read ascii data file SCHAtable.dat, written by pro write_scha
 !   (write_data.pro)
@@ -755,7 +801,8 @@
       implicit none
 !
 ! Args:
-      character(len=*),intent(in) :: infile
+      character(len=*),intent(in)  :: infile
+      integer,optional,intent(out) :: rc
 !
 ! Local:
 !
@@ -763,29 +810,36 @@
       integer :: i,j,lu=20
       integer :: iulog=6, ios
 !
+      if (present(rc)) rc = IPE_SUCCESS
+!
       open(lu,file=infile,status='old', ACCESS ='SEQUENTIAL',
      &     iostat=ios)
-        if(ios.gt.0) then
-         write(iulog,*)
-     &'read error in opening file ', infile, 
-     &' unit ', lu
-        end if
+      if (ipe_iostatus_check(ios,msg="error opening file "//infile,
+     &  rc=rc)) return
       
-      read(lu,"(a)") fname
-      read(lu,"(2i3)") maxk_scha,maxm_scha
+      read(lu,"(a)",iostat=ios) fname
+      if (ipe_iostatus_check(ios,msg="error reading filename",
+     &  rc=rc)) return
+      read(lu,"(2i3)",iostat=ios) maxk_scha,maxm_scha
+      if (ipe_iostatus_check(ios,
+     &  msg="error reading maxk_scha,maxm_scha",rc=rc)) return
       do i=1,d3_scha
         do j=1,d2_scha
-          read(lu,"(6e20.9)") allnkm(:,j,i)
+          read(lu,"(6e20.9)",iostat=ios) allnkm(:,j,i)
+          if (ipe_iostatus_check(ios,msg="error reading allnkm",
+     &      rc=rc)) return
         enddo
       enddo
-      read(lu,"(8f10.4)") th0s
+      read(lu,"(8f10.4)",iostat=ios) th0s
+      if (ipe_iostatus_check(ios,msg="error reading th0s",
+     &  rc=rc)) return
 
-!      print *, 'read_schatable', th0s
-
-      close(lu)
+      close(lu,iostat=ios)
+      if (ipe_iostatus_check(ios,msg="error closing file "//infile,
+     &  rc=rc)) return
       end subroutine read_schatable
 !-----------------------------------------------------------------------
-      subroutine read_bndy(infile)
+      subroutine read_bndy(infile,rc)
 !
 ! Read ascii data file W05scBndy.dat, written by pro write_bndy
 !   (write_data.pro)
@@ -793,7 +847,8 @@
       implicit none
 !
 ! Args:
-      character(len=*),intent(in) :: infile
+      character(len=*),intent(in)  :: infile
+      integer,optional,intent(out) :: rc
 !
 ! Local:
 !
@@ -801,16 +856,19 @@
       integer :: rd_na,rd_nb,lu=20
       integer :: iulog=6, ios
 !
+      if (present(rc)) rc = IPE_SUCCESS
+!
       open(lu,file=infile,status='old', ACCESS ='SEQUENTIAL',
      &     iostat=ios)
-        if(ios.gt.0) then
-         write(iulog,*)
-     &'read error in opening file ', infile, 
-     &' unit ', lu
-        end if
+      if (ipe_iostatus_check(ios,msg="error opening file "//infile,
+     &  rc=rc)) return
 
-      read(lu,"(a)") fname
-      read(lu,"(2i3)") rd_na,rd_nb
+      read(lu,"(a)",iostat=ios) fname
+      if (ipe_iostatus_check(ios,msg="error reading filename",
+     &  rc=rc)) return
+      read(lu,"(2i3)",iostat=ios) rd_na,rd_nb
+      if (ipe_iostatus_check(ios,msg="error reading rd_na,rd_nb",
+     &  rc=rc)) return
 !      if (rd_na /= na) then
 !        write(iulog,"('>>> read_potential: file ',a,': 
 !     c  incompatable na: ',
@@ -821,12 +879,19 @@
 !     c  incompatable nb: ',
 !     c  'rd_nb=',i4,' nb=',i4)") fname,rd_nb,nb
 !      endif
-      read(lu,"(8e20.9)") bndya
-      read(lu,"(8e20.9)") bndyb
-      read(lu,"(8e20.9)") ex_bndy
+      read(lu,"(8e20.9)",iostat=ios) bndya
+      if (ipe_iostatus_check(ios,msg="error reading bndya",
+     &  rc=rc)) return
+      read(lu,"(8e20.9)",iostat=ios) bndyb
+      if (ipe_iostatus_check(ios,msg="error reading bndyb",
+     &  rc=rc)) return
+      read(lu,"(8e20.9)",iostat=ios) ex_bndy
+      if (ipe_iostatus_check(ios,msg="error reading ex_bndy",
+     &  rc=rc)) return
 
-
-      close(lu)
+      close(lu,iostat=ios)
+      if (ipe_iostatus_check(ios,msg="error closing file "//infile,
+     &  rc=rc)) return
       end subroutine read_bndy
 !-----------------------------------------------------------------------
       end module weimer2005_ipe

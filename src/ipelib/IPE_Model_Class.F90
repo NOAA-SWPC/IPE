@@ -9,6 +9,7 @@ MODULE IPE_Model_Class
   USE IPE_Plasma_Class
   USE IPE_Electrodynamics_Class
   USE IPE_MPI_Layer_Class
+  USE ipe_error_module
 
   USE COMIO
 
@@ -45,44 +46,39 @@ MODULE IPE_Model_Class
 
   END TYPE IPE_Model
 
-
-  REAL(prec), PARAMETER :: fillValue = -999999.9_prec
-
 CONTAINS
 
-  SUBROUTINE Build_IPE_Model( ipe, init_success, mpi_comm )
+  SUBROUTINE Build_IPE_Model( ipe, mpi_comm, rc )
 
     IMPLICIT NONE
 
     CLASS( IPE_Model ), INTENT(inout) :: ipe
-    LOGICAL,            INTENT(out)   :: init_success
     INTEGER, OPTIONAL,  INTENT(in)    :: mpi_comm
+    INTEGER, OPTIONAL,  INTENT(out)   :: rc
 
     ! Local
-    INTEGER        :: error
-    CHARACTER(200) :: init_file
-    LOGICAL        :: fileExists
+    INTEGER :: localrc
 
-    init_success = .false.
+    IF (PRESENT(rc)) rc = IPE_SUCCESS
 
     CALL ipe % mpi_layer % Initialize( comm = mpi_comm )
 
-    CALL ipe % parameters % Build( ipe % mpi_layer, init_success )
-    IF ( .NOT. init_success ) RETURN
-
-    init_success = .false.
+    CALL ipe % parameters % Build( ipe % mpi_layer, rc=localrc )
+    IF ( ipe_error_check( localrc, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     ! Initialize I/O
     IF ( ipe % mpi_layer % enabled ) THEN
       ipe % io => COMIO_T(fmt=COMIO_FMT_HDF5, &
                           comm=ipe % mpi_layer % mpi_communicator, &
                           info=ipe % mpi_layer % mpi_info)
-      IF (ipe % io % err % check(msg="Failed to initialize I/O layer", &
-        file=__FILE__, line=__LINE__)) RETURN
+      IF ( ipe_status_check( .not.ipe % io % err % check(), &
+        msg="Failed to initialize I/O layer", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     ELSE
       ipe % io => COMIO_T(fmt=COMIO_FMT_HDF5)
-      IF (ipe % io % err % check(msg="Failed to initialize I/O layer", &
-        file=__FILE__, line=__LINE__)) RETURN
+      IF ( ipe_status_check( .not.ipe % io % err % check(), &
+        msg="Failed to initialize I/O layer", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     END IF
 
     ! Initialize the clock
@@ -90,22 +86,26 @@ CONTAINS
 
     ! ////// Forcing ////// !
 
-    CALL ipe % forcing % Build( ipe % parameters, error )
-    IF ( error /= 0 ) RETURN
+    CALL ipe % forcing % Build( ipe % parameters, rc=localrc )
+    IF ( ipe_error_check( localrc, msg="Failed to initialize model forcing", &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     ! ////// grid ////// !
 
-    CALL ipe % grid % Build( ipe % io, ipe % mpi_layer, ipe % parameters, "IPE_Grid.h5", error )
-    IF (ipe % io % err % check(error /= 0, msg="Failed to initialize grid", &
-      file=__FILE__, line=__LINE__)) RETURN
+    CALL ipe % grid % Build( ipe % io, ipe % mpi_layer, ipe % parameters, "IPE_Grid.h5", rc=localrc )
+    IF ( ipe_error_check( localrc, msg="Failed to initialize model grid", &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     ! ////// neutrals ////// !
 
-    CALL ipe % neutrals % Build( nFluxtube       = ipe % grid % nFluxTube, &
-                                 NLP             = ipe % grid % NLP, &
-                                 NMP             = ipe % grid % NMP, &
-                                 mp_low          = ipe % mpi_layer % mp_low, &
-                                 mp_high         = ipe % mpi_layer % mp_high )
+    CALL ipe % neutrals % Build( nFluxtube = ipe % grid % nFluxTube, &
+                                 NLP       = ipe % grid % NLP, &
+                                 NMP       = ipe % grid % NMP, &
+                                 mp_low    = ipe % mpi_layer % mp_low, &
+                                 mp_high   = ipe % mpi_layer % mp_high, &
+                                 rc        = localrc )
+    IF ( ipe_error_check( localrc, msg="Failed to initialize neutrals", &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     ! ////// electric field /////// !
 
@@ -115,7 +115,10 @@ CONTAINS
                               dynamo    = ipe % parameters % dynamo_efield, &
                               mp_low    = ipe % mpi_layer % mp_low, &
                               mp_high   = ipe % mpi_layer % mp_high, &
-                              halo      = ipe % mpi_layer % mp_halo_size )
+                              halo      = ipe % mpi_layer % mp_halo_size, &
+                              rc        = localrc )
+    IF ( ipe_error_check( localrc, msg="Failed to initialize electrodynamics", &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
 
     ! ////// plasma ////// !
@@ -125,24 +128,40 @@ CONTAINS
                                NMP       = ipe % grid % NMP, &
                                mp_low    = ipe % mpi_layer % mp_low, &
                                mp_high   = ipe % mpi_layer % mp_high, &
-                               halo      = ipe % mpi_layer % mp_halo_size )
-
-    init_success = .true.
+                               halo      = ipe % mpi_layer % mp_halo_size, &
+                               rc        = localrc )
+    IF ( ipe_error_check( localrc, msg="Failed to initialize plasma", &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
   END SUBROUTINE Build_IPE_Model
 
 
-  SUBROUTINE Trash_IPE_Model( ipe )
+  SUBROUTINE Trash_IPE_Model( ipe, rc )
 
     IMPLICIT NONE
 
     CLASS( IPE_Model ), INTENT(inout) :: ipe
+    INTEGER, OPTIONAL,  INTENT(out)   :: rc
 
-    CALL ipe % forcing  % Trash( )
-    CALL ipe % grid     % Trash( )
-    CALL ipe % neutrals % Trash( )
-    CALL ipe % plasma   % Trash( )
-    CALL ipe % eldyn    % Trash( )
+    INTEGER :: localrc
+
+    IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
+
+    CALL ipe % forcing  % Trash( rc=localrc )
+    IF ( ipe_error_check( localrc, msg="Failed to shutdown forcing", &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    CALL ipe % grid     % Trash( rc=localrc )
+    IF ( ipe_error_check( localrc, msg="Failed to shutdown grid", &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    CALL ipe % neutrals % Trash( rc=localrc )
+    IF ( ipe_error_check( localrc, msg="Failed to shutdown neutrals", &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    CALL ipe % plasma   % Trash( rc=localrc )
+    IF ( ipe_error_check( localrc, msg="Failed to shutdown plasma", &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    CALL ipe % eldyn    % Trash( rc=localrc )
+    IF ( ipe_error_check( localrc, msg="Failed to shutdown electrodynamics", &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     CALL ipe % io       % Shutdown( )
 
@@ -151,15 +170,18 @@ CONTAINS
   END SUBROUTINE Trash_IPE_Model
 
 
-  SUBROUTINE Update_IPE_Model( ipe, t0, t1 )
+  SUBROUTINE Update_IPE_Model( ipe, t0, t1, rc )
 
     IMPLICIT NONE
 
-    CLASS( IPE_Model ), INTENT(inout) :: ipe
-    REAL(prec), OPTIONAL, INTENT(in)  :: t0, t1
+    CLASS( IPE_Model ),   INTENT(inout) :: ipe
+    REAL(prec), OPTIONAL, INTENT(in)    :: t0, t1
+    INTEGER, OPTIONAL,    INTENT(out)   :: rc
 
     ! Local
-    INTEGER    :: i, nSteps
+    INTEGER    :: i, nSteps, localrc
+
+    IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
     IF( PRESENT( t0 ) .AND. PRESENT(t1) )THEN
 
@@ -181,7 +203,10 @@ CONTAINS
                                  ipe % forcing, &
                                  ipe % time_tracker, &
                                  ipe % plasma, &
-                                 ipe % mpi_layer )
+                                 ipe % mpi_layer, &
+                                 rc = localrc )
+      IF ( ipe_error_check( localrc, msg="Failed to update electrodynamics", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
       CALL ipe % plasma % Update( ipe % grid, &
                                   ipe % neutrals, &
@@ -189,7 +214,10 @@ CONTAINS
                                   ipe % time_tracker, &
                                   ipe % mpi_layer, &
                                   ipe % eldyn % v_ExB_apex, &
-                                  ipe % parameters % time_step )
+                                  ipe % parameters % time_step, &
+                                  rc = localrc )
+      IF ( ipe_error_check( localrc, msg="Failed to update plasma", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
       ! Update the timer
       CALL ipe % time_tracker % Increment( ipe % parameters % time_step )
@@ -198,36 +226,36 @@ CONTAINS
 
   END SUBROUTINE Update_IPE_Model
 
-  SUBROUTINE Initialize_IPE_Model( ipe, filename, success )
+  SUBROUTINE Initialize_IPE_Model( ipe, filename, rc )
 
     IMPLICIT NONE
 
     CLASS( IPE_Model ), INTENT(inout) :: ipe
     CHARACTER(*),       INTENT(in)    :: filename
-    LOGICAL,            INTENT(out)   :: success
+    INTEGER, OPTIONAL,  INTENT(out)   :: rc
 
     ! Local
-    INTEGER    :: error
+    INTEGER :: localrc
 
-    success = .false.
+    ! Begin
+    IF (PRESENT(rc)) rc = IPE_SUCCESS
 
-    CALL ipe % Read( filename, error )
-    IF ( error /= 0 ) RETURN
+    CALL ipe % Read( filename, rc=localrc )
+    IF ( ipe_error_check( localrc, msg="Failed to read file "//filename, &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     CALL ipe % plasma % Calculate_Field_Line_Integrals( ipe % grid, ipe % neutrals, ipe % mpi_layer )
-
-    success = .true.
 
   END SUBROUTINE Initialize_IPE_Model
 
 
-  SUBROUTINE Read_IPE_State( ipe, filename, error )
+  SUBROUTINE Read_IPE_State( ipe, filename, rc )
 
     IMPLICIT NONE
 
     CLASS( IPE_Model ), INTENT(inout) :: ipe
     CHARACTER(*),       INTENT(in)    :: filename
-    INTEGER,            INTENT(out)   :: error
+    INTEGER, OPTIONAL,  INTENT(out)   :: rc
 
     ! Local
     INTEGER, PARAMETER :: num_ion_densities = 9
@@ -279,7 +307,7 @@ CONTAINS
     INTEGER :: item
 
     ! Begin
-    error = -1
+    IF ( PRESENT( rc ) ) rc = IPE_FAILURE
 
     IF( ipe % mpi_layer % rank_id == 0 )THEN
       PRINT *, '  Reading output file : '//TRIM(filename)
@@ -406,17 +434,17 @@ CONTAINS
     IF (ipe % io % err % check(msg="Failed to close file "//filename, &
       file=__FILE__, line=__LINE__)) RETURN
 
-    error = 0
+    IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
   END SUBROUTINE Read_IPE_State
 
-  SUBROUTINE Write_IPE_State( ipe, filename, error )
+  SUBROUTINE Write_IPE_State( ipe, filename, rc )
 
     IMPLICIT NONE
 
     CLASS( IPE_Model ), INTENT(inout) :: ipe
     CHARACTER(*),       INTENT(in)    :: filename
-    INTEGER,            INTENT(out)   :: error
+    INTEGER, OPTIONAL,  INTENT(out)   :: rc
 
     ! Local
     INTEGER, PARAMETER :: num_groups = 1
@@ -472,7 +500,7 @@ CONTAINS
 
     ! Begin
 
-    error = -1
+    IF ( PRESENT( rc ) ) rc = IPE_FAILURE
 
     IF( ipe % mpi_layer % rank_id == 0 )THEN
       PRINT *, '  Writing output file : '//TRIM(filename)
@@ -603,7 +631,7 @@ CONTAINS
     IF (ipe % io % err % check(msg="Unable to close file "//filename, &
       file=__FILE__, line=__LINE__)) RETURN
 
-    error = 0
+    IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
   END SUBROUTINE Write_IPE_State
 

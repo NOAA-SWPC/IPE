@@ -4,6 +4,7 @@ USE IPE_Precision
 USE IPE_Constants_Dictionary
 USE IPE_Common_Routines
 USE IPE_Model_Parameters_Class
+USE ipe_error_module
 
 IMPLICIT NONE
 
@@ -64,20 +65,19 @@ IMPLICIT NONE
 
 CONTAINS
 
-  SUBROUTINE Build_IPE_Forcing( forcing, params, error )
+  SUBROUTINE Build_IPE_Forcing( forcing, params, rc )
 
     IMPLICIT NONE
 
     CLASS( IPE_Forcing ),          INTENT(out) :: forcing
     CLASS( IPE_Model_Parameters ), INTENT(in)  :: params
-    INTEGER,                       INTENT(out) :: error
+    INTEGER, OPTIONAL,             INTENT(out) :: rc
 
     ! Local
-    INTEGER :: n_time_levels
+    INTEGER :: n_time_levels, localrc, stat
     REAL(preC) :: dt
 
-
-    error = 0
+    IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
     forcing % coupled = .false.
 
@@ -111,8 +111,9 @@ CONTAINS
               forcing % emaps(1:maps_ipe_size(1),1:maps_ipe_size(2),1:maps_ipe_size(3)), &
               forcing % cmaps(1:maps_ipe_size(1),1:maps_ipe_size(2),1:maps_ipe_size(3)), &
               forcing % djspectra(1:n_flux_ipe,1:n_bands_ipe), &
-              stat = error )
-    IF( error /= 0 ) RETURN
+              stat = stat )
+    IF ( ipe_alloc_check(stat, msg="Failed to allocate forcing internal arrays", &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     ! Default settings
     forcing % f107              = params % f107
@@ -143,23 +144,30 @@ CONTAINS
       CALL forcing % Read_F107KP_IPE_Forcing( params % f107_kp_file,          &
                                               params % f107_kp_data_size,     &
                                               params % f107_kp_read_in_start+1, &
-                                              error )
-      IF( error /= 0 ) RETURN
-
+                                              localrc )
+      IF( ipe_error_check( localrc, msg="call to Read_F107KP_IPE_Forcing failed", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     ENDIF
 
     CALL forcing % Estimate_AP_from_KP( params % f107_kp_read_in_start+1 )
 
-    CALL forcing % Read_Tiros_IPE_Forcing( error )
+    CALL forcing % Read_Tiros_IPE_Forcing( localrc )
+    IF( ipe_error_check( localrc, msg="call to Read_Tiros_IPE_Forcing failed", &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
   END SUBROUTINE Build_IPE_Forcing
 
 
-  SUBROUTINE Trash_IPE_Forcing( forcing )
+  SUBROUTINE Trash_IPE_Forcing( forcing, rc )
 
     IMPLICIT NONE
 
     CLASS( IPE_Forcing ), INTENT(inout) :: forcing
+    INTEGER, OPTIONAL,    INTENT(out)   :: rc
+
+    INTEGER :: stat
+
+    IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
     DEALLOCATE( forcing % time, &
                 forcing % f107, &
@@ -179,7 +187,10 @@ CONTAINS
                 forcing % solarwind_angle, &
                 forcing % solarwind_velocity, &
                 forcing % solarwind_density, &
-                forcing % solarwind_Bz )
+                forcing % solarwind_Bz, &
+                stat = stat )
+    IF ( ipe_dealloc_check( stat, msg="Unable to free up memory", &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
   END SUBROUTINE Trash_IPE_Forcing
 
@@ -248,7 +259,7 @@ CONTAINS
   END SUBROUTINE Update_Current_index
 
 
-  SUBROUTINE Read_F107KP_IPE_Forcing( forcing, filename, data_size, read_in_start, error )
+  SUBROUTINE Read_F107KP_IPE_Forcing( forcing, filename, data_size, read_in_start, rc )
 
     IMPLICIT NONE
 
@@ -256,36 +267,37 @@ CONTAINS
     CHARACTER(*),         INTENT(in)    :: filename
     INTEGER,              INTENT(in)    :: data_size
     INTEGER,              INTENT(in)    :: read_in_start
-    INTEGER,              INTENT(out)   :: error
+    INTEGER,              INTENT(out)   :: rc
 
     ! Local
     INTEGER       :: fUnit
     INTEGER       :: i, iostat, read_in_size
     CHARACTER(20) :: date_work
 
-    error = 0
+    rc = IPE_SUCCESS
 
     OPEN( UNIT   = NewUnit(fUnit), &
           FILE   = TRIM(filename), &
           FORM   = 'FORMATTED',    &
           ACTION = 'READ',         &
           STATUS = 'OLD' ,         &
-          IOSTAT = error )
-
-    IF ( error /= 0 ) RETURN
+          IOSTAT = iostat )
+    IF ( ipe_iostatus_check( iostat, msg="Error opening forcing file "//filename, &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     ! Skip over the header information
     DO i = 1, 5
 
-      READ(fUnit, *, IOSTAT = error )
-      IF ( error /= 0 ) RETURN
+      READ(fUnit, *, IOSTAT = iostat )
+      IF ( ipe_iostatus_check( iostat, msg="Error advancing forcing file "//filename, &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     END DO
 
     read_in_size = MIN(forcing % n_time_levels, data_size)
     DO i = read_in_start, read_in_size + read_in_start - 1
 
-      READ(fUnit, *, IOSTAT = error) date_work, &
+      READ(fUnit, *, IOSTAT = iostat) date_work, &
                                      forcing % f107(i), &
                                      forcing % kp(i), &
                                      forcing % f107_flag(i), &
@@ -301,12 +313,14 @@ CONTAINS
                                      forcing % solarwind_velocity(i), &
                                      forcing % solarwind_Bz(i), &
                                      forcing % solarwind_density(i)
-      IF ( error /= 0 ) RETURN
+      IF ( ipe_iostatus_check( iostat, msg="Error reading forcing file "//filename, &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     END DO
 
-    CLOSE(fUnit, IOSTAT = error)
-    IF ( error /= 0 ) RETURN
+    CLOSE(fUnit, IOSTAT = iostat)
+    IF ( ipe_iostatus_check( iostat, msg="Error closing forcing file "//filename, &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     DO i = read_in_start + read_in_size, forcing % n_time_levels
         forcing % f107(i)               = forcing % f107(read_in_size)
@@ -328,63 +342,75 @@ CONTAINS
   END SUBROUTINE Read_F107KP_IPE_Forcing
 
 
-  SUBROUTINE Read_Tiros_IPE_Forcing( forcing, error )
+  SUBROUTINE Read_Tiros_IPE_Forcing( forcing, rc )
 
     IMPLICIT NONE
 
     CLASS( IPE_Forcing ), INTENT(inout) :: forcing
-    INTEGER,              INTENT(out)   :: error
+    INTEGER,              INTENT(out)   :: rc
 
     ! Local
-    INTEGER :: fUnit, iBand
+    INTEGER :: fUnit, iBand, irec, iostat
+    CHARACTER(LEN=*), PARAMETER :: ion_filename     = "./ionprof"
+    CHARACTER(LEN=*), PARAMETER :: spectra_filename = "./tiros_spectra"
 
     OPEN( UNIT = NewUnit(fUnit), &
-          FILE = './ionprof', &
+          FILE = ion_filename, &
           FORM = 'FORMATTED', &
           STATUS = 'OLD', &
           ACTION = 'READ',&
-          IOSTAT = error )
-    IF ( error /= 0 ) RETURN
+          IOSTAT = iostat )
+    IF ( ipe_iostatus_check( iostat, msg="Error opening tiros file "//ion_filename, &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
-    READ (fUnit,'(1x,6E13.6)', IOSTAT = error) forcing % emaps
-    IF ( error /= 0 ) RETURN
+    READ (fUnit,'(1x,6E13.6)', IOSTAT = iostat) forcing % emaps
+    IF ( ipe_iostatus_check( iostat, msg="Error reading emaps from "//ion_filename, &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
-    READ (fUnit,'(1x,6E13.6)', IOSTAT = error) forcing % cmaps
-    IF ( error /= 0 ) RETURN
+    READ (fUnit,'(1x,6E13.6)', IOSTAT = iostat) forcing % cmaps
+    IF ( ipe_iostatus_check( iostat, msg="Error reading cmaps from "//ion_filename, &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
-    CLOSE(fUnit, IOSTAT = error)
-    IF ( error /= 0 ) RETURN
+    CLOSE(fUnit, IOSTAT = iostat)
+    IF ( ipe_iostatus_check( iostat, msg="Error closing tiros file "//ion_filename, &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     OPEN( UNIT = NewUnit(fUnit), &
-          FILE = './tiros_spectra', &
+          FILE = spectra_filename, &
           FORM = 'FORMATTED', &
           STATUS = 'OLD', &
           ACTION = 'READ',&
-          IOSTAT = error )
-    IF ( error /= 0 ) RETURN
+          IOSTAT = iostat )
+    IF ( ipe_iostatus_check( iostat, msg="Error opening tiros file "//spectra_filename, &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
-    READ(fUnit,*, IOSTAT = error)
-    IF ( error /= 0 ) RETURN
-    READ(fUnit,*, IOSTAT = error)
-    IF ( error /= 0 ) RETURN
-    READ(fUnit,*, IOSTAT = error)
-    IF ( error /= 0 ) RETURN
+    DO irec = 1, 3
+      READ(fUnit,*, IOSTAT = iostat)
+      IF ( ipe_iostatus_check( iostat, msg="Error advancing tiros file "//spectra_filename, &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    END DO
 
     DO iBand = 1, n_bands_ipe
 
-       READ(fUnit,*, IOSTAT = error)
-       IF ( error /= 0 ) RETURN
-       READ(fUnit,*, IOSTAT = error)
-       IF ( error /= 0 ) RETURN
-       READ(fUnit,'(1X,5E10.4)', IOSTAT = error) forcing % djspectra(1:n_flux_ipe,iBand)
-       IF ( error /= 0 ) RETURN
-       READ(fUnit,*, IOSTAT = error)
-       IF ( error /= 0 ) RETURN
+      DO irec = 1, 2
+        READ(fUnit,*, IOSTAT = iostat)
+        IF ( ipe_iostatus_check( iostat, msg="Error advancing tiros file "//spectra_filename, &
+          line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+      END DO
+
+      READ(fUnit,'(1X,5E10.4)', IOSTAT = iostat) forcing % djspectra(1:n_flux_ipe,iBand)
+      IF ( ipe_iostatus_check( iostat, msg="Error reading spectral data from file "//spectra_filename, &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+
+      READ(fUnit,*, IOSTAT = iostat)
+      IF ( ipe_iostatus_check( iostat, msg="Error advancing tiros file "//spectra_filename, &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     ENDDO
 
-    CLOSE(fUnit, IOSTAT = error)
-    IF ( error /= 0 ) RETURN
+    CLOSE(fUnit, IOSTAT = iostat)
+    IF ( ipe_iostatus_check( iostat, msg="Error closing tiros file "//spectra_filename, &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
   END SUBROUTINE Read_Tiros_IPE_Forcing
 !

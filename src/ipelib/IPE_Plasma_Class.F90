@@ -8,6 +8,7 @@ MODULE IPE_Plasma_Class
   USE IPE_Time_Class
   USE IPE_MPI_Layer_Class
   USE IPE_Common_Routines
+  USE ipe_error_module
 
   USE HDF5
 
@@ -54,7 +55,6 @@ MODULE IPE_Plasma_Class
       PROCEDURE, PRIVATE :: Test_Transport_Time_step
       PROCEDURE, PRIVATE :: Auroral_Precipitation
       PROCEDURE, PRIVATE :: FLIP_Wrapper
-      PROCEDURE, PRIVATE :: Write_Electron_Density_to_HDF5
       PROCEDURE :: Calculate_Field_Line_Integrals
 
   END TYPE IPE_Plasma
@@ -126,13 +126,18 @@ MODULE IPE_Plasma_Class
 
 CONTAINS
 
-  SUBROUTINE Build_IPE_Plasma( plasma, nFluxTube, NLP, NMP, mp_low, mp_high, halo )
+  SUBROUTINE Build_IPE_Plasma( plasma, nFluxTube, NLP, NMP, mp_low, mp_high, halo, rc )
     IMPLICIT NONE
     CLASS( IPE_Plasma ), INTENT(out) :: plasma
-    INTEGER, INTENT(in)              :: nFluxTube
-    INTEGER, INTENT(in)              :: NLP
-    INTEGER, INTENT(in)              :: NMP
-    INTEGER, INTENT(in)              :: mp_low, mp_high, halo
+    INTEGER,             INTENT(in)  :: nFluxTube
+    INTEGER,             INTENT(in)  :: NLP
+    INTEGER,             INTENT(in)  :: NMP
+    INTEGER,             INTENT(in)  :: mp_low, mp_high, halo
+    INTEGER, OPTIONAL,   INTENT(out) :: rc
+
+    INTEGER :: stat
+
+    IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
       plasma % nFluxTube = nFluxTube
       plasma % NLP       = NLP
@@ -155,7 +160,10 @@ CONTAINS
                 plasma % electron_velocity_old(1:3,1:nFluxTube,1:NLP,mp_low-halo:mp_high+halo), &
                 plasma % electron_temperature_old(1:nFluxTube,1:NLP,mp_low-halo:mp_high+halo), &
                 plasma % conductivities(1:6,1:2,1:NLP,1:NMP), &
-                plasma % ionization_rates(1:4,1:nFluxTube,1:NLP,mp_low-halo:mp_high+halo) )
+                plasma % ionization_rates(1:4,1:nFluxTube,1:NLP,mp_low-halo:mp_high+halo), &
+                stat = stat )
+      IF ( ipe_alloc_check( stat, msg="Failed to allocate plasma internal arrays", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
       plasma % ion_densities           = safe_density_minimum
       plasma % ion_velocities          = 0.0_prec
@@ -174,9 +182,14 @@ CONTAINS
 
   END SUBROUTINE Build_IPE_Plasma
 !
-  SUBROUTINE Trash_IPE_Plasma( plasma )
+  SUBROUTINE Trash_IPE_Plasma( plasma, rc )
     IMPLICIT NONE
     CLASS( IPE_Plasma ), INTENT(inout) :: plasma
+    INTEGER, OPTIONAL,   INTENT(out)   :: rc
+
+    INTEGER :: stat
+
+    IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
 
     DEALLOCATE( plasma % ion_densities, &
@@ -193,36 +206,45 @@ CONTAINS
                 plasma % electron_velocity_old, &
                 plasma % electron_temperature_old, &
                 plasma % ionization_rates, &
-                plasma % conductivities)  
+                plasma % conductivities, &
+                stat = stat )
+    IF ( ipe_dealloc_check( stat, msg="Unable to free up memory", &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
 #ifdef HAVE_MPI
-      DEALLOCATE( ion_requestHandle, ion_requestStats )
+    DEALLOCATE( ion_requestHandle, ion_requestStats, stat=stat )
+    IF ( ipe_dealloc_check( stat, msg="Unable to free up memory", &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 #endif
 
   END SUBROUTINE Trash_IPE_Plasma
  
 
-  SUBROUTINE Update_IPE_Plasma( plasma, grid, neutrals, forcing, time_tracker, mpi_layer, v_ExB, time_step )
+  SUBROUTINE Update_IPE_Plasma( plasma, grid, neutrals, forcing, time_tracker, mpi_layer, v_ExB, time_step, rc )
     IMPLICIT NONE
-    CLASS( IPE_Plasma ), INTENT(inout) :: plasma
-    TYPE( IPE_Grid ), INTENT(in)       :: grid
-    TYPE( IPE_Neutrals ), INTENT(in)   :: neutrals
-    TYPE( IPE_Forcing ), INTENT(in)    :: forcing
-    TYPE( IPE_Time ), INTENT(in)       :: time_tracker
-    TYPE( IPE_MPI_Layer ), INTENT(in)  :: mpi_layer
-    REAL(prec), INTENT(in)             :: v_ExB(1:3,1:grid % NLP,grid % mp_low:grid % mp_high)
-    REAL(prec), INTENT(in)             :: time_step
-    INTEGER  :: nflag_t(1 : plasma % NLP,plasma % mp_low : plasma % mp_high)
-    INTEGER  :: nflag_d(1 : plasma % NLP,plasma % mp_low : plasma % mp_high)
+    CLASS( IPE_Plasma ),   INTENT(inout) :: plasma
+    TYPE( IPE_Grid ),      INTENT(in)    :: grid
+    TYPE( IPE_Neutrals ),  INTENT(in)    :: neutrals
+    TYPE( IPE_Forcing ),   INTENT(in)    :: forcing
+    TYPE( IPE_Time ),      INTENT(in)    :: time_tracker
+    TYPE( IPE_MPI_Layer ), INTENT(in)    :: mpi_layer
+    REAL(prec),            INTENT(in)    :: v_ExB(1:3,1:grid % NLP,grid % mp_low:grid % mp_high)
+    REAL(prec),            INTENT(in)    :: time_step
+    INTEGER, OPTIONAL,     INTENT(out)   :: rc
+
     ! Local
     INTEGER    :: n_transport_timesteps
-    INTEGER    :: i, lp, mp, j
+    INTEGER    :: i, lp, mp, j, localrc
+    INTEGER    :: nflag_t(1 : plasma % NLP,plasma % mp_low : plasma % mp_high)
+    INTEGER    :: nflag_d(1 : plasma % NLP,plasma % mp_low : plasma % mp_high)
     REAL(prec) :: max_transport_convection_ratio_local
     REAL(prec) :: max_transport_convection_ratio
     REAL(prec) :: transport_time_step2
 #ifdef HAVE_MPI
     INTEGER :: mpiError
 #endif
+
+      IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
 ! GHGM no transport for first call .....
       if(time_tracker % utime.gt.0.00001) then
@@ -288,7 +310,9 @@ CONTAINS
 
 #endif
 
-        CALL plasma % Cross_Flux_Tube_Transport( grid, v_ExB, transport_time_step2, mpi_layer )
+        CALL plasma % Cross_Flux_Tube_Transport( grid, v_ExB, transport_time_step2, mpi_layer, localrc )
+        IF ( ipe_error_check( localrc, msg="call to Cross_Flux_Tube_Transport failed", &
+          line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
       ENDDO
 ! GHGM no transport for first call .....
@@ -308,11 +332,8 @@ CONTAINS
       !TWFANG, calculate field line integrals for dynamo solver
       CALL plasma % Calculate_Field_Line_Integrals(grid, neutrals, mpi_layer)
 
-! GHGM
-!     CALL plasma % Write_Electron_Density_to_HDF5( grid, mpi_layer, "IPE_Electron_Density."//time_tracker % DateStamp( )//".h5" )
-
-
   END SUBROUTINE Update_IPE_Plasma
+
 !
   SUBROUTINE Clean_Data( plasma, grid )
     CLASS( IPE_Plasma ), INTENT(inout) :: plasma
@@ -683,167 +704,6 @@ CONTAINS
   END SUBROUTINE Calculate_Pole_Values
 
 
-  SUBROUTINE Write_Electron_Density_to_HDF5( plasma, grid, mpi_layer, filename )
-    IMPLICIT NONE
-    CLASS( IPE_Plasma ), INTENT(inout) :: plasma
-    TYPE( IPE_Grid ), INTENT(in)      :: grid
-    TYPE( IPE_MPI_Layer ), INTENT(in) :: mpi_layer
-    CHARACTER(*), INTENT(in)      :: filename
-    ! Local
-    CHARACTER(100)   :: groupname
-    CHARACTER(13)    :: timeStampString
-    CHARACTER(10)    :: zoneID
-    INTEGER          :: mp, iEl, N, rank, m_rank, error, istat, nEl, elID
-    INTEGER(HSIZE_T) :: dimensions(1:3), global_dimensions(1:3)
-    INTEGER(HSIZE_T) :: starts(1:3), counts(1:3), strides(1:3)
-    INTEGER(HID_T)   :: file_id, memspace, dataset_id, filespace
-    INTEGER(HID_T)   :: model_group_id
-    INTEGER(HID_T)   :: plist_id
-    REAL(prec)       :: electron_density(1:grid % nFluxTube,1:grid % NLP,mpi_layer % mp_low:mpi_layer % mp_high)
-
-
-    IF( mpi_layer % rank_id == 0 )THEN
-      PRINT*, '  Writing Electron Density file : '//TRIM(filename)
-    ENDIF
-
-#ifdef HAVE_MPI
-
-    CALL MPI_BARRIER( mpi_layer % mpi_communicator, error )
-    rank = 3
-    ! Local Dimensions
-    dimensions = (/ grid % nFluxTube, grid % NLP, 1 /)
-    global_dimensions = (/ grid % nFluxTube, grid % NLP, grid % NMP /)
-
-
-#else
-
-    rank = 3
-    ! Local Dimensions
-    dimensions = (/ grid % nFluxTube, grid % NLP, grid % NMP /)
-    global_dimensions = (/ grid % nFluxTube, grid % NLP, grid % NMP /)
-
-#endif
-
-
-    CALL h5open_f(error)
-
-#ifdef HAVE_MPI
-    CALL h5pcreate_f(H5P_FILE_ACCESS_F, plist_id, error)
-    CALL h5pset_fapl_mpio_f(plist_id, mpi_layer % mpi_communicator, MPI_INFO_NULL, error)
-
-    ! Create a new file using default properties.
-    CALL h5fcreate_f(TRIM(filename), H5F_ACC_TRUNC_F, file_id, error, access_prp=plist_id)
-    CALL h5pclose_f(plist_id, error)
-
-    ! Create a dataspace for the global dataset
-    CALL h5screate_simple_f(rank, global_dimensions, filespace, error)
-    CALL h5screate_simple_f(rank, dimensions, memspace, error)
-
-    ! Set the data creation mode to CHUNK
-    CALL h5pcreate_f(H5P_DATASET_CREATE_F, plist_id, error)
-    CALL h5pset_chunk_f(plist_id, rank, dimensions, error)
-
-#else
-
-    ! Create a new file using default properties.
-    CALL h5fcreate_f(TRIM(filename), H5F_ACC_TRUNC_F, file_id, error)
-    CALL h5screate_simple_f(rank, dimensions, memspace, error)
-
-#endif
-
-
-
-    ! Create groups
-    groupname = "/apex"
-    CALL h5gcreate_f( file_id, TRIM(groupname), model_group_id, error )
-    IF( error /= 0 ) STOP
-
-
-    ! Plasma data
-    ! O+
-    electron_density(1:grid % nFluxTube,1:grid % NLP,mpi_layer % mp_low:mpi_layer % mp_high) = &
-             plasma % ion_densities(1,1:grid % nFluxTube,1:grid % NLP,mpi_layer % mp_low:mpi_layer % mp_high) + &
-             plasma % ion_densities(2,1:grid % nFluxTube,1:grid % NLP,mpi_layer % mp_low:mpi_layer % mp_high) + &
-             plasma % ion_densities(3,1:grid % nFluxTube,1:grid % NLP,mpi_layer % mp_low:mpi_layer % mp_high) + &
-             plasma % ion_densities(4,1:grid % nFluxTube,1:grid % NLP,mpi_layer % mp_low:mpi_layer % mp_high) + &
-             plasma % ion_densities(5,1:grid % nFluxTube,1:grid % NLP,mpi_layer % mp_low:mpi_layer % mp_high) + &
-             plasma % ion_densities(6,1:grid % nFluxTube,1:grid % NLP,mpi_layer % mp_low:mpi_layer % mp_high) + &
-             plasma % ion_densities(7,1:grid % nFluxTube,1:grid % NLP,mpi_layer % mp_low:mpi_layer % mp_high) + &
-             plasma % ion_densities(8,1:grid % nFluxTube,1:grid % NLP,mpi_layer % mp_low:mpi_layer % mp_high) + &
-             plasma % ion_densities(9,1:grid % nFluxTube,1:grid % NLP,mpi_layer % mp_low:mpi_layer % mp_high)
-
-    CALL Add_Electron_Variable_to_HDF5( file_id, "/apex/electron_density",&
-                               electron_density(1:grid % nFluxTube,1:grid % NLP,mpi_layer % mp_low:mpi_layer % mp_high), &
-                               filespace, memspace, plist_id, dimensions,&
-                               grid % nFluxTube, grid % NLP, &
-                               grid % NMP, &
-                               mpi_layer % mp_low, &
-                               mpi_layer % mp_high, error )
-
-#ifdef HAVE_MPI
-    CALL h5pclose_f( plist_id, error )
-    CALL h5sclose_f( filespace, error )
-#endif
-
-    CALL h5gclose_f( model_group_id, error )
-    CALL h5sclose_f( memspace, error )
-    CALL h5fclose_f( file_id, error )
-
-    CALL h5close_f( error )
-
-
-
-  END SUBROUTINE Write_Electron_Density_to_HDF5
-
-
-  SUBROUTINE Add_Electron_Variable_to_HDF5( file_id, variable_name, variable, filespace, memspace, plist_id, dimensions, n_fluxtube, NLP, NMP, mp_low, mp_high, error )
-    INTEGER(HID_T), INTENT(in)   :: file_id
-    CHARACTER(*), INTENT(in)     :: variable_name
-    INTEGER(HID_T), INTENT(in)   :: filespace
-    INTEGER(HID_T), INTENT(in)   :: memspace
-    INTEGER(HID_T), INTENT(in)   :: plist_id
-    INTEGER, INTENT(in)          :: n_fluxtube, NLP, NMP
-    INTEGER, INTENT(in)          :: mp_low, mp_high
-    REAL(prec), INTENT(in)       :: variable(1:n_fluxtube,1:NLP,mp_low:mp_high)
-    INTEGER(HSIZE_T), INTENT(in) :: dimensions(1:3)
-    INTEGER, INTENT(out)         :: error
-    ! Local
-    INTEGER(HID_T) :: dataset_id
-    INTEGER        :: mp
-    INTEGER(HSIZE_T)        :: starts(1:3), counts(1:3), strides(1:3)
-
-
-
-#ifdef HAVE_MPI
-
-    CALL h5dcreate_f( file_id, TRIM(variable_name), H5T_IEEE_F64LE, filespace, dataset_id, error, plist_id)
-
-    DO mp = mp_low, mp_high
-      starts = (/ 0, 0, mp-1 /)
-      counts = (/ 1, 1, 1 /)
-      strides = (/ 1, 1, 1 /)
-
-      CALL h5sselect_hyperslab_f( filespace, H5S_SELECT_SET_F, starts, counts, error, strides, dimensions )
-
-      CALL h5dwrite_f( dataset_id, H5T_IEEE_F64LE, &
-                       variable(1:n_fluxtube,1:NLP,mp), &
-                       dimensions, error, memspace, filespace )
-
-    ENDDO
-
-#else
-
-    CALL h5dcreate_f( file_id, TRIM(variable_name), &
-                       H5T_IEEE_F64LE, memspace, dataset_id, error)
-    CALL h5dwrite_f( dataset_id, H5T_IEEE_F64LE, &
-                     variable, dimensions, error)
-
-#endif
-
-    CALL h5dclose_f( dataset_id, error)
-
-  END SUBROUTINE Add_Electron_Variable_to_HDF5
-
   SUBROUTINE Test_Transport_Time_step( plasma, grid, v_ExB, time_step, mpi_layer, &
                                        max_transport_convection_ratio )
     IMPLICIT NONE
@@ -886,13 +746,14 @@ CONTAINS
   END SUBROUTINE Test_Transport_Time_step
 
 
-  SUBROUTINE Cross_Flux_Tube_Transport( plasma, grid, v_ExB, time_step, mpi_layer )
+  SUBROUTINE Cross_Flux_Tube_Transport( plasma, grid, v_ExB, time_step, mpi_layer, rc )
     IMPLICIT NONE
-    CLASS( IPE_Plasma ), INTENT(inout) :: plasma
-    TYPE( IPE_Grid ), INTENT(in)       :: grid
-    REAL(prec), INTENT(in)             :: v_ExB(1:3,1:grid % NLP, grid % mp_low:grid % mp_high)
-    REAL(prec), INTENT(in)             :: time_step
-    TYPE( IPE_MPI_Layer ), INTENT(in)  :: mpi_layer
+    CLASS( IPE_Plasma ),   INTENT(inout) :: plasma
+    TYPE( IPE_Grid ),      INTENT(in)    :: grid
+    REAL(prec),            INTENT(in)    :: v_ExB(1:3,1:grid % NLP, grid % mp_low:grid % mp_high)
+    REAL(prec),            INTENT(in)    :: time_step
+    TYPE( IPE_MPI_Layer ), INTENT(in)    :: mpi_layer
+    INTEGER,               INTENT(out)   :: rc
     ! Local
     INTEGER, PARAMETER :: n_conv_spec = 4   ! number of ions for ExB convection ( = 4)
     REAL(prec) :: ion_densities_pole_value(1:n_conv_spec, 1:plasma % nFluxTube)
@@ -921,6 +782,8 @@ CONTAINS
     INTEGER    :: mp, lp, i, lpx, mpx, jth
     INTEGER    :: i_min(1:2)
     REAL(prec), PARAMETER :: rad_to_deg = 57.295779513
+
+      rc = IPE_SUCCESS
 
       CALL plasma % Calculate_Pole_Values( grid,                       &
                                            mpi_layer,                  &
@@ -1025,9 +888,8 @@ CONTAINS
 
           ENDIF
 
-          IF( lp_min == 0 )THEN
-            write(6,*) 'GHGM OK I GIVE UP ', mp , lp
-          ENDIF
+          IF ( ipe_status_check(lp_min /= 0, msg="Unable to find lp_min", &
+            line=__LINE__, file=__FILE__, rc=rc) ) RETURN
 
 ! GHGM - check that lp_min is not greater than NLP
           
@@ -1451,6 +1313,7 @@ CONTAINS
       ENDDO
 
   END SUBROUTINE Auroral_Precipitation
+
 
   SUBROUTINE FLIP_Wrapper( plasma, grid, neutrals, forcing, time_tracker, flip_time_step, &
     nflag_t,nflag_d )

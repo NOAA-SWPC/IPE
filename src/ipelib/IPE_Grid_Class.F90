@@ -5,6 +5,7 @@ MODULE IPE_Grid_Class
   USE IPE_Common_Routines
   USE IPE_Model_Parameters_Class
   USE IPE_MPI_Layer_Class
+  USE ipe_error_module
 
   USE COMIO
 
@@ -71,21 +72,21 @@ CONTAINS
     CLASS( IPE_MPI_Layer ),        INTENT(inout) :: mpl
     TYPE ( IPE_Model_Parameters ), INTENT(in)    :: params
     CHARACTER(len=*),              INTENT(in)    :: filename
-    INTEGER,                       INTENT(out)   :: rc
+    INTEGER, OPTIONAL,             INTENT(out)   :: rc
 
-    rc = -1
+    INTEGER :: localrc
 
-    CALL ipe_grid_read_file(grid, io, mpl, filename, rc)
-    IF (io % err % check(rc /= 0, &
+    IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
+
+    CALL ipe_grid_read_file(grid, io, mpl, filename, localrc)
+    IF ( ipe_error_check( localrc, &
       msg="Unable to read grid from file "//filename, &
       file=__FILE__,line=__LINE__)) RETURN
 
-    CALL Initialize_IPE_Grid( grid, params, rc )
-    IF (io % err % check(rc /= 0, &
+    CALL Initialize_IPE_Grid( grid, params, localrc )
+    IF ( ipe_error_check( localrc, &
       msg="Unable to initialize grid", &
       file=__FILE__,line=__LINE__)) RETURN
-
-    rc = 0
 
   END SUBROUTINE Build_IPE_Grid
 
@@ -103,7 +104,7 @@ CONTAINS
     INTEGER :: mp_low, mp_high, halo
 
     ! Begin
-    rc = 0
+    rc = IPE_SUCCESS
 
     nFluxTube = grid % nFluxTube
     NLP       = grid % NLP
@@ -146,7 +147,8 @@ CONTAINS
               grid % latitude_geo(1:nlat_geo), &
               grid % longitude_geo(1:nlon_geo), &
               grid % altitude_geo(1:nheights_geo), stat=stat )
-    if (stat /= 0) return
+    if (ipe_alloc_check(stat, msg="Failed to allocate grid internal arrays", &
+      line=__LINE__, file=__FILE__, rc=rc)) return
 
     grid % altitude                = 0.0_prec
     grid % colatitude              = 0.0_prec
@@ -197,11 +199,16 @@ CONTAINS
   END SUBROUTINE Allocate_IPE_Grid
 
 
-  SUBROUTINE Trash_IPE_Grid( grid )
+  SUBROUTINE Trash_IPE_Grid( grid, rc )
 
     IMPLICIT NONE
 
     CLASS( IPE_Grid ), INTENT(inout) :: grid
+    INTEGER, OPTIONAL, INTENT(out)   :: rc
+
+    INTEGER :: stat
+
+    IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
     DEALLOCATE( grid % altitude, &
                 grid % colatitude, &
@@ -231,7 +238,10 @@ CONTAINS
                 grid % ii4_interface, &
                 grid % longitude_geo, &
                 grid % latitude_geo, &
-                grid % altitude_geo )
+                grid % altitude_geo, &
+                stat=stat )
+    IF ( ipe_dealloc_check(stat, msg="Failed to free up memory", &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
   END SUBROUTINE Trash_IPE_Grid
 
@@ -246,7 +256,7 @@ CONTAINS
 
     INTEGER :: im, in, is, lp, jtop
 
-    rc = 0
+    rc = IPE_SUCCESS
 
     ! -- compute northern, southern, and midpoint (apex) index along magnetic field line
     ! -- NOTE: field lines are assumed to be symmetrical around midpoint
@@ -268,7 +278,8 @@ CONTAINS
           grid % northern_top_index(lp) = jtop + in - 1
           grid % southern_top_index(lp) = is - jtop + 1
         ELSE
-          rc = -1
+          CALL ipe_error_set( msg="Unable to find grid point corresponding to mesh_height_max", &
+            line=__LINE__, file=__FILE__, rc=rc )
           RETURN
         ENDIF
       ELSE
@@ -298,7 +309,7 @@ CONTAINS
     character(len=34) :: dset_name
 
     ! -- begin
-    rc = -1
+    rc = IPE_FAILURE
 
     ! -- open grid file for reading
     call io % open(filename, "r")
@@ -333,8 +344,7 @@ CONTAINS
 
     ! -- allocate internal arrays
     call Allocate_IPE_Grid( grid, rc )
-    if (io % err % check(rc /= 0, &
-      msg="Unable to allocate mmeory for grid", &
+    if (ipe_error_check(rc, msg="Unable to allocate mmeory for grid", &
       file=__FILE__,line=__LINE__)) return
 
     ! -- setup local domain
@@ -597,7 +607,7 @@ CONTAINS
     call io % close()
     if (io % err % check(msg="Unable to close grid file "//filename, file=__FILE__,line=__LINE__)) return
 
-    rc = 0
+    rc = IPE_SUCCESS
 
   end subroutine ipe_grid_read_file
 
@@ -617,7 +627,7 @@ CONTAINS
     character(len=34) :: dset_name
 
     ! -- begin
-    rc = -1
+    rc = IPE_FAILURE
 
     ! -- setup data decomposition arrays
     fdims(1) = grid % nFluxTube
@@ -854,7 +864,7 @@ CONTAINS
     call io % close()
     if (io % err % check(msg="Unable to close grid file "//filename, file=__FILE__,line=__LINE__)) return
 
-    rc = 0
+    rc = IPE_SUCCESS
 
   end subroutine ipe_grid_write_file
 

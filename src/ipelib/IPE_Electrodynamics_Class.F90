@@ -12,6 +12,7 @@ USE IPE_Plasma_Class
 
 USE efield_ipe
 USE dynamo_module
+USE ipe_error_module
 
 IMPLICIT NONE
 
@@ -57,7 +58,6 @@ IMPLICIT NONE
 
   END TYPE IPE_Electrodynamics
 
-  REAL(prec), PARAMETER, PRIVATE :: fillValue = -999999.9_prec
   LOGICAL, PRIVATE :: dynamo_efield
 
   REAL(prec), PRIVATE :: theta90_rad(0:nmlat)
@@ -65,17 +65,20 @@ IMPLICIT NONE
 CONTAINS
 
 
-  SUBROUTINE Build_IPE_Electrodynamics( eldyn, nFluxTube, NLP, NMP, dynamo, mp_low, mp_high, halo )
+  SUBROUTINE Build_IPE_Electrodynamics( eldyn, nFluxTube, NLP, NMP, dynamo, mp_low, mp_high, halo, rc )
     IMPLICIT NONE
     CLASS( IPE_Electrodynamics ), INTENT(out) :: eldyn
-    INTEGER, INTENT(in)                       :: nFluxTube
-    INTEGER, INTENT(in)                       :: NLP
-    INTEGER, INTENT(in)                       :: NMP
-    LOGICAL, INTENT(IN)                       :: dynamo
-    INTEGER, INTENT(in)                       :: mp_low, mp_high, halo
+    INTEGER,                      INTENT(in)  :: nFluxTube
+    INTEGER,                      INTENT(in)  :: NLP
+    INTEGER,                      INTENT(in)  :: NMP
+    LOGICAL,                      INTENT(IN)  :: dynamo
+    INTEGER,                      INTENT(in)  :: mp_low, mp_high, halo
+    INTEGER, OPTIONAL,            INTENT(out) :: rc
     ! Local
-    INTEGER :: j
+    INTEGER :: j, localrc, stat
     REAL(prec) :: theta130_rad
+
+    IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
       eldyn % nFluxTube = nFluxTube
       eldyn % NLP       = NLP
@@ -97,7 +100,9 @@ CONTAINS
                 eldyn % lat_interp_weights(1:2,1:NLP), &
                 eldyn % lon_interp_weights(1:2,mp_low-halo:mp_high+halo), &
                 eldyn % lat_interp_index(1:2,1:NLP), &
-                eldyn % lon_interp_index(1:2,mp_low-halo:mp_high+halo) )
+                eldyn % lon_interp_index(1:2,mp_low-halo:mp_high+halo), stat=stat )
+      IF ( ipe_alloc_check( stat, msg="Unable to allocate internal arrays", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
       eldyn % electric_potential      = 0.0_prec
       eldyn % electric_potential2     = 0.0_prec
@@ -118,7 +123,10 @@ CONTAINS
                 eldyn % geo_v_ExB_geographic(1:3,1:nlon_geo,1:nlat_geo), &
                 eldyn % geo_hall_conductivity(1:nlon_geo,1:nlat_geo), &
                 eldyn % geo_pedersen_conductivity(1:nlon_geo,1:nlat_geo), &
-                eldyn % geo_b_parallel_conductivity(1:nlon_geo,1:nlat_geo) )
+                eldyn % geo_b_parallel_conductivity(1:nlon_geo,1:nlat_geo), &
+                stat=stat )
+      IF ( ipe_alloc_check( stat, msg="Unable to allocate internal arrays", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
       ! When building the Electrodynamics data structure, we set this
       ! module-private switch to true to ensure that the appropriate
@@ -127,7 +135,9 @@ CONTAINS
 
       dynamo_efield = dynamo
       IF ( .not. dynamo ) THEN
-        CALL efield_init_ipe
+        CALL efield_init_ipe( rc=localrc )
+        IF ( ipe_error_check( localrc, msg="call to efield_init_ipe failed", &
+          line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
         ! Maps latitude from 130km to 90km along flux tube.
         DO j=0,nmlat
           theta130_rad   = ( 180.0_prec - ylatm(j) ) * dtr
@@ -139,9 +149,14 @@ CONTAINS
 
   END SUBROUTINE Build_IPE_Electrodynamics
 
-  SUBROUTINE Trash_IPE_Electrodynamics( eldyn )
+  SUBROUTINE Trash_IPE_Electrodynamics( eldyn, rc )
     IMPLICIT NONE
     CLASS( IPE_Electrodynamics ), INTENT(inout) :: eldyn
+    INTEGER, OPTIONAL,            INTENT(out)   :: rc
+
+    INTEGER :: stat
+
+    IF (PRESENT(rc)) rc = IPE_SUCCESS
 
       DEALLOCATE( eldyn % electric_potential, &
                   eldyn % electric_potential2, &
@@ -155,44 +170,57 @@ CONTAINS
                   eldyn % lat_interp_weights, &
                   eldyn % lon_interp_weights, &
                   eldyn % lat_interp_index, &
-                  eldyn % lon_interp_index )
+                  eldyn % lon_interp_index, &
+                  stat=stat )
+      IF ( ipe_dealloc_check( stat, msg="Unable to deallocate internal arrays", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
       DEALLOCATE( eldyn % geo_electric_potential, &
                   eldyn % geo_v_ExB_geographic, &
                   eldyn % geo_hall_conductivity, &
                   eldyn % geo_pedersen_conductivity, &
-                  eldyn % geo_b_parallel_conductivity )
+                  eldyn % geo_b_parallel_conductivity, &
+                  stat=stat )
+      IF ( ipe_dealloc_check( stat, msg="Unable to deallocate internal geo arrays", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
   END SUBROUTINE Trash_IPE_Electrodynamics
 
 
 
-  SUBROUTINE Update_IPE_Electrodynamics( eldyn, grid, forcing, time_tracker, plasma, mpi_layer)
+  SUBROUTINE Update_IPE_Electrodynamics( eldyn, grid, forcing, time_tracker, plasma, mpi_layer, rc )
     IMPLICIT NONE
     CLASS( IPE_Electrodynamics ), INTENT(inout) :: eldyn
-    TYPE( IPE_Grid ), INTENT(in)                :: grid
-    TYPE( IPE_Forcing ), INTENT(in)             :: forcing
-    TYPE( IPE_Time ), INTENT(in)                :: time_tracker
-    TYPE( IPE_Plasma ), INTENT(in)              :: plasma
-    TYPE( IPE_MPI_Layer ), INTENT(in)  :: mpi_layer
+    TYPE( IPE_Grid ),             INTENT(in)    :: grid
+    TYPE( IPE_Forcing ),          INTENT(in)    :: forcing
+    TYPE( IPE_Time ),             INTENT(in)    :: time_tracker
+    TYPE( IPE_Plasma ),           INTENT(in)    :: plasma
+    TYPE( IPE_MPI_Layer ),        INTENT(in)    :: mpi_layer
+    INTEGER, OPTIONAL,            INTENT(out)   :: rc
     ! Local
-    INTEGER :: lp, mp
+    INTEGER :: lp, mp, localrc
     REAL(prec) :: max_v_exb_local
     REAL(prec) :: max_v_exb
 #ifdef HAVE_MPI
     INTEGER :: mpiError
 #endif
 
+    IF (PRESENT(rc)) rc = IPE_SUCCESS
+
     IF( dynamo_efield ) THEN
 
-      CALL eldyn % Dynamo_Wrapper(grid, forcing, time_tracker, plasma, mpi_layer )
+      CALL eldyn % Dynamo_Wrapper(grid, forcing, time_tracker, plasma, mpi_layer, rc=localrc )
+      IF ( ipe_error_check(localrc, msg="call to Dynamo_Wrapper failed", &
+        line=__LINE__, file=__FILE__, rc=rc) ) RETURN
       IF( mpi_layer % rank_id == 0 )THEN
         print *,'Dynamo E field ', int(time_tracker % elapsed_sec / 60), ' mins UT'
       ENDIF
 
     ELSE
 
-      CALL eldyn % Empirical_E_Field_Wrapper( grid, forcing, time_tracker, mpi_layer)
+      CALL eldyn % Empirical_E_Field_Wrapper( grid, forcing, time_tracker, mpi_layer, rc=localrc )
+      IF ( ipe_error_check(localrc, msg="call to Empirical_E_Field_Wrapper failed", &
+        line=__LINE__, file=__FILE__, rc=rc) ) RETURN
       IF( mpi_layer % rank_id == 0 )THEN
         print *,'TZU-WEI calling empirical E field'
       ENDIF
@@ -205,12 +233,10 @@ CONTAINS
     ! Calculate ExB drift velocity
     CALL eldyn % Calculate_ExB_Velocity( grid , mpi_layer, max_v_exb_local )
 
-!   IF( mpi_layer % rank_id == 0 ) print *,'End Update Electrodynamics'
-
   END SUBROUTINE Update_IPE_Electrodynamics
 
 
-  SUBROUTINE Empirical_E_Field_Wrapper( eldyn, grid, forcing, time_tracker, mpi_layer)
+  SUBROUTINE Empirical_E_Field_Wrapper( eldyn, grid, forcing, time_tracker, mpi_layer, rc )
 
     IMPLICIT NONE
 
@@ -219,14 +245,17 @@ CONTAINS
     TYPE( IPE_Forcing ),          INTENT(in)    :: forcing
     TYPE( IPE_Time ),             INTENT(in)    :: time_tracker
     TYPE( IPE_MPI_Layer ),        INTENT(in)    :: mpi_layer
+    INTEGER, OPTIONAL,            INTENT(out)   :: rc
 
     ! Local
-    INTEGER :: i, j, year
+    INTEGER :: i, j, year, localrc
     INTEGER :: lp, mp
     REAL(prec) :: utime, lat
     REAL(prec) :: potent_local(0:nmlon,0:nmlat)
     REAL(prec) :: mlt_local(0:nmlon)
     REAL(prec) :: colat_local(0:nmlat)
+
+    IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
     ! iday, iday_m, ut, f107d, bt, angle, v_sw, bz are all variables
     ! declared in efield_ipe.f
@@ -246,13 +275,15 @@ CONTAINS
 
     iyear = 1999
 
-    call get_efield_ipe(mpi_layer%rank_id)
+    call get_efield_ipe(mpi_layer%rank_id, rc=localrc)
+    IF ( ipe_error_check( localrc, msg="call to get_efield_ipe failed", line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     ! Interpolate the potential to the IPE grid
     potent_local = potent
     mlt_local    = ylonm
     colat_local  = rtd * theta90_rad
-    CALL eldyn % Regrid_Potential( grid, mpi_layer, time_tracker, potent_local, mlt_local, colat_local, 0, nmlon, nmlat )
+    CALL eldyn % Regrid_Potential( grid, mpi_layer, time_tracker, potent_local, mlt_local, colat_local, 0, nmlon, nmlat, rc=localrc )
+    IF ( ipe_error_check( localrc, msg="call to Regrid_Potential failed", line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
   END SUBROUTINE Empirical_E_Field_Wrapper
 
@@ -293,9 +324,6 @@ CONTAINS
                                                  + (eldyn % v_ExB_apex(2,lp,mp) * grid % apex_e_vectors(3,2,i_90km,lp,mp))
         ENDDO
 
-!       write(1000 + mpi_layer % rank_id, 255) mp,lp,eldyn % v_ExB_apex(1,lp,mp),eldyn % v_ExB_apex(2,lp,mp)
-!255    format(2i4,2e12.4)
-
       ENDDO
 
     ENDDO
@@ -335,13 +363,8 @@ CONTAINS
 
         eldyn % electric_field(1,lp,mp) = -( eldyn % electric_potential(lp,mp+1) - &
                                             eldyn % electric_potential(lp,mp-1) )/d_mp
-
-!       if (mp.eq.1.and.lp.eq.40) then
-!         write(612,*) 'GHGM POT ', eldyn % electric_potential(lp,mp+1), eldyn % electric_potential(lp,mp-1), d_mp
-!       endif
       ENDDO
     ENDDO
-
 
     ! latitude component of e-field ( ed2 ): Eq(4.9)
     ! Note that ed1 is calculated slightly differently here by dividing
@@ -383,7 +406,7 @@ CONTAINS
   END SUBROUTINE Calculate_Potential_Gradient
 
 
-  SUBROUTINE Regrid_Potential( eldyn, grid, mpi_layer, time_tracker, potential, mlt, colat, start_index, nlon, nlat )
+  SUBROUTINE Regrid_Potential( eldyn, grid, mpi_layer, time_tracker, potential, mlt, colat, start_index, nlon, nlat, rc )
   ! This subroutine regrids electric potential from a structured grid
   ! on (magnetic local time, magnetic colatitude) to IPE's grid.
   !
@@ -406,27 +429,33 @@ CONTAINS
   !   nlat - last index in the latitude direction
   !
     CLASS( IPE_Electrodynamics ), INTENT(inout) :: eldyn
-    TYPE( IPE_Grid ), INTENT(in)                :: grid
-    TYPE( IPE_MPI_Layer ), INTENT(in)  :: mpi_layer
-    TYPE( IPE_Time ), INTENT(in)                :: time_tracker
-    INTEGER, INTENT(in)                         :: start_index, nlon, nlat
-    REAL(prec), INTENT(in)                      :: potential(start_index:nlon,start_index:nlat)
-    REAL(prec), INTENT(in)                      :: mlt(start_index:nlon)
-    REAL(prec), INTENT(in)                      :: colat(start_index:nlat)
+    TYPE( IPE_Grid ),             INTENT(in)    :: grid
+    TYPE( IPE_MPI_Layer ),        INTENT(in)    :: mpi_layer
+    TYPE( IPE_Time ),             INTENT(in)    :: time_tracker
+    INTEGER,                      INTENT(in)    :: start_index, nlon, nlat
+    REAL(prec),                   INTENT(in)    :: potential(start_index:nlon,start_index:nlat)
+    REAL(prec),                   INTENT(in)    :: mlt(start_index:nlon)
+    REAL(prec),                   INTENT(in)    :: colat(start_index:nlat)
+    INTEGER, OPTIONAL,            INTENT(out)   :: rc
 
     ! Local
-    INTEGER :: mp, lp, i, j, i1, i2, j1, j2, ii
+    INTEGER :: mp, lp, i, j, i1, i2, j1, j2, ii, localrc
     INTEGER :: ilat(1:grid % NLP), jlon(grid % mp_low - grid % mp_halo:grid % mp_high+grid % mp_halo)
     REAL(prec) :: lat, lon, dlon, difflon, mindiff
     REAL(prec) :: lat_weight(1:2), lon_weight(1:2)
     REAL(prec) :: mlon90_rad(start_index:nlon)
     REAL(prec) :: mlat90_rad(start_index:nlat)
 
+    IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
+
     IF( dynamo_efield ) THEN
       mlon90_rad = dtr * mlt
       mlat90_rad = dtr * colat
     ELSE
-      mlon90_rad = MLT_to_MagneticLongitude( mlt, 1999, time_tracker % day_of_year, time_tracker % utime, start_index, nlon )
+      mlon90_rad = MLT_to_MagneticLongitude( mlt, 1999, time_tracker % day_of_year, time_tracker % utime, &
+                                             start_index, nlon, rc=localrc )
+      IF ( ipe_error_check( localrc, msg="call to MLT_to_MagneticLongitude failed", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
       mlat90_rad = dtr * colat
     ENDIF
 
@@ -604,20 +633,25 @@ CONTAINS
   END SUBROUTINE Regrid_Potential
 
 
-  FUNCTION MLT_to_MagneticLongitude( mlt, year, day_of_year, utime, start_index, nlon ) RESULT( mag_longitude )
+  FUNCTION MLT_to_MagneticLongitude( mlt, year, day_of_year, utime, start_index, nlon, rc ) RESULT( mag_longitude )
 
-    INTEGER    :: start_index, nlon
-    REAL(prec) :: mlt(start_index:nlon)
-    INTEGER    :: year, day_of_year
-    REAL(prec) :: utime
-    REAL(prec) :: mag_longitude(start_index:nlon)
+    INTEGER                        :: start_index, nlon
+    REAL(prec)                     :: mlt(start_index:nlon)
+    INTEGER                        :: year, day_of_year
+    REAL(prec)                     :: utime
+    REAL(prec)                     :: mag_longitude(start_index:nlon)
+    INTEGER, OPTIONAL, INTENT(out) :: rc
 
     ! Local
-    INTEGER    :: i
+    INTEGER    :: i, localrc
     REAL       :: sunlons
 
+    IF( PRESENT( rc ) ) rc = IPE_SUCCESS
+
     ! Map magnetic local time to magnetic longitude
-    CALL sunloc( year, day_of_year, utime, sunlons )
+    CALL sunloc( year, day_of_year, utime, sunlons, localrc )
+    IF( ipe_error_check( localrc, msg="call to sunloc failed", line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+
     DO i=start_index,nlon
 
       mag_longitude(i) = dtr * (mlt(i)-180.0_prec) + sunlons
@@ -629,11 +663,12 @@ CONTAINS
   END FUNCTION MLT_to_MagneticLongitude
 
 
-  SUBROUTINE sunloc(iyr,iday,secs,sunlons)
+  SUBROUTINE sunloc(iyr,iday,secs,sunlons,rc)
 
     integer,    intent(in)  :: iyr, iday ! day of year
-    REAL(prec), intent(in)  ::  secs    ! ut in seconds
-    REAL, INTENT(out) :: sunlons
+    REAL(prec), intent(in)  :: secs      ! ut in seconds
+    REAL,       INTENT(out) :: sunlons
+    INTEGER,    INTENT(out) :: rc
 
     integer :: ihr,imn
     real :: sec,date,vp,xmlon ! apex magnetic longitude
@@ -650,12 +685,15 @@ CONTAINS
     !          input: iyr,iday,ihr,imn,sec
     !          output: sbsllat,sbsllon
     !
-    call subsol_empirical(iyr,iday,ihr,imn,sec ,sbsllat,sbsllon)
+    call subsol_empirical(iyr,iday,ihr,imn,sec ,sbsllat,sbsllon,rc)
+    IF( ipe_error_check( rc, msg="call to subsol empirical failed", line=__LINE__, file=__FILE__ ) ) RETURN
 
     date = float(iyr) + float(iday)/365. + float(ihr)/24./365. + &
            float(imn)/60./24./365.+ sec/60./60./24./365.
 
-    call cofrm_empirical(date)
+    call cofrm_empirical(date,rc)
+    IF( ipe_error_check( rc, msg="call to cofrm empirical failed", line=__LINE__, file=__FILE__ ) ) RETURN
+
     call dypol_empirical(colat,elon,vp)
 
     ! calculate geomagn. diploe longitude
@@ -667,7 +705,7 @@ CONTAINS
   END SUBROUTINE sunloc
 
 
-  SUBROUTINE Dynamo_Wrapper(eldyn,grid,forcing,time_tracker, plasma, mpi_layer)
+  SUBROUTINE Dynamo_Wrapper(eldyn,grid,forcing,time_tracker, plasma, mpi_layer, rc)
 
     use module_init_cons!,only:init_cons
     use module_init_heelis!,only:init_heelis
@@ -678,14 +716,16 @@ CONTAINS
     use dynamo_module
     use heelis_module, only:ctpoten
     use module_magfield
+    use ipe_error_module
 !!     use module_update_fli,ONLY:update_fli
 
     CLASS( IPE_Electrodynamics ), INTENT(inout) :: eldyn
-    TYPE( IPE_Forcing ), INTENT(in)             :: forcing
+    TYPE( IPE_Forcing ),          INTENT(in)    :: forcing
     TYPE( IPE_Time ),             INTENT(in)    :: time_tracker
     TYPE( IPE_Grid ),             INTENT(in)    :: grid
     TYPE( IPE_Plasma ),           INTENT(in)    :: plasma
     TYPE( IPE_MPI_Layer ),        INTENT(in)    :: mpi_layer
+    INTEGER, OPTIONAL,            INTENT(out)   :: rc
 
     INTEGER, PARAMETER :: dyn_midpoint=48 
     REAL(prec) :: ed_IPE(2,grid % NLP,grid % NMP,2) !1:N/SH....4:ed1/2
@@ -694,6 +734,7 @@ CONTAINS
     INTEGER    :: year,i,i_dyn,j,k,l,ilat_dyn,ilon_dyn
     INTEGER    :: diffval,imlat_plas,imlat_dyn
     INTEGER    :: tube_need(dyn_midpoint),ihem,lp_dyn
+    INTEGER    :: localrc
     REAL(prec) :: mlat_plas,mlat_dyn
     REAL(prec) :: fkp
     REAL(prec) :: ed_dyn(170,80,2)
@@ -702,6 +743,8 @@ CONTAINS
     REAL(prec) :: ylatm_deg_map(kmlat)
     REAL(prec) :: ed1dy_map(82,kmlat)
     REAL(prec) :: ed2dy_map(82,kmlat)
+
+    IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
     eldyn_conductivities(:,:,:,:)=0.
     ed_conductivities(:,:,:)=0.
@@ -719,7 +762,8 @@ CONTAINS
 
     year=2000
 
-    CALL sunloc( year, time_tracker % day_of_year, time_tracker % utime, sunlons )
+    CALL sunloc( year, time_tracker % day_of_year, time_tracker % utime, sunlons, localrc )
+    IF ( ipe_error_check( localrc, msg="call to sunloc failed", line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     DO i = 1, grid % NLP
       mlat_plas  = 90. - grid % magnetic_colatitude(1,i)*rtd
@@ -819,9 +863,13 @@ CONTAINS
 ! Can we push the dynamo grid to match the IPE grid (NMP,2*NLP)?
 ! ************************ !
 
-    call highlat
+    call highlat( rc=localrc )
+    if (ipe_error_check(localrc,msg="call to highlat failed", &
+      line=__LINE__, file=__FILE__, rc=rc)) return
 
-    call dynamo
+    call dynamo( rc = localrc )
+    if (ipe_error_check(localrc,msg="call to dynamo failed", &
+      line=__LINE__, file=__FILE__, rc=rc)) return
 
     dlonm = two_pi/float(kmlon)
 
@@ -846,11 +894,13 @@ CONTAINS
     ed2dy_map(1,:)=ed2dy(40,:)
     ed2dy_map(82,:)=ed2dy(41,:)
 
-    CALL eldyn % Regrid_Potential( grid,mpi_layer, time_tracker,ed1dy_map,xlonm_deg_map,ylatm_deg_map, 1, 82,kmlat )
-      eldyn % electric_field(1,:,:) = eldyn % electric_potential
+    CALL eldyn % Regrid_Potential( grid,mpi_layer, time_tracker,ed1dy_map,xlonm_deg_map,ylatm_deg_map, 1, 82,kmlat, rc=localrc )
+    IF ( ipe_error_check( localrc, msg="call to Regrid_Potential (ed1dy_map) failed", line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    eldyn % electric_field(1,:,:) = eldyn % electric_potential
 
-    CALL eldyn % Regrid_Potential( grid,mpi_layer, time_tracker,ed2dy_map,xlonm_deg_map,ylatm_deg_map, 1, 82,kmlat )
-      eldyn % electric_field(2,:,:) = eldyn % electric_potential
+    CALL eldyn % Regrid_Potential( grid,mpi_layer, time_tracker,ed2dy_map,xlonm_deg_map,ylatm_deg_map, 1, 82,kmlat, rc=localrc )
+    IF ( ipe_error_check( localrc, msg="call to Regrid_Potential (ed2dy_map) failed", line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    eldyn % electric_field(2,:,:) = eldyn % electric_potential
 
   END SUBROUTINE Dynamo_Wrapper
 
@@ -1082,7 +1132,7 @@ CONTAINS
 !-----------------------------------------------------------------------
 !
 !!!compiler warning      IF (IYYY.EQ.0) PAUSE 'There is no Year Zero.'
-      IF (IYYY.EQ.0) STOP 'There is no Year Zero.'
+!     IF (IYYY.EQ.0) STOP 'There is no Year Zero.'
       IF (IYYY.LT.0) IYYY=IYYY+1
       IF (MM.GT.2) THEN
         JY=IYYY

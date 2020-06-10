@@ -61,24 +61,35 @@ module hwm
 
 end module hwm
 
-subroutine hwm14(iyd,sec,alt,glat,glon,stl,f107a,f107,ap,path,w)
+subroutine hwm14(iyd,sec,alt,glat,glon,stl,f107a,f107,ap,path,w,rc)
 
     use hwm
+    use ipe_error_module
     implicit none
-    integer(4),intent(in)     :: iyd
-    real(4),intent(in)        :: sec,alt,glat,glon,stl,f107a,f107
-    real(4),intent(in)        :: ap(2)
-    real(4),intent(out)       :: w(2)
-    real(4)                   :: dw(2)
-    character(250),intent(in) :: path
+    integer(4),     intent(in)  :: iyd
+    real(4),        intent(in)  :: sec,alt,glat,glon,stl,f107a,f107
+    real(4),        intent(in)  :: ap(2)
+    real(4),        intent(out) :: w(2)
+    real(4)                     :: dw(2)
+    character(250), intent(in)  :: path
+    integer,        intent(out) :: rc
+
+    integer :: localrc
+
+    rc = IPE_SUCCESS
 
     pathdefault = path
-    if (hwminit) call inithwm()
+    if (hwminit) then
+      call inithwm(localrc)
+      if (ipe_error_check(localrc,msg="hwm14: call to inithwm failed",rc=rc)) return
+    end if
 
-    call hwmqt(iyd,sec,alt,glat,glon,stl,f107a,f107,ap,w)
+    call hwmqt(iyd,sec,alt,glat,glon,stl,f107a,f107,ap,w,localrc)
+    if (ipe_error_check(localrc,msg="hwm14: call to hwmqt failed",rc=rc)) return
 
     if (ap(2) .ge. 0.0) then
-        call dwm07(iyd,sec,alt,glat,glon,ap,dw)
+        call dwm07(iyd,sec,alt,glat,glon,ap,dw,localrc)
+        if (ipe_error_check(localrc,msg="hwm14: call to dwm07 failed",rc=rc)) return
         w = w + dw
     endif
 
@@ -275,20 +286,30 @@ module dwm
 
 end module dwm
 
-subroutine inithwm()
+subroutine inithwm(rc)
 
     use hwm
     use qwm
     use dwm
     use alf,only:initalf
+    use ipe_error_module
+
     implicit none
 
-    integer(4)           :: nmax0, mmax0
+    integer, intent(out) :: rc
+
+    integer    :: lrc, stat
+    integer(4) :: nmax0, mmax0
+
+    rc = IPE_SUCCESS
 
     qwmdefault = trim(pathdefault)//trim(qwmdefault)
     dwmdefault = trim(pathdefault)//trim(dwmdefault)
-    call initqwm(qwmdefault)
-    call initdwm(nmaxdwm, mmaxdwm)
+    call initqwm(qwmdefault,lrc)
+    if (ipe_error_check(lrc,msg="inithwm: call to initqwm failed",rc=rc)) return
+
+    call initdwm(nmaxdwm, mmaxdwm, lrc)
+    if (ipe_error_check(lrc,msg="inithwm: call to initdwm failed",rc=rc)) return
 
     nmaxgeo = max(nmaxhwm, nmaxqdc)
     mmaxgeo = max(omaxhwm, mmaxqdc)
@@ -300,18 +321,32 @@ subroutine inithwm()
 
     ! shared for QWM and DWM, no need to compute twice
 
-    if (allocated(gpbar)) deallocate(gpbar,gvbar,gwbar)
-    allocate(gpbar(0:nmaxgeo,0:mmaxgeo))
-    allocate(gvbar(0:nmaxgeo,0:mmaxgeo))
-    allocate(gwbar(0:nmaxgeo,0:mmaxgeo))
+    if (allocated(gpbar)) then
+      deallocate(gpbar,gvbar,gwbar,stat=stat)
+      if (ipe_dealloc_check(stat, &
+        msg="inithwm: failed to deallocate gpbar,gvbar,gwbar", rc=rc)) return
+    endif
+    allocate(gpbar(0:nmaxgeo,0:mmaxgeo), &
+             gvbar(0:nmaxgeo,0:mmaxgeo), &
+             gwbar(0:nmaxgeo,0:mmaxgeo), stat=stat)
+    if (ipe_alloc_check(stat, &
+      msg="inithwm: failed to allocate gpbar,gvbar,gwbar", rc=rc)) return
+
     gpbar = 0
     gvbar = 0
     gwbar = 0
 
-    if (allocated(spbar)) deallocate(spbar,svbar,swbar)
-    allocate(spbar(0:nmaxgeo,0:mmaxgeo))
-    allocate(svbar(0:nmaxgeo,0:mmaxgeo))
-    allocate(swbar(0:nmaxgeo,0:mmaxgeo))
+    if (allocated(spbar)) then
+      deallocate(spbar,svbar,swbar,stat=stat)
+      if (ipe_dealloc_check(stat, &
+        msg="inithwm: failed to deallocate spbar,svbar,swbar", rc=rc)) return
+    endif
+    allocate(spbar(0:nmaxgeo,0:mmaxgeo), &
+             svbar(0:nmaxgeo,0:mmaxgeo), &
+             swbar(0:nmaxgeo,0:mmaxgeo), stat=stat)
+    if (ipe_alloc_check(stat, &
+      msg="inithwm: failed to allocate spbar,svbar,swbar", rc=rc)) return
+
     spbar = 0
     svbar = 0
     swbar = 0
@@ -330,41 +365,65 @@ end subroutine inithwm
 ! A routine to load the quiet time HWM coeffiecents into memory
 !============================================================================
 
-subroutine initqwm(filename)
+subroutine initqwm(filename,rc)
 
     use qwm
     use hwm,only:omaxhwm,nmaxhwm
+    use ipe_error_module
+
     implicit none
 
-    character(128),intent(in)      :: filename
-    integer(4)                     :: i,j
-    integer(4)                     :: ncomp
+    character(128), intent(in)    :: filename
+    integer,        intent(out)   :: rc
+    integer(4)                    :: i,j
+    integer(4)                    :: ncomp
+
+    integer :: ios, lrc, stat
+
+    rc = IPE_SUCCESS
 
     if (allocated(vnode)) then
-        deallocate(order,nb,vnode,mparm,tparm)
-        deallocate(fs,fm,fl,zwght,bz,bm)
+        deallocate(order,nb,vnode,mparm,tparm,&
+                   fs,fm,fl,zwght,bz,bm,stat=stat)
+        if (ipe_dealloc_check(stat, msg="initqwm: unable to deallocate memory", rc=rc)) return
     endif
 
-    call findandopen(filename,23)
-    read(23) nbf,maxs,maxm,maxl,maxn,ncomp
-    read(23) nlev,p
+    call findandopen(filename,23,lrc)
+    if (ipe_error_check(lrc,msg="initqwm: call to findandopen failed",&
+      rc=rc)) return
+
+    read(23,iostat=ios) nbf,maxs,maxm,maxl,maxn,ncomp
+    if (ipe_iostatus_check(ios,msg="initqwm: error reading nbf,maxs,maxm,maxl,maxn,ncomp",&
+      rc=rc)) return
+    read(23,iostat=ios) nlev,p
+    if (ipe_iostatus_check(ios,msg="initqwm: error reading nlev, p", &
+      rc=rc)) return
     nnode = nlev + p
-    allocate(nb(0:nnode),order(ncomp,0:nnode),vnode(0:nnode))
-    read(23) vnode
+    allocate(nb(0:nnode),order(ncomp,0:nnode),vnode(0:nnode),stat=stat)
+    if (ipe_alloc_check(stat,msg="initqwm: failed to allocate nb, order, vnode", rc=rc)) return
+    read(23,iostat=ios) vnode
+    if (ipe_iostatus_check(ios,msg="initqwm: error reading vnode",rc=rc)) return
     vnode(3) = 0.0
-    allocate(mparm(nbf,0:nlev))
+    allocate(mparm(nbf,0:nlev),stat=stat)
+    if (ipe_alloc_check(stat,msg="initqwm: failed to allocate mparm", rc=rc)) return
     mparm = 0.0d0
     do i = 0,nlev-p+1-2
-        read(23) order(1:ncomp,i)
-        read(23) nb(i)
-        read(23) mparm(1:nbf,i)
+        read(23,iostat=ios) order(1:ncomp,i)
+        if (ipe_iostatus_check(ios,msg="initqwm: error reading order array",rc=rc)) return
+        read(23,iostat=ios) nb(i)
+        if (ipe_iostatus_check(ios,msg="initqwm: error reading nb array",rc=rc)) return
+        read(23,iostat=ios) mparm(1:nbf,i)
+        if (ipe_iostatus_check(ios,msg="initqwm: error reading mparm array",rc=rc)) return
     enddo
-    read(23) e1,e2
-    close(23)
+    read(23,iostat=ios) e1,e2
+    if (ipe_iostatus_check(ios,msg="initqwm: error reading e1,e2",rc=rc)) return
+    close(23,iostat=ios)
+    if (ipe_iostatus_check(ios,msg="initqwm: error closing file "//filename,rc=rc)) return
 
     ! Calculate the parity relationship permutations
 
-    allocate(tparm(nbf,0:nlev))
+    allocate(tparm(nbf,0:nlev),stat=stat)
+    if (ipe_alloc_check(stat,msg="initqwm: unable to allocate tparm", rc=rc)) return
     do i = 0,nlev-p+1-2
         call parity(order(:,i),nb(i),mparm(:,i),tparm(:,i))
     enddo
@@ -381,9 +440,11 @@ subroutine initqwm(filename)
     omaxhwm = maxo
     nmaxhwm = maxn
 
-    allocate(fs(0:maxs,2),fm(0:maxm,2),fl(0:maxl,2))
-    allocate(bz(nbf),bm(nbf))
-    allocate(zwght(0:p))
+    allocate(fs(0:maxs,2),fm(0:maxm,2),fl(0:maxl,2),&
+             bz(nbf),bm(nbf), &
+             zwght(0:p), stat=stat)
+    if (ipe_alloc_check(stat,&
+      msg="initqwm: unable to allocate fs, fm, fl, bz, bm, zwght", rc=rc)) return
 
     bz = 0.0d0
     bm = 0.0d0
@@ -499,17 +560,20 @@ end subroutine initqwm
 ! The quiet time only HWM function call
 ! ------------------------------------------------------------
 
-subroutine hwmqt(IYD,SEC,ALT,GLAT,GLON,STL,F107A,F107,AP,W)
+subroutine hwmqt(IYD,SEC,ALT,GLAT,GLON,STL,F107A,F107,AP,W,rc)
 
     use hwm
     use qwm
     use alf,only:alfbasis
+    use ipe_error_module
+
     implicit none
 
-    integer,intent(in)      :: IYD
-    real(4),intent(in)      :: SEC,ALT,GLAT,GLON,STL,F107A,F107
-    real(4),intent(in)      :: AP(2)
-    real(4),intent(out)     :: W(2)
+    integer, intent(in)  :: IYD
+    real(4), intent(in)  :: SEC,ALT,GLAT,GLON,STL,F107A,F107
+    real(4), intent(in)  :: AP(2)
+    real(4), intent(out) :: W(2)
+    integer, intent(out) :: rc
 
     ! Local variables
 
@@ -523,6 +587,7 @@ subroutine hwmqt(IYD,SEC,ALT,GLAT,GLON,STL,F107A,F107,AP,W)
     real(8)                 :: vb,wb
     real(8)                 :: theta,sc
 
+    integer                 :: lrc
     integer(4)              :: b,c,d,m,n,s,l
 
     integer(4)              :: amaxs,amaxn
@@ -534,11 +599,16 @@ subroutine hwmqt(IYD,SEC,ALT,GLAT,GLON,STL,F107A,F107,AP,W)
     real(8),parameter       :: twoPi = 2.0d0*3.1415926535897932384626433832795d0
     real(8),parameter       :: deg2rad = twoPi/360.0d0
 
+    rc = IPE_SUCCESS
+
     ! ====================================================================
     ! Update VSH model terms based on any change in the input parameters
     ! ====================================================================
 
-    if (qwminit) call initqwm(qwmdefault)
+    if (qwminit) then
+      call initqwm(qwmdefault,lrc)
+      if (ipe_error_check(lrc,msg="hwmqt: call to initqwm failed",rc=rc)) return
+    endif
 
     input(1) = dble(mod(IYD,1000))
     input(2) = dble(sec)
@@ -912,30 +982,64 @@ end subroutine vertwght
 !                         Disturbance Wind Model Functions
 ! #################################################################################
 
-subroutine initdwm(nmaxout,mmaxout)
+subroutine initdwm(nmaxout,mmaxout,rc)
 
     use hwm
     use dwm
+    use ipe_error_module
+
     implicit none
 
-    integer(4),intent(out)     :: nmaxout, mmaxout
+    integer(4), intent(out) :: nmaxout, mmaxout
+    integer,    intent(out) :: rc
 
-    call findandopen(dwmdefault,23)
-    if (allocated(termarr)) deallocate(termarr,coeff)
-    read(23) nterm, mmax, nmax
-    allocate(termarr(0:2, 0:nterm-1))
-    read(23) termarr
-    allocate(coeff(0:nterm-1))
-    read(23) coeff
-    read(23) twidth
-    close(23)
+    integer :: ios, lrc, stat
 
-    if (allocated(termval)) deallocate(termval,dpbar,dvbar,dwbar,mltterms,vshterms)
+    rc = IPE_SUCCESS
+
+    call findandopen(dwmdefault,23,lrc)
+    if (ipe_error_check(lrc,msg="initdwm: call to findandopen failed", &
+      rc=rc)) return
+    if (allocated(termarr)) then
+      deallocate(termarr,coeff,stat=stat)
+      if (ipe_dealloc_check(stat,&
+        msg="initdwm: unable to deallocate termarr,coeff", rc=rc)) return
+    endif
+    read(23,iostat=ios) nterm, mmax, nmax
+    if (ipe_iostatus_check(ios,msg="initdwm: error reading nterm, mmax, nmax",&
+      rc=rc)) return
+
+    allocate(termarr(0:2, 0:nterm-1),stat=stat)
+    if (ipe_alloc_check(stat,&
+        msg="initdwm: unable to allocate termarr", rc=rc)) return
+    read(23,iostat=ios) termarr
+    if (ipe_iostatus_check(ios,msg="initdwm: error reading termarr",&
+      rc=rc)) return
+    allocate(coeff(0:nterm-1),stat=stat)
+    if (ipe_alloc_check(stat,&
+        msg="initdwm: unable to allocate coeff", rc=rc)) return
+    read(23,iostat=ios) coeff
+    if (ipe_iostatus_check(ios,msg="initdwm: error reading coeff",&
+      rc=rc)) return
+    read(23,iostat=ios) twidth
+    if (ipe_iostatus_check(ios,msg="initdwm: error reading twidth",&
+      rc=rc)) return
+    close(23,iostat=ios)
+    if (ipe_iostatus_check(ios,msg="initdwm: error closing file "//dwmdefault,&
+      rc=rc)) return
+
+    if (allocated(termval)) then
+      deallocate(termval,dpbar,dvbar,dwbar,mltterms,vshterms,stat=stat)
+      if (ipe_dealloc_check(stat,&
+        msg="initdwm: unable to deallocate termval,dpbar,dvbar,dwbar,mltterms,vshterms", rc=rc)) return
+    endif
     nvshterm = ( ((nmax+1)*(nmax+2) - (nmax-mmax)*(nmax-mmax+1))/2 - 1 ) * 4 - 2*nmax
-    allocate(termval(0:1, 0:nterm-1))
-    allocate(dpbar(0:nmax,0:mmax),dvbar(0:nmax,0:mmax),dwbar(0:nmax,0:mmax))
-    allocate(mltterms(0:mmax,0:1))
-    allocate(vshterms(0:1, 0:nvshterm-1))
+    allocate(termval(0:1, 0:nterm-1), &
+             dpbar(0:nmax,0:mmax),dvbar(0:nmax,0:mmax),dwbar(0:nmax,0:mmax), &
+             mltterms(0:mmax,0:1), &
+             vshterms(0:1, 0:nvshterm-1), stat=stat)
+    if (ipe_dealloc_check(stat,&
+      msg="initdwm: unable to allocate termval,dpbar,dvbar,dwbar,mltterms,vshterms", rc=rc)) return
     dpbar = 0
     dvbar = 0
     dwbar = 0
@@ -949,16 +1053,19 @@ subroutine initdwm(nmaxout,mmaxout)
 
 end subroutine initdwm
 
-subroutine dwm07(IYD,SEC,ALT,GLAT,GLON,AP,DW)
+subroutine dwm07(IYD,SEC,ALT,GLAT,GLON,AP,DW,rc)
 
     use hwm
     use dwm
+    use ipe_error_module
+
     implicit none
 
-    INTEGER,intent(in)      :: IYD
-    REAL(4),intent(in)      :: SEC,ALT,GLAT,GLON
-    REAL(4),intent(in)      :: AP(2)
-    REAL(4),intent(out)     :: DW(2)
+    INTEGER, intent(in)  :: IYD
+    REAL(4), intent(in)  :: SEC,ALT,GLAT,GLON
+    REAL(4), intent(in)  :: AP(2)
+    REAL(4), intent(out) :: DW(2)
+    INTEGER, intent(out) :: rc
 
     real(4), save           :: day, ut, mlat, mlon, mlt, kp
     real(4)                 :: mmpwind, mzpwind
@@ -969,6 +1076,10 @@ subroutine dwm07(IYD,SEC,ALT,GLAT,GLON,AP,DW)
 
     real(4), external       :: ap2kp, mltcalc
 
+    integer                 :: lrc
+
+    rc = IPE_SUCCESS
+
     !CONVERT AP TO KP
     if (ap(2) .ne. aplast) then
       kp = ap2kp(ap(2))
@@ -976,7 +1087,8 @@ subroutine dwm07(IYD,SEC,ALT,GLAT,GLON,AP,DW)
 
     !CONVERT GEO LAT/LON TO QD LAT/LON
     if ((glat .ne. glatlast) .or. (glon .ne. glonlast)) then
-      call gd2qd(glat,glon,mlat,mlon,f1e,f1n,f2e,f2n)
+      call gd2qd(glat,glon,mlat,mlon,f1e,f1n,f2e,f2n,lrc)
+      if (ipe_error_check(lrc,msg="dwm07: call to gd2qd failed",rc=rc)) return
     endif
 
     !COMPUTE QD MAGNETIC LOCAL TIME (LOW-PRECISION)
@@ -988,7 +1100,8 @@ subroutine dwm07(IYD,SEC,ALT,GLAT,GLON,AP,DW)
     endif
 
     !RETRIEVE DWM WINDS
-    call dwm07b(mlt, mlat, kp, mmpwind, mzpwind)
+    call dwm07b(mlt, mlat, kp, mmpwind, mzpwind, lrc)
+    if (ipe_error_check(lrc, msg="dwm07: call to dwm07b failed", rc=rc)) return
 
     !CONVERT TO GEOGRAPHIC COORDINATES
     dw(1) = f2n*mmpwind + f1n*mzpwind
@@ -1007,21 +1120,26 @@ subroutine dwm07(IYD,SEC,ALT,GLAT,GLON,AP,DW)
 
 end subroutine dwm07
 
-subroutine dwm07b(mlt, mlat, kp, mmpwind, mzpwind)
+subroutine dwm07b(mlt, mlat, kp, mmpwind, mzpwind, rc)
 
     use hwm
     use dwm
     use alf,only:alfbasis
+    use ipe_error_module
+
     implicit none
 
-    real(4),intent(in)        :: mlt       !Magnetic local time (hours)
-    real(4),intent(in)        :: mlat      !Magnetic latitude (degrees)
-    real(4),intent(in)        :: kp        !3-hour Kp
+    real(4), intent(in)  :: mlt       !Magnetic local time (hours)
+    real(4), intent(in)  :: mlat      !Magnetic latitude (degrees)
+    real(4), intent(in)  :: kp        !3-hour Kp
 
-    real(4),intent(out)       :: mmpwind   !Mer. disturbance wind (+north, QD coordinates)
-    real(4),intent(out)       :: mzpwind   !Zon. disturbance wind (+east, QD coordinates)
+    real(4), intent(out) :: mmpwind   !Mer. disturbance wind (+north, QD coordinates)
+    real(4), intent(out) :: mzpwind   !Zon. disturbance wind (+east, QD coordinates)
+
+    integer, intent(out) :: rc
 
     ! Local variables
+    integer                   :: lrc
     integer(4)                :: iterm, ivshterm, n, m
     real(4)                   :: termvaltemp(0:1)
     real(4),save              :: kpterms(0:2)
@@ -1031,8 +1149,13 @@ subroutine dwm07b(mlt, mlat, kp, mmpwind, mzpwind)
 
     real(4),external          :: latwgt2
 
+    rc = IPE_SUCCESS
+
     !LOAD MODEL PARAMETERS IF NECESSARY
-    if (dwminit) call initdwm(nmaxdwm, mmaxdwm)
+    if (dwminit) then
+        call initdwm(nmaxdwm, mmaxdwm, lrc)
+        if (ipe_error_check(lrc,msg="dwm07b: call to initdwm failed",rc=rc)) return
+    endif
 
     !COMPUTE LATITUDE PART OF VSH TERMS
     if (mlat .ne. mlatlast) then
@@ -1147,6 +1270,8 @@ end function ap2kp
 
 module gd2qdc
 
+    use ipe_error_module
+
     implicit none
 
     integer(4)               :: nterm, nmax, mmax  !Spherical harmonic expansion parameters
@@ -1169,33 +1294,53 @@ module gd2qdc
 
 contains
 
-    subroutine initgd2qd()
+    subroutine initgd2qd(rc)
 
         use hwm
         implicit none
 
+        integer, intent(out) :: rc
+
         character(250) :: datafile
         integer(4)     :: iterm, n
         integer(4)     :: j
+        integer        :: ios, lrc, stat
+
+        rc = IPE_SUCCESS
 
         datafile = trim(pathdefault)//'gd2qd.dat'
 
-        call findandopen(datafile,23)
-        read(23) nmax, mmax, nterm, epoch, alt
+        call findandopen(datafile,23,lrc)
+        if (ipe_error_check(lrc,msg="initgd2qd: call to findandopen failed", &
+          rc=rc)) return
+        read(23,iostat=ios) nmax, mmax, nterm, epoch, alt
+        if (ipe_iostatus_check(ios, &
+          msg="initgd2qd: error reading nmax, mmax, nterm, epoch, alt",rc=rc)) return
         if (allocated(coeff)) then
-            deallocate(coeff,xcoeff,ycoeff,zcoeff,sh,shgradtheta,shgradphi,normadj)
+            deallocate(coeff,xcoeff,ycoeff,zcoeff,sh,shgradtheta,shgradphi,normadj,stat=stat)
+            if (ipe_dealloc_check(stat,msg="initgd2qd: failed to deallocate memory",rc=rc)) return
         endif
-        allocate( coeff(0:nterm-1, 0:2) )
-        read(23) coeff
-        close(23)
+        allocate( coeff(0:nterm-1, 0:2), stat=stat )
+        if (ipe_dealloc_check(stat,msg="initgd2qd: failed to allocate coeff",rc=rc)) return
+        read(23,iostat=ios) coeff
+        if (ipe_iostatus_check(ios, msg="initgd2qd: error reading coeff", rc=rc)) return
+        close(23,iostat=ios)
+        if (ipe_iostatus_check(ios, msg="initgd2qd: error closing file "//datafile, rc=rc)) return
 
-        allocate( xcoeff(0:nterm-1) )
-        allocate( ycoeff(0:nterm-1) )
-        allocate( zcoeff(0:nterm-1) )
-        allocate( sh(0:nterm-1) )
-        allocate( shgradtheta(0:nterm-1) )
-        allocate( shgradphi(0:nterm-1) )
-        allocate( normadj(0:nmax) )
+        allocate( xcoeff(0:nterm-1), stat=stat )
+        if (ipe_dealloc_check(stat,msg="initgd2qd: failed to allocate xcoeff",rc=rc)) return
+        allocate( ycoeff(0:nterm-1), stat=stat )
+        if (ipe_dealloc_check(stat,msg="initgd2qd: failed to allocate ycoeff",rc=rc)) return
+        allocate( zcoeff(0:nterm-1), stat=stat )
+        if (ipe_dealloc_check(stat,msg="initgd2qd: failed to allocate zcoeff",rc=rc)) return
+        allocate( sh(0:nterm-1), stat=stat )
+        if (ipe_dealloc_check(stat,msg="initgd2qd: failed to allocate sh",rc=rc)) return
+        allocate( shgradtheta(0:nterm-1), stat=stat )
+        if (ipe_dealloc_check(stat,msg="initgd2qd: failed to allocate shgradtheta",rc=rc)) return
+        allocate( shgradphi(0:nterm-1), stat=stat )
+        if (ipe_dealloc_check(stat,msg="initgd2qd: failed to allocate shgradphi",rc=rc)) return
+        allocate( normadj(0:nmax), stat=stat )
+        if (ipe_dealloc_check(stat,msg="initgd2qd: failed to allocate normadj",rc=rc)) return
 
         do iterm = 0, nterm-1
             xcoeff(iterm) = coeff(iterm,0)
@@ -1218,18 +1363,21 @@ contains
 
 end module gd2qdc
 
-subroutine gd2qd(glatin,glon,qlat,qlon,f1e,f1n,f2e,f2n)
+subroutine gd2qd(glatin,glon,qlat,qlon,f1e,f1n,f2e,f2n,rc)
 
     use hwm
     use gd2qdc
     use alf
+    use ipe_error_module
 
     implicit none
 
-    real(4), intent(in)         :: glatin, glon
-    real(4), intent(out)        :: qlat, qlon
-    real(4), intent(out)        :: f1e, f1n, f2e, f2n
+    real(4), intent(in)  :: glatin, glon
+    real(4), intent(out) :: qlat, qlon
+    real(4), intent(out) :: f1e, f1n, f2e, f2n
+    integer, intent(out) :: rc
 
+    integer                  :: lrc
     integer(4)               :: n, m, i
     real(8)                  :: glat, theta, phi
     real(8)                  :: mphi, cosmphi, sinmphi
@@ -1239,7 +1387,12 @@ subroutine gd2qd(glatin,glon,qlat,qlon,f1e,f1n,f2e,f2n)
     real(8)                  :: xgradphi, ygradphi, zgradphi
     real(8)                  :: qlonrad
 
-   if (gd2qdinit) call initgd2qd()
+    rc = IPE_SUCCESS
+
+    if (gd2qdinit) then
+      call initgd2qd(lrc)
+      if (ipe_error_check(lrc,msg="gd2qd: call to initgd2qd failed",rc=rc)) return
+    endif
 
     glat = dble(glatin)
     if (glat .ne. glatalf) then
@@ -1304,17 +1457,20 @@ end subroutine gd2qd
 !                  (Function) Calculate Magnetic Local Time
 !==============================================================================
 
-function mltcalc(qlat,qlon,day,ut)
+function mltcalc(qlat,qlon,day,ut,rc)
 
     use hwm
     use gd2qdc
     use alf
+!   use ipe_error_module
 
     implicit none
 
-    real(4), intent(in)      :: qlat, qlon, day, ut
-    real(4)                  :: mltcalc
+    real(4), intent(in)  :: qlat, qlon, day, ut
+    real(4)              :: mltcalc
+    integer, intent(out) :: rc
 
+    integer                  :: lrc
     integer(4)               :: n, m, i
     real(8)                  :: asunglat, asunglon, asunqlon
     real(8)                  :: glat, theta, phi
@@ -1323,7 +1479,12 @@ function mltcalc(qlat,qlon,day,ut)
     real(8)                  :: cosqlat, cosqlon, sinqlon
     real(8)                  :: qlonrad
 
-    if (gd2qdinit) call initgd2qd()
+    rc = IPE_SUCCESS
+
+    if (gd2qdinit) then
+      call initgd2qd(lrc)
+      if (ipe_error_check(lrc,msg="mltcalc: call to initgd2qd failed",rc=rc)) return
+    endif
 
     !COMPUTE GEOGRAPHIC COORDINATES OF ANTI-SUNWARD DIRECTION (LOW PRECISION)
     asunglat = -asin(sin((dble(day)+dble(ut)/24.0d0-80.0d0)*dtor) * sineps) / dtor
@@ -1431,52 +1592,83 @@ end function latwgt2
 ! Utility to find and open the supporting data files
 ! ========================================================================
 
-subroutine findandopen(datafile,unitid)
+subroutine findandopen(datafile,unitid,rc)
+
+    use ipe_error_module
 
     implicit none
 
-    character(128)      :: datafile
-    integer             :: unitid
+    character(128)             :: datafile
+    integer                    :: unitid
+    integer,       intent(out) :: rc
+
     character(128)      :: hwmpath
     logical             :: havefile
-    integer             :: i
+    integer             :: i, ios
+
+    rc = IPE_SUCCESS
 
     i = index(datafile,'bin')
     if (i .eq. 0) then
-        inquire(file=trim(datafile),exist=havefile)
-        if (havefile) open(unit=unitid,file=trim(datafile),status='old',form='unformatted')
-        if (.not. havefile) then
+        inquire(file=trim(datafile),exist=havefile,iostat=ios)
+        if (ipe_iostatus_check(ios,msg="error inquiring file "//datafile,rc=rc)) return
+        if (havefile) then
+            open(unit=unitid,file=trim(datafile),status='old',form='unformatted',iostat=ios)
+            if (ipe_iostatus_check(ios,msg="error opening file "//datafile,rc=rc)) return
+        else
             call get_environment_variable('HWMPATH',hwmpath)
-            inquire(file=trim(hwmpath)//'/'//trim(datafile),exist=havefile)
-            if (havefile) open(unit=unitid, &
-                file=trim(hwmpath)//'/'//trim(datafile),status='old',form='unformatted')
+            inquire(file=trim(hwmpath)//'/'//trim(datafile),exist=havefile,iostat=ios)
+            if (ipe_iostatus_check(ios,msg="error inquiring HWMPATH/file "//&
+                trim(hwmpath)//'/'//trim(datafile),rc=rc)) return
+            if (havefile) then
+                open(unit=unitid, file=trim(hwmpath)//'/'//trim(datafile), &
+                    status='old',form='unformatted',iostat=ios)
+                if (ipe_iostatus_check(ios,msg="error opening HWMPATH/file "//&
+                    trim(hwmpath)//'/'//trim(datafile),rc=rc)) return
+            end if
         endif
         if (.not. havefile) then
-            inquire(file='../Meta/'//trim(datafile),exist=havefile)
-            if (havefile) open(unit=unitid, &
-                file='../Meta/'//trim(datafile),status='old',form='unformatted')
+            inquire(file='../Meta/'//trim(datafile),exist=havefile,iostat=ios)
+            if (ipe_iostatus_check(ios,msg="error inquiring ../Meta/file "//&
+                '../Meta/'//trim(datafile),rc=rc)) return
+            if (havefile) then
+                open(unit=unitid, file='../Meta/'//trim(datafile),status='old',&
+                    form='unformatted',iostat=ios)
+                if (ipe_iostatus_check(ios,msg="error opening ../Meta/file "//&
+                    '../Meta/'//trim(datafile),rc=rc)) return
+            endif
         endif
     else
-        inquire(file=trim(datafile),exist=havefile)
-        if (havefile) open(unit=unitid,file=trim(datafile),status='old',access='stream')
-        if (.not. havefile) then
+        inquire(file=trim(datafile),exist=havefile,iostat=ios)
+        if (ipe_iostatus_check(ios,msg="error inquiring file "//datafile,rc=rc)) return
+        if (havefile) then
+            open(unit=unitid,file=trim(datafile),status='old',access='stream',iostat=ios)
+            if (ipe_iostatus_check(ios,msg="error opening file "//datafile,rc=rc)) return
+        else
             call get_environment_variable('HWMPATH',hwmpath)
-            inquire(file=trim(hwmpath)//'/'//trim(datafile),exist=havefile)
-            if (havefile) open(unit=unitid, &
-                file=trim(hwmpath)//'/'//trim(datafile),status='old',access='stream')
+            inquire(file=trim(hwmpath)//'/'//trim(datafile),exist=havefile,iostat=ios)
+            if (ipe_iostatus_check(ios,msg="error inquiring HWMPATH/file "//&
+                trim(hwmpath)//'/'//trim(datafile),rc=rc)) return
+            if (havefile) then
+                open(unit=unitid,file=trim(hwmpath)//'/'//trim(datafile),status='old',&
+                    access='stream',iostat=ios)
+                if (ipe_iostatus_check(ios,msg="error opening HWMPATH/file "//&
+                    trim(hwmpath)//'/'//trim(datafile),rc=rc)) return
+            endif
         endif
         if (.not. havefile) then
-            inquire(file='../Meta/'//trim(datafile),exist=havefile)
-            if (havefile) open(unit=unitid, &
-                file='../Meta/'//trim(datafile),status='old',access='stream')
+            inquire(file='../Meta/'//trim(datafile),exist=havefile,iostat=ios)
+            if (ipe_iostatus_check(ios,msg="error inquiring ../Meta/file "//&
+                '../Meta/'//trim(datafile),rc=rc)) return
+            if (havefile) then
+                open(unit=unitid,file='../Meta/'//trim(datafile),status='old',&
+                    access='stream',iostat=ios)
+                if (ipe_iostatus_check(ios,msg="error opening ../Meta/file "//&
+                    '../Meta/'//trim(datafile),rc=rc)) return
+            endif
         endif
     endif
 
-    if (havefile) then
-        return
-    else
-        print *,"Can not find file ",trim(datafile)
-        stop
-    endif
+    if (ipe_status_check(havefile,msg="Can not find file "//datafile,rc=rc)) return
 
 end subroutine findandopen

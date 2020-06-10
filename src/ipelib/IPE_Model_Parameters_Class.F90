@@ -4,6 +4,7 @@ MODULE IPE_Model_Parameters_Class
   USE IPE_Constants_Dictionary
   USE IPE_Common_Routines
   USE IPE_MPI_Layer_Class
+  USE ipe_error_module
 
 
   IMPLICIT NONE
@@ -80,13 +81,13 @@ MODULE IPE_Model_Parameters_Class
 
 CONTAINS
 
-  SUBROUTINE Build_IPE_Model_Parameters( params, mpi_layer, read_success )
+  SUBROUTINE Build_IPE_Model_Parameters( params, mpi_layer, rc )
 
     IMPLICIT NONE
 
     CLASS( IPE_Model_Parameters ), INTENT(out) :: params
     TYPE( IPE_MPI_Layer ),         INTENT(in)  :: mpi_layer
-    LOGICAL,                       INTENT(out) :: read_success
+    INTEGER, OPTIONAL,             INTENT(out) :: rc
 
     ! Local
     CHARACTER(200) :: grid_file
@@ -152,7 +153,8 @@ CONTAINS
     NAMELIST / IPECAP          / mesh_height_min, mesh_height_max, mesh_fill, mesh_write, mesh_write_file
     NAMELIST / ElDyn           / dynamo_efield
 
-    read_success = .FALSE.
+    ! Begin
+    IF (PRESENT(rc)) rc = IPE_SUCCESS
 
     ! Default Parameters !
 
@@ -223,69 +225,43 @@ CONTAINS
     IF ( mpi_layer % rank_id == 0 ) THEN
 
       INQUIRE( FILE = 'IPE.inp', EXIST = fileExists, IOSTAT = iostatus )
-      IF ( iostatus /= 0 ) RETURN
-
-      IF( .not. fileExists ) THEN
-        OPEN( UNIT = NEWUNIT(fUnit), FILE = 'IPE.inp', ACTION = 'WRITE', DELIM = 'APOSTROPHE', IOSTAT = iostatus )
-        IF ( iostatus /= 0 ) RETURN
-
-        WRITE( UNIT = fUnit, NML = SpaceManagement, IOSTAT = iostatus )
-        IF ( iostatus /= 0 ) RETURN
-
-        WRITE( UNIT = fUnit, NML = TimeStepping,    IOSTAT = iostatus )
-        IF ( iostatus /= 0 ) RETURN
-
-        WRITE( UNIT = fUnit, NML = Forcing,         IOSTAT = iostatus )
-        IF ( iostatus /= 0 ) RETURN
-
-        WRITE( UNIT = fUnit, NML = FileIO,          IOSTAT = iostatus )
-        IF ( iostatus /= 0 ) RETURN
-
-        WRITE( UNIT = fUnit, NML = IPECAP,          IOSTAT = iostatus )
-        IF ( iostatus /= 0 ) RETURN
-
-        WRITE( UNIT = fUnit, NML = ElDyn,           IOSTAT = iostatus )
-        IF ( iostatus /= 0 ) RETURN
-
-        CLOSE( UNIT = fUnit, IOSTAT = iostatus )
-        IF ( iostatus /= 0 ) RETURN
-
-        PRINT*, ' '
-        PRINT*, '  Module IPE_Model_Parameters_Class.F90 : S/R Build_IPE_Model_Parameters : '
-        PRINT*, '    IPE.inp not found. A sample IPE.inp namelist file has been'
-        PRINT*, '    generated for you in your current directory.'
-      END IF
+      IF ( ipe_iostatus_check( iostatus, msg="Failed to retrieve IPE.inp status", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+      IF ( ipe_status_check( fileExists, msg="Input file IPE.inp not found", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
       OPEN( UNIT = NewUnit(fUnit), FILE = 'IPE.inp', ACTION = 'READ', IOSTAT = iostatus )
-      IF ( iostatus /= 0 ) RETURN
+      IF ( ipe_iostatus_check( iostatus, msg="Unable to open file IPE.inp for reading", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
       REWIND( UNIT = fUnit, IOSTAT = iostatus )
-      IF ( iostatus /= 0 ) RETURN
+      IF ( ipe_iostatus_check( iostatus, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
       READ( UNIT = fUnit, NML = SpaceManagement, IOSTAT = iostatus )
-      IF ( iostatus /= 0 ) RETURN
+      IF ( ipe_iostatus_check( iostatus, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
       READ( UNIT = fUnit, NML = TimeStepping,    IOSTAT = iostatus )
-      IF ( iostatus /= 0 ) RETURN
+      IF ( ipe_iostatus_check( iostatus, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
       READ( UNIT = fUnit, NML = Forcing,         IOSTAT = iostatus )
-      IF ( iostatus /= 0 ) RETURN
+      IF ( ipe_iostatus_check( iostatus, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
       READ( UNIT = fUnit, NML = FileIO,          IOSTAT = iostatus )
-      IF ( iostatus /= 0 ) RETURN
+      IF ( ipe_iostatus_check( iostatus, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
       READ( UNIT = fUnit, NML = IPECAP,          IOSTAT = iostatus )
-      IF ( iostatus /= 0 ) RETURN
+      IF ( ipe_iostatus_check( iostatus, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
       READ( UNIT = fUnit, NML = ElDyn,           IOSTAT = iostatus )
-      IF ( iostatus /= 0 ) RETURN
+      IF ( ipe_iostatus_check( iostatus, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
       CLOSE( fUnit, IOSTAT = iostatus )
-      IF ( iostatus /= 0 ) RETURN
+      IF ( ipe_iostatus_check( iostatus, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
       IF ( LEN_TRIM( f107_kp_file ) > 0 ) THEN
         INQUIRE( FILE = TRIM( f107_kp_file ), EXIST = params % use_f107_kp_file, IOSTAT = iostatus )
-        IF ( iostatus /= 0 ) RETURN
+        IF ( ipe_iostatus_check( iostatus, msg="Failed to inquire file "//f107_kp_file, &
+          line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
       ENDIF
 
       ! prepare buffers
@@ -315,15 +291,17 @@ CONTAINS
 
 #ifdef HAVE_MPI
     CALL MPI_BCAST( sbuf, 200 * size(sbuf), MPI_CHAR, 0, mpi_layer % mpi_communicator, ierr )
+    IF ( ipe_status_check( ierr == 0, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 #endif
 
-    params % grid_file  = sbuf(1)
+    params % grid_file         = sbuf(1)
     params % initial_timestamp = sbuf(2)
     params % f107_kp_file      = sbuf(3)
     params % mesh_write_file   = sbuf(4)
 
 #ifdef HAVE_MPI
     CALL MPI_BCAST( ibuf, size(ibuf), MPI_INTEGER, 0, mpi_layer % mpi_communicator, ierr )
+    IF ( ipe_status_check( ierr == 0, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 #endif
 
     params % f107_kp_size          = ibuf(1)
@@ -349,6 +327,7 @@ CONTAINS
 
 #ifdef HAVE_MPI
     CALL MPI_BCAST( rbuf, size(rbuf), mpi_layer % mpi_prec, 0, mpi_layer % mpi_communicator, ierr )
+    IF ( ipe_status_check( ierr == 0, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 #endif
 
     params % time_step               = rbuf(1)
@@ -374,8 +353,6 @@ CONTAINS
     params % file_output_frequency   = rbuf(21)
 
     params % n_model_updates = INT( ( params % end_time - params % start_time ) / params % file_output_frequency )
-
-    read_success = .TRUE.
 
   END SUBROUTINE Build_IPE_Model_Parameters
 

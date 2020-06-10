@@ -76,7 +76,7 @@ POST_INSTALL = :
 NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
-subdir = src/ipelib/empirical_efield
+subdir = src/ipelib/shared
 DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ar-lib.m4 \
@@ -89,18 +89,44 @@ am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 mkinstalldirs = $(install_sh) -d
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
-LIBRARIES = $(noinst_LIBRARIES)
+am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
+am__vpath_adj = case $$p in \
+    $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
+    *) f=$$p;; \
+  esac;
+am__strip_dir = f=`echo $$p | sed -e 's|^.*/||'`;
+am__install_max = 40
+am__nobase_strip_setup = \
+  srcdirstrip=`echo "$(srcdir)" | sed 's/[].[^$$\\*|]/\\\\&/g'`
+am__nobase_strip = \
+  for p in $$list; do echo "$$p"; done | sed -e "s|$$srcdirstrip/||"
+am__nobase_list = $(am__nobase_strip_setup); \
+  for p in $$list; do echo "$$p $$p"; done | \
+  sed "s| $$srcdirstrip/| |;"' / .*\//!s/ .*/ ./; s,\( .*\)/[^/]*$$,\1,' | \
+  $(AWK) 'BEGIN { files["."] = "" } { files[$$2] = files[$$2] " " $$1; \
+    if (++n[$$2] == $(am__install_max)) \
+      { print $$2, files[$$2]; n[$$2] = 0; files[$$2] = "" } } \
+    END { for (dir in files) print dir, files[dir] }'
+am__base_list = \
+  sed '$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;s/\n/ /g' | \
+  sed '$$!N;$$!N;$$!N;$$!N;s/\n/ /g'
+am__uninstall_files_from_dir = { \
+  test -z "$$files" \
+    || { test ! -d "$$dir" && test ! -f "$$dir" && test ! -r "$$dir"; } \
+    || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
+         $(am__cd) "$$dir" && rm -f $$files; }; \
+  }
+am__installdirs = "$(DESTDIR)$(libdir)"
+LIBRARIES = $(lib_LIBRARIES)
 ARFLAGS = cru
 AM_V_AR = $(am__v_AR_@AM_V@)
 am__v_AR_ = $(am__v_AR_@AM_DEFAULT_V@)
 am__v_AR_0 = @echo "  AR      " $@;
 am__v_AR_1 = 
-libefield_a_AR = $(AR) $(ARFLAGS)
-libefield_a_LIBADD =
-am_libefield_a_OBJECTS = libefield_a-apex_sunloc_empirical.$(OBJEXT) \
-	libefield_a-efield_ipe.$(OBJEXT) \
-	libefield_a-weimer2005_ipe.$(OBJEXT)
-libefield_a_OBJECTS = $(am_libefield_a_OBJECTS)
+libshared_a_AR = $(AR) $(ARFLAGS)
+libshared_a_LIBADD =
+am_libshared_a_OBJECTS = ipe_error_module.$(OBJEXT)
+libshared_a_OBJECTS = $(am_libshared_a_OBJECTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -114,24 +140,21 @@ am__v_at_ = $(am__v_at_@AM_DEFAULT_V@)
 am__v_at_0 = @
 am__v_at_1 = 
 DEFAULT_INCLUDES = -I.@am__isrc@
-AM_V_lt = $(am__v_lt_@AM_V@)
-am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
-am__v_lt_0 = --silent
-am__v_lt_1 = 
-F77COMPILE = $(F77) $(AM_FFLAGS) $(FFLAGS)
-AM_V_F77 = $(am__v_F77_@AM_V@)
-am__v_F77_ = $(am__v_F77_@AM_DEFAULT_V@)
-am__v_F77_0 = @echo "  F77     " $@;
-am__v_F77_1 = 
-F77LD = $(F77)
-F77LINK = $(F77LD) $(AM_FFLAGS) $(FFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o \
+PPFCCOMPILE = $(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
+	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS)
+AM_V_PPFC = $(am__v_PPFC_@AM_V@)
+am__v_PPFC_ = $(am__v_PPFC_@AM_DEFAULT_V@)
+am__v_PPFC_0 = @echo "  PPFC    " $@;
+am__v_PPFC_1 = 
+FCLD = $(FC)
+FCLINK = $(FCLD) $(AM_FCFLAGS) $(FCFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o \
 	$@
-AM_V_F77LD = $(am__v_F77LD_@AM_V@)
-am__v_F77LD_ = $(am__v_F77LD_@AM_DEFAULT_V@)
-am__v_F77LD_0 = @echo "  F77LD   " $@;
-am__v_F77LD_1 = 
-SOURCES = $(libefield_a_SOURCES)
-DIST_SOURCES = $(libefield_a_SOURCES)
+AM_V_FCLD = $(am__v_FCLD_@AM_V@)
+am__v_FCLD_ = $(am__v_FCLD_@AM_DEFAULT_V@)
+am__v_FCLD_0 = @echo "  FCLD    " $@;
+am__v_FCLD_1 = 
+SOURCES = $(libshared_a_SOURCES)
+DIST_SOURCES = $(libshared_a_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -271,14 +294,13 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-noinst_LIBRARIES = libefield.a
-libefield_a_SOURCES = apex_sunloc_empirical.f efield_ipe.f weimer2005_ipe.f
-libefield_a_FFLAGS = $(FC_MODINC) . $(FC_MODINC) ../shared
-EXTRA_DIST = apex_sunloc.f
+lib_LIBRARIES = libshared.a
+libshared_a_SOURCES = ipe_error_module.F90
+libipe_a_FCFLAGS = 
 all: all-am
 
 .SUFFIXES:
-.SUFFIXES: .f .o .obj
+.SUFFIXES: .F90 .o .obj
 $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
@@ -288,9 +310,9 @@ $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__confi
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu src/ipelib/empirical_efield/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu src/ipelib/shared/Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --gnu src/ipelib/empirical_efield/Makefile
+	  $(AUTOMAKE) --gnu src/ipelib/shared/Makefile
 .PRECIOUS: Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
@@ -309,14 +331,42 @@ $(top_srcdir)/configure: @MAINTAINER_MODE_TRUE@ $(am__configure_deps)
 $(ACLOCAL_M4): @MAINTAINER_MODE_TRUE@ $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 $(am__aclocal_m4_deps):
+install-libLIBRARIES: $(lib_LIBRARIES)
+	@$(NORMAL_INSTALL)
+	@list='$(lib_LIBRARIES)'; test -n "$(libdir)" || list=; \
+	list2=; for p in $$list; do \
+	  if test -f $$p; then \
+	    list2="$$list2 $$p"; \
+	  else :; fi; \
+	done; \
+	test -z "$$list2" || { \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(libdir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(libdir)" || exit 1; \
+	  echo " $(INSTALL_DATA) $$list2 '$(DESTDIR)$(libdir)'"; \
+	  $(INSTALL_DATA) $$list2 "$(DESTDIR)$(libdir)" || exit $$?; }
+	@$(POST_INSTALL)
+	@list='$(lib_LIBRARIES)'; test -n "$(libdir)" || list=; \
+	for p in $$list; do \
+	  if test -f $$p; then \
+	    $(am__strip_dir) \
+	    echo " ( cd '$(DESTDIR)$(libdir)' && $(RANLIB) $$f )"; \
+	    ( cd "$(DESTDIR)$(libdir)" && $(RANLIB) $$f ) || exit $$?; \
+	  else :; fi; \
+	done
 
-clean-noinstLIBRARIES:
-	-test -z "$(noinst_LIBRARIES)" || rm -f $(noinst_LIBRARIES)
+uninstall-libLIBRARIES:
+	@$(NORMAL_UNINSTALL)
+	@list='$(lib_LIBRARIES)'; test -n "$(libdir)" || list=; \
+	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
+	dir='$(DESTDIR)$(libdir)'; $(am__uninstall_files_from_dir)
 
-libefield.a: $(libefield_a_OBJECTS) $(libefield_a_DEPENDENCIES) $(EXTRA_libefield_a_DEPENDENCIES) 
-	$(AM_V_at)-rm -f libefield.a
-	$(AM_V_AR)$(libefield_a_AR) libefield.a $(libefield_a_OBJECTS) $(libefield_a_LIBADD)
-	$(AM_V_at)$(RANLIB) libefield.a
+clean-libLIBRARIES:
+	-test -z "$(lib_LIBRARIES)" || rm -f $(lib_LIBRARIES)
+
+libshared.a: $(libshared_a_OBJECTS) $(libshared_a_DEPENDENCIES) $(EXTRA_libshared_a_DEPENDENCIES) 
+	$(AM_V_at)-rm -f libshared.a
+	$(AM_V_AR)$(libshared_a_AR) libshared.a $(libshared_a_OBJECTS) $(libshared_a_LIBADD)
+	$(AM_V_at)$(RANLIB) libshared.a
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -324,29 +374,11 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-.f.o:
-	$(AM_V_F77)$(F77COMPILE) -c -o $@ $<
+.F90.o:
+	$(AM_V_PPFC)$(PPFCCOMPILE) -c -o $@ $<
 
-.f.obj:
-	$(AM_V_F77)$(F77COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
-
-libefield_a-apex_sunloc_empirical.o: apex_sunloc_empirical.f
-	$(AM_V_F77)$(F77) $(libefield_a_FFLAGS) $(FFLAGS) -c -o libefield_a-apex_sunloc_empirical.o `test -f 'apex_sunloc_empirical.f' || echo '$(srcdir)/'`apex_sunloc_empirical.f
-
-libefield_a-apex_sunloc_empirical.obj: apex_sunloc_empirical.f
-	$(AM_V_F77)$(F77) $(libefield_a_FFLAGS) $(FFLAGS) -c -o libefield_a-apex_sunloc_empirical.obj `if test -f 'apex_sunloc_empirical.f'; then $(CYGPATH_W) 'apex_sunloc_empirical.f'; else $(CYGPATH_W) '$(srcdir)/apex_sunloc_empirical.f'; fi`
-
-libefield_a-efield_ipe.o: efield_ipe.f
-	$(AM_V_F77)$(F77) $(libefield_a_FFLAGS) $(FFLAGS) -c -o libefield_a-efield_ipe.o `test -f 'efield_ipe.f' || echo '$(srcdir)/'`efield_ipe.f
-
-libefield_a-efield_ipe.obj: efield_ipe.f
-	$(AM_V_F77)$(F77) $(libefield_a_FFLAGS) $(FFLAGS) -c -o libefield_a-efield_ipe.obj `if test -f 'efield_ipe.f'; then $(CYGPATH_W) 'efield_ipe.f'; else $(CYGPATH_W) '$(srcdir)/efield_ipe.f'; fi`
-
-libefield_a-weimer2005_ipe.o: weimer2005_ipe.f
-	$(AM_V_F77)$(F77) $(libefield_a_FFLAGS) $(FFLAGS) -c -o libefield_a-weimer2005_ipe.o `test -f 'weimer2005_ipe.f' || echo '$(srcdir)/'`weimer2005_ipe.f
-
-libefield_a-weimer2005_ipe.obj: weimer2005_ipe.f
-	$(AM_V_F77)$(F77) $(libefield_a_FFLAGS) $(FFLAGS) -c -o libefield_a-weimer2005_ipe.obj `if test -f 'weimer2005_ipe.f'; then $(CYGPATH_W) 'weimer2005_ipe.f'; else $(CYGPATH_W) '$(srcdir)/weimer2005_ipe.f'; fi`
+.F90.obj:
+	$(AM_V_PPFC)$(PPFCCOMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
 ID: $(am__tagged_files)
 	$(am__define_uniq_tagged_files); mkid -fID $$unique
@@ -434,6 +466,9 @@ check-am: all-am
 check: check-am
 all-am: Makefile $(LIBRARIES)
 installdirs:
+	for dir in "$(DESTDIR)$(libdir)"; do \
+	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
+	done
 install: install-am
 install-exec: install-exec-am
 install-data: install-data-am
@@ -466,8 +501,7 @@ maintainer-clean-generic:
 	@echo "it deletes files that may require special tools to rebuild."
 clean: clean-am
 
-clean-am: clean-generic clean-local clean-noinstLIBRARIES \
-	mostlyclean-am
+clean-am: clean-generic clean-libLIBRARIES clean-local mostlyclean-am
 
 distclean: distclean-am
 	-rm -f Makefile
@@ -492,7 +526,7 @@ install-dvi: install-dvi-am
 
 install-dvi-am:
 
-install-exec-am:
+install-exec-am: install-libLIBRARIES
 
 install-html: install-html-am
 
@@ -530,22 +564,23 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am:
+uninstall-am: uninstall-libLIBRARIES
 
 .MAKE: install-am install-strip
 
 .PHONY: CTAGS GTAGS TAGS all all-am check check-am clean clean-generic \
-	clean-local clean-noinstLIBRARIES cscopelist-am ctags ctags-am \
+	clean-libLIBRARIES clean-local cscopelist-am ctags ctags-am \
 	distclean distclean-compile distclean-generic distclean-tags \
 	distdir dvi dvi-am html html-am info info-am install \
 	install-am install-data install-data-am install-dvi \
 	install-dvi-am install-exec install-exec-am install-html \
-	install-html-am install-info install-info-am install-man \
-	install-pdf install-pdf-am install-ps install-ps-am \
-	install-strip installcheck installcheck-am installdirs \
-	maintainer-clean maintainer-clean-generic mostlyclean \
-	mostlyclean-compile mostlyclean-generic pdf pdf-am ps ps-am \
-	tags tags-am uninstall uninstall-am
+	install-html-am install-info install-info-am \
+	install-libLIBRARIES install-man install-pdf install-pdf-am \
+	install-ps install-ps-am install-strip installcheck \
+	installcheck-am installdirs maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-compile \
+	mostlyclean-generic pdf pdf-am ps ps-am tags tags-am uninstall \
+	uninstall-am uninstall-libLIBRARIES
 
 
 .PHONY: clean-modules
@@ -556,7 +591,6 @@ clean-modules:
 clean-local: clean-modules
 
 # dependencies
-libefield_a-efield_ipe.$(OBJEXT) : libefield_a-weimer2005_ipe.$(OBJEXT)
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

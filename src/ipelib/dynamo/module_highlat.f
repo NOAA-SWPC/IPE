@@ -5,7 +5,8 @@
       
       contains 
 !-----------------------------------------------------------------------
-      subroutine highlat
+      subroutine highlat(rc)
+      use ipe_error_module
       use params_module,ONLY: kmlonp1,kmlat,kmlon
       use dynamo_module,ONLY: kmlat0,phihm,potential_model
       use module_sub_heelis,ONLY: heelis
@@ -15,7 +16,9 @@
      &  ,fileLocation
       use cons_module,ONLY:xlatm_deg,xlonm_deg,pi,dtr,xlatm
       implicit none
-      integer :: i,j
+      integer,optional,intent(out) :: rc
+
+      integer :: i,j,lrc
       real*8,parameter::fill=1.0E36 !fill in value outside the boundary
       real*8 ::mlat,mlt,epot
 !   
@@ -27,6 +30,8 @@
 !  If Weimer is used, then theta0,phid etc is changed before use in aurora
 !   in dynamics.
 !
+      if (present(rc)) rc = IPE_SUCCESS
+
       if (potential_model == 'HEELIS') then
         call heelis
 
@@ -35,7 +40,9 @@
         call heelis
 
         call setmodel2005Ipe(sangle,bt,stilt,swvel,swden
-     &,fileLocation,'epot')
+     &,fileLocation,'epot',rc=lrc)
+        if (ipe_error_check(lrc,msg="call to setmodel2005Ipe failed",
+     &    rc=rc)) return
 !        mlatLoop: do j=1,kmlat0 !kmlat0=(kmlat+1)/2, from -90 to 0 SH
          mlatLoop:do j=1,kmlat
 

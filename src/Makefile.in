@@ -130,7 +130,8 @@ libipm_a_AR = $(AR) $(ARFLAGS)
 @COUPLED_TRUE@	ipelib/dynamo/*.$(OBJEXT) \
 @COUPLED_TRUE@	ipelib/empirical_efield/*.$(OBJEXT) \
 @COUPLED_TRUE@	ipelib/flip/*.$(OBJEXT) \
-@COUPLED_TRUE@	ipelib/msise00/*.$(OBJEXT)
+@COUPLED_TRUE@	ipelib/msise00/*.$(OBJEXT) \
+@COUPLED_TRUE@	ipelib/shared/*.$(OBJEXT)
 am__libipm_a_SOURCES_DIST = ipeCap.F90 ipeMethods.F90 IPE_Wrapper.F90
 @COUPLED_TRUE@am_libipm_a_OBJECTS = libipm_a-ipeCap.$(OBJEXT) \
 @COUPLED_TRUE@	libipm_a-ipeMethods.$(OBJEXT) \
@@ -362,13 +363,15 @@ SUBDIRS = ipelib .
 @COUPLED_TRUE@	ipelib/dynamo/*.$(OBJEXT) \
 @COUPLED_TRUE@	ipelib/empirical_efield/*.$(OBJEXT) \
 @COUPLED_TRUE@	ipelib/flip/*.$(OBJEXT) \
-@COUPLED_TRUE@	ipelib/msise00/*.$(OBJEXT)
+@COUPLED_TRUE@	ipelib/msise00/*.$(OBJEXT) \
+@COUPLED_TRUE@	ipelib/shared/*.$(OBJEXT)
 
 @COUPLED_TRUE@libipm_a_FCFLAGS = $(FC_MODINC) ipelib \
 @COUPLED_TRUE@	$(FC_MODINC) ipelib/dynamo \
 @COUPLED_TRUE@        $(FC_MODINC) ipelib/empirical_efield \
 @COUPLED_TRUE@        $(FC_MODINC) ipelib/flip \
-@COUPLED_TRUE@        $(FC_MODINC) ipelib/msise00
+@COUPLED_TRUE@        $(FC_MODINC) ipelib/msise00 \
+@COUPLED_TRUE@        $(FC_MODINC) ipelib/shared
 
 @COUPLED_TRUE@libipm_a_SOURCES = ipeCap.F90 ipeMethods.F90 IPE_Wrapper.F90
 @COUPLED_FALSE@ipe_x_SOURCES = IPE_Driver.F90
@@ -376,7 +379,8 @@ SUBDIRS = ipelib .
 @COUPLED_FALSE@	$(FC_MODINC) ipelib/dynamo \
 @COUPLED_FALSE@        $(FC_MODINC) ipelib/empirical_efield \
 @COUPLED_FALSE@        $(FC_MODINC) ipelib/flip \
-@COUPLED_FALSE@        $(FC_MODINC) ipelib/msise00
+@COUPLED_FALSE@        $(FC_MODINC) ipelib/msise00 \
+@COUPLED_FALSE@        $(FC_MODINC) ipelib/shared
 
 @COUPLED_FALSE@ipe_x_LDADD = $(builddir)/ipelib/libipe.a
 all: all-recursive

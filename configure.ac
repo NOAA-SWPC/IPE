@@ -204,7 +204,8 @@ AC_CONFIG_FILES([Makefile
                  src/ipelib/dynamo/Makefile
                  src/ipelib/empirical_efield/Makefile
                  src/ipelib/flip/Makefile
-                 src/ipelib/msise00/Makefile])
+                 src/ipelib/msise00/Makefile
+                 src/ipelib/shared/Makefile])
 AC_OUTPUT
 
 

@@ -5194,7 +5194,7 @@ esac
 
 
 # Output Makefiles
-ac_config_files="$ac_config_files Makefile src/Makefile src/ipelib/Makefile src/ipelib/dynamo/Makefile src/ipelib/empirical_efield/Makefile src/ipelib/flip/Makefile src/ipelib/msise00/Makefile"
+ac_config_files="$ac_config_files Makefile src/Makefile src/ipelib/Makefile src/ipelib/dynamo/Makefile src/ipelib/empirical_efield/Makefile src/ipelib/flip/Makefile src/ipelib/msise00/Makefile src/ipelib/shared/Makefile"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -5956,6 +5956,7 @@ do
     "src/ipelib/empirical_efield/Makefile") CONFIG_FILES="$CONFIG_FILES src/ipelib/empirical_efield/Makefile" ;;
     "src/ipelib/flip/Makefile") CONFIG_FILES="$CONFIG_FILES src/ipelib/flip/Makefile" ;;
     "src/ipelib/msise00/Makefile") CONFIG_FILES="$CONFIG_FILES src/ipelib/msise00/Makefile" ;;
+    "src/ipelib/shared/Makefile") CONFIG_FILES="$CONFIG_FILES src/ipelib/shared/Makefile" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac

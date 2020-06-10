@@ -3,6 +3,7 @@ MODULE IPE_Wrapper
   USE ESMF
   USE IPE_Precision
   USE IPE_Model_Class
+  USE ipe_error_module
 
   IMPLICIT NONE
 
@@ -55,9 +56,8 @@ CONTAINS
       rcToReturn=rc) ) RETURN  ! bail out
 
     ! Build IPE
-    CALL ipe % Build( init_success, mpi_comm = mpicomm )
-
-    IF( .not. init_success )THEN
+    CALL ipe % Build(mpi_comm=mpicomm, rc=localrc)
+    IF( localrc /= IPE_SUCCESS ) THEN
       CALL ESMF_LogSetError(ESMF_RC_INTNRL_BAD, msg="Error building IPE", &
         line=__LINE__, &
         file=__FILE__, &
@@ -87,11 +87,19 @@ CONTAINS
     ipe % time_tracker % elapsed_sec = 0.0_prec
 
     init_file = "IPE_State.apex."//ipe % time_tracker % DateStamp( )//".h5"
-    INQUIRE( FILE = TRIM(init_file), EXIST = file_exists )
+    INQUIRE( FILE = TRIM(init_file), EXIST = file_exists, IOSTAT = localrc )
+    IF( localrc /= 0 ) THEN
+      CALL ESMF_LogSetError(ESMF_RC_FILE_UNEXPECTED, &
+        msg="Failed to inquire file "//init_file, &
+        line=__LINE__, &
+        file=__FILE__, &
+        rcToReturn=rc)
+      RETURN
+    ENDIF
 
     IF( file_exists )THEN
-      CALL ipe % Initialize( init_file, init_success )
-      IF ( .not. init_success ) THEN
+      CALL ipe % Initialize( init_file, rc=localrc )
+      IF ( localrc /= IPE_SUCCESS ) THEN
         CALL ESMF_LogSetError(ESMF_RC_INTNRL_BAD, msg="Error initializing IPE", &
           line=__LINE__, &
           file=__FILE__, &
@@ -153,13 +161,20 @@ CONTAINS
 
     ipe % time_tracker % elapsed_sec = REAL(elapsed_s, KIND=prec)
 
-    CALL ipe % Update( )
+    CALL ipe % Update( rc=localrc )
+    IF( localrc /= IPE_SUCCESS ) THEN
+      CALL ESMF_LogSetError(ESMF_RC_INTNRL_BAD, msg="Error updating IPE", &
+        line=__LINE__, &
+        file=__FILE__, &
+        rcToReturn=rc)
+      RETURN
+    ENDIF
 
     IF( MOD( ipe % time_tracker % elapsed_sec, ipe % parameters % file_output_frequency ) == 0.0_prec )THEN
 
       hdf5_file = "IPE_State.apex."//ipe % time_tracker % DateStamp( )//".h5"
-      CALL ipe % Write( hdf5_file, error )
-      IF ( error /= 0 ) THEN
+      CALL ipe % Write( hdf5_file, rc=localrc )
+      IF( localrc /= IPE_SUCCESS ) THEN
         CALL ESMF_LogSetError(ESMF_RC_FILE_WRITE, msg="Error writing to HDF5 file "//hdf5_file, &
           line=__LINE__, &
           file=__FILE__, &
@@ -189,7 +204,14 @@ CONTAINS
       FILE=__FILE__, &
       rcToReturn=rc) ) RETURN  ! bail out
 
-    CALL ipe % Trash( )
+    CALL ipe % Trash( rc=localrc )
+    IF( localrc /= IPE_SUCCESS ) THEN
+      CALL ESMF_LogSetError(ESMF_RC_INTNRL_BAD, msg="Error finalizing IPE", &
+        line=__LINE__, &
+        file=__FILE__, &
+        rcToReturn=rc)
+      RETURN
+    ENDIF
 
     CALL ESMF_LogWrite("Finalize_IPE end:", ESMF_LOGMSG_INFO, rc=localrc)
     IF( ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &

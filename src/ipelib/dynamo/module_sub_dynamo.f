@@ -9,8 +9,9 @@
 ! BOP
 ! !IROUTINE: dynamo 
 ! !INTERFACE:
-      subroutine dynamo
+      subroutine dynamo(rc)
 !     !USES:
+      use ipe_error_module
       use params_module,only: 
      |  kmlon,  ! number of geomagnetic grid longitudes
      |  kmlonp1,! kmlon+1
@@ -57,11 +58,14 @@
 ! 
 ! EOP
 ! 
+      integer, optional, intent(out) :: rc
 ! Local:
-      integer :: i,j,jj,jjj,j0,jntl,k,n,ncc,nmaglat,nmaglon,ier
+      integer :: i,j,jj,jjj,j0,jntl,k,n,ncc,nmaglat,nmaglon,ier,lrc
       real :: sym
       real :: array(-15:kmlon0+16,kmlat0),cs(kmlat0)
       character :: fname*10,labl*56,units*12
+
+      if (present(rc)) rc = IPE_SUCCESS
      
       call transf
 !
@@ -92,7 +96,6 @@
           zigmc(i,kmlat+1-j)  = -zigmc(i,kmlat+1-j)
           zigm2(i,kmlat+1-j)  =  zigm2(i,kmlat+1-J)+zigm2(i,j)
           zigm22(i,kmlat+1-j) = (zigm22(i,kmlat+1-J)+zigm22(i,j))
-	  
           rim(i,kmlatp1-j,1)  = (rim(i,kmlat+1-j,1)+rim(i,j,1))
           rim(i,kmlatp1-j,2)  = (rim(i,kmlat+1-j,2)+rim(i,j,2))  
         enddo ! i=1,kmlonp1
@@ -200,15 +203,15 @@
 
 !
 ! Sigma_(phi lam)(0)/( 4*d lam_0* d lon )
-	zigmc(:,kmlat0) = -zigmc(:,kmlat0)
+        zigmc(:,kmlat0) = -zigmc(:,kmlat0)
         call stencmd(zigmc(1,kmlat0),kmlon0,kmlat0,cee,2)
-	zigmc(:,kmlat0) = -zigmc(:,kmlat0)
+        zigmc(:,kmlat0) = -zigmc(:,kmlat0)
 
 !
 ! Sigma_(lam phi)(0)/( 4*d lam_0* d lon )
-	zigm2(:,kmlat0) = -zigm2(:,kmlat0)
+        zigm2(:,kmlat0) = -zigm2(:,kmlat0)
         call stencmd(zigm2(1,kmlat0),kmlon0,kmlat0,cee,3)
-	zigm2(:,kmlat0) = -zigm2(:,kmlat0)
+        zigm2(:,kmlat0) = -zigm2(:,kmlat0)
 
 !
 ! isolve /= 2: original or hybrid solver (only modified stencil).
@@ -222,15 +225,15 @@
 
 !
 ! Sigma_(phi lam)(0)/( 4*d lam_0* d lon )
-	zigmc(:,kmlat0) = -zigmc(:,kmlat0)
+        zigmc(:,kmlat0) = -zigmc(:,kmlat0)
         call stencil(zigmc(1,kmlat0),kmlon0,kmlat0,cee,2)
-	zigmc(:,kmlat0) = -zigmc(:,kmlat0)
+        zigmc(:,kmlat0) = -zigmc(:,kmlat0)
 
 !
 ! Sigma_(lam phi)(0)/( 4*d lam_0* d lon )
-	zigm2(:,kmlat0) = -zigm2(:,kmlat0)
+        zigm2(:,kmlat0) = -zigm2(:,kmlat0)
         call stencil(zigm2(1,kmlat0),kmlon0,kmlat0,cee,3)
-	zigm2(:,kmlat0) = -zigm2(:,kmlat0)
+        zigm2(:,kmlat0) = -zigm2(:,kmlat0)
 
 !
       endif ! isolve
@@ -296,22 +299,37 @@
 !
       ier = 0 
       if(isolve==0) then
-        call mud(rim,jntl,isolve,ier)	 ! solver in mud.F
-        if(ier < 0 ) then 	! not converged
-	  write(6,*) 'muh: use direct solver'
-	  call muh(rim,jntl) 		! solver in mud.F
-	endif
+        call mud(rim,jntl,isolve,ier,lrc) ! solver in mud.F
+        if (ipe_error_check(lrc,msg="call to mud failed (isolve=0)",
+     &    rc=rc)) return
+        if(ier < 0) then ! not converged
+          call ipe_warning_log(
+     &      msg="mud not converged: use direct solver")
+          call muh(rim,jntl,lrc) ! solver in mud.F
+          if (ipe_error_check(lrc,msg="call to muh failed (isolve=0)",
+     &      rc=rc))
+     &      return
+        endif
       elseif (isolve==1) then
-        call muh(rim,jntl)        	! solver in muh2cr.F
+        call muh(rim,jntl,lrc)        ! solver in muh2cr.F
+        if (ipe_error_check(lrc,msg="call to muh failed (isolve=1)",
+     &    rc=rc)) return
       elseif (isolve==2) then
-        call mudmod(rim,jntl,isolve,ier)! solver in mudmod.F
-        if(ier < 0 ) then 	! not converged
-	  write(6,*) 'muh: use direct solver'
-	  call muh(rim,jntl) 		! solver in mud.F
-	endif
+        call mudmod(rim,jntl,isolve,ier,lrc)! solver in mudmod.F
+        if (ipe_error_check(lrc,msg="call to mudmod failed (isolve=2)",
+     &    rc=rc)) return
+        if(ier < 0) then ! not converged
+          call ipe_warning_log(
+     &      msg="mud not converged: use direct solver")
+          call muh(rim,jntl,lrc) ! solver in mud.F
+          if (ipe_error_check(lrc,msg="call to muh failed (isolve=2)",
+     &      rc=rc))
+     &      return
+        endif
       else
-        write(6,*) 'dynamo: solver type ',isolve,' not implemented.'
-        stop 'isolve'
+        call ipe_error_set(msg='dynamo: solver type not implemented.',
+     &    rc=rc)
+        return
       endif
 !
 ! Copy output potential from rim to phim(kmlonp1,kmlat):
