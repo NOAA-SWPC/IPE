@@ -24,16 +24,12 @@ CONTAINS
     TYPE(ESMF_VM), OPTIONAL              :: vm
     INTEGER,       OPTIONAL, INTENT(OUT) :: rc
     ! Local
-    LOGICAL               :: init_success
     LOGICAL               :: file_exists
     INTEGER               :: localrc
-    INTEGER               :: year, month, day, hour, minute, second
-    INTEGER               :: mpicomm, mpierr
-    INTEGER(ESMF_KIND_I4) :: mm, dd, h, m, s
-    INTEGER(ESMF_KIND_I4) :: yystop, mmstop, ddstop, hstop, mstop, sstop
+    INTEGER               :: mpicomm
     CHARACTER(LEN=30)     :: init_file
     TYPE(ESMF_VM)         :: vm_IPE
-    TYPE(ESMF_Time)       :: currTime
+    TYPE(ESMF_Time)       :: currTime, startTime
 
     ! begin
     IF (PRESENT(rc)) rc = ESMF_SUCCESS
@@ -69,22 +65,17 @@ CONTAINS
     ipe % forcing % coupled = .true.
 
     ! Set IPE internal clock
-    CALL ESMF_ClockGet(clock, currTime=currTime, rc=localrc)
+    CALL ESMF_ClockGet(clock, startTime=startTime, currTime=currTime, rc=localrc)
     IF( ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       FILE=__FILE__, &
       rcToReturn=rc) ) RETURN  ! bail out
 
-    CALL ESMF_TimeGet(currTime, yy=year, mm=month, dd=day, &
-      h=hour, m=minute, s=second, rc=localrc)
+    CALL IPE_SetClock( ipe, currTime, startTime, localrc )
     IF( ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       FILE=__FILE__, &
       rcToReturn=rc) ) RETURN  ! bail out
-
-    CALL ipe % time_tracker % Set_Date( year, month, day )
-    CALL ipe % time_tracker % Set_HourMinute( hour, minute )
-    ipe % time_tracker % elapsed_sec = 0.0_prec
 
     init_file = "IPE_State.apex."//ipe % time_tracker % DateStamp( )//".h5"
     INQUIRE( FILE = TRIM(init_file), EXIST = file_exists, IOSTAT = localrc )
@@ -126,40 +117,25 @@ CONTAINS
     INTEGER, OPTIONAL, INTENT(OUT) :: rc
      ! Local
     TYPE(ESMF_Time)         :: currTime, startTime
-    TYPE(ESMF_TimeInterval) :: elapsedTime
-    REAL(ESMF_KIND_R8)      :: elapsed_s
+    TYPE(ESMF_TimeInterval) :: timeStep
     INTEGER                 :: localrc
-    INTEGER                 :: error
-    INTEGER                 :: year, month, day, hour, minute, second
     CHARACTER(LEN=30)       :: hdf5_file
 
     ! begin
     IF (PRESENT(rc)) rc = ESMF_SUCCESS
 
-    CALL ESMF_ClockGet(clock, startTime=startTime, currTime=currTime, rc=localrc)
+    CALL ESMF_ClockGet(clock, startTime=startTime, currTime=currTime, &
+      timeStep=timeStep, rc=localrc)
     IF( ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       FILE=__FILE__, &
       rcToReturn=rc) ) RETURN  ! bail out
 
-    CALL ESMF_TimeGet(currtime, yy=year, mm=month, dd=day, &
-      h=hour, m=minute, s=second, rc=localrc)
+    CALL IPE_SetClock( ipe, currTime, startTime, localrc )
     IF( ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       FILE=__FILE__, &
       rcToReturn=rc) ) RETURN  ! bail out
-
-    CALL ipe % time_tracker % Set_Date( year, month, day )
-    CALL ipe % time_tracker % Set_HourMinute( hour, minute )
-
-    elapsedTime = currTime - startTime
-    CALL ESMF_TimeIntervalGet(elapsedTime, s_r8=elapsed_s, rc=localrc)
-    IF( ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      FILE=__FILE__, &
-      rcToReturn=rc) ) RETURN  ! bail out
-
-    ipe % time_tracker % elapsed_sec = REAL(elapsed_s, KIND=prec)
 
     CALL ipe % Update( rc=localrc )
     IF( localrc /= IPE_SUCCESS ) THEN
@@ -169,6 +145,13 @@ CONTAINS
         rcToReturn=rc)
       RETURN
     ENDIF
+
+    currTime = currTime + timeStep
+    CALL IPE_SetClock( ipe, currTime, startTime, localrc )
+    IF( ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      FILE=__FILE__, &
+      rcToReturn=rc) ) RETURN  ! bail out
 
     IF( MOD( ipe % time_tracker % elapsed_sec, ipe % parameters % file_output_frequency ) == 0.0_prec )THEN
 
@@ -219,6 +202,42 @@ CONTAINS
       FILE=__FILE__, &
       rcToReturn=rc) ) RETURN  ! bail out
 
- END SUBROUTINE Finalize_IPE
+  END SUBROUTINE Finalize_IPE
+
+
+  SUBROUTINE IPE_SetClock( ipe, currTime, startTime, rc )
+
+    TYPE(IPE_Model)              :: ipe
+    TYPE(ESMF_Time), INTENT(IN)  :: currTime
+    TYPE(ESMF_Time), INTENT(IN)  :: startTime
+    INTEGER,         INTENT(OUT) :: rc
+
+    ! local variables
+    INTEGER                 :: year, month, day, hour, minute, second
+    REAL(ESMF_KIND_R8)      :: elapsed_s
+    TYPE(ESMF_TimeInterval) :: elapsedTime
+
+
+    ! begin
+    rc = ESMF_SUCCESS
+
+    CALL ESMF_TimeGet(currTime, yy=year, mm=month, dd=day, &
+      h=hour, m=minute, s=second, rc=rc)
+    IF( ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      FILE=__FILE__) ) RETURN  ! bail out
+
+    CALL ipe % time_tracker % Set_Date( year, month, day )
+    CALL ipe % time_tracker % Set_HourMinute( hour, minute )
+
+    elapsedTime = currTime - startTime
+    CALL ESMF_TimeIntervalGet(elapsedTime, s_r8=elapsed_s, rc=rc)
+    IF( ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      FILE=__FILE__) ) RETURN  ! bail out
+
+    ipe % time_tracker % elapsed_sec = REAL(elapsed_s, KIND=prec)
+
+  END SUBROUTINE IPE_SetClock
 
 END MODULE IPE_Wrapper
