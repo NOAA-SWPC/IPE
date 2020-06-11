@@ -565,9 +565,16 @@ C.... Written by P. Richards June-September 2010.
       sza_south = sza(jmax - 4) * 180.0 / 3.14159
 
       IF(sza_north.LT.103.0.OR.sza_south.LT.103.0) then
+! 
+! flux tube 158 has an apex height of 127.6
+! that's the last one we call photoelectrons on...
+!
+      if(lp.le.158) then
 
       CALL PE2S(F107,F107A,N,temp_ti_te,FPAS,electron_density,UVFAC,
      >          COLUM,IHEPLS,INPLS,INNO,mp,lp)
+
+      endif
 
       ENDIF
 
