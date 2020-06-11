@@ -329,7 +329,7 @@ C........no+
 C::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
       SUBROUTINE CO2P(J,I,JP,Z,RTS,ON,O2N,N2N,NE,P1
      > ,O2P,TPROD5,OPLS,OP2D,N2PLS,NPLUS,N4S,NNO,OP2P,
-     > mp,ilp)
+     > mp,ilp,icall,its)
 C........o2+
       IMPLICIT DOUBLE PRECISION(A-H,L,N-Z)
       DIMENSION RTS(99),LR(22),PR(22)

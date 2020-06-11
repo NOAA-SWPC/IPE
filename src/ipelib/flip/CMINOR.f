@@ -86,8 +86,9 @@ C....... Sep 1989
 ! GHGM
 !     ZNE=XIONN(1,J)+XIONN(2,J)
       ZNESAV=ZNE
+
       CALL CO2P(J,0,0,Z(J),RTS,ON(J),O2N(J),N2N(J),ZNE,PO2P,DO2P
-     > ,TOTO2I,N(1,J),OP2D,N2PLUS,NPLUS,N4S(J),NNO(J),OP2P,mp,lp)
+     > ,TOTO2I,N(1,J),OP2D,N2PLUS,NPLUS,N4S(J),NNO(J),OP2P,mp,lp,0,0)
 
       !.. .... no+
       CALL CNOP(J,0,0,Z(J),RTS,ON(J),O2N(J),N2N(J),ZNE,PNOP
@@ -121,7 +122,7 @@ C....... Sep 1989
       !...... o2+
       CALL CO2P(J,0,0,Z(J),RTS,ON(J),O2N(J),N2N(J),ZNE,PO2P
      > ,O2PLUS,TOTO2I,N(1,J),OP2D,N2PLUS,NPLUS,N4S(J)
-     > ,NNO(J),OP2P,mp,lp)
+     > ,NNO(J),OP2P,mp,lp,1,its)
 
       !...... no+
       CALL CNOP(J,0,0,Z(J),RTS,ON(J),O2N(J),N2N(J),ZNE,PNOP
@@ -274,7 +275,7 @@ C....... Sep 1989
 
       IF(I.EQ.13) CALL CO2P(J,ID,JP,Z(J),RTS,ON(J),O2N(J),N2N(J),ZNE
      > ,PO2P,O2PLUS,TOTO2I,N(1,J),OP2D,N2PLUS,NPLUS,N4S(J)
-     > ,NNO(J),OP2P,mp,lp)
+     > ,NNO(J),OP2P,mp,lp,2,0)
 
       IF(I.EQ.14) THEN
         EUVP4S=EUVION(1,7,J)
