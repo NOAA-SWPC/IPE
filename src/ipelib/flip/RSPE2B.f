@@ -278,32 +278,41 @@ C////////////main calculations  begin here ////////////
 
       DO j_low_N=JMIN,j120N
 
-       j_low_S=2*j_apex-j_low_N
+! GHGM - not this definition - Southern loop below...
+!      j_low_S=2*j_apex-j_low_N
 
        PHIDWN(j_low_N)=(.5*PRED(j_low_N)+PRODWN(I_energy,j_low_N))/
      >                 (T2(j_low_N)-T1(j_low_N))
-       PHIDWN(j_low_S)=(.5*PRED(j_low_S)+PRODWN(I_energy,j_low_S))/
-     >                 (T2(j_low_S)-T1(j_low_S))
        PHIUP(j_low_N)=PHIDWN(j_low_N)
-       PHIUP(j_low_S)=PHIDWN(j_low_S)
 
        if(phidwn(j_low_N).lt.0.0) then
          write(6,255) mp,lp,j_low_n,z(j_low_n),phidwn(j_low_n)
+         write(6,*) i_energy,PRED(j_low_N),PRODWN(I_energy,j_low_N),
+     >              T2(j_low_N),T1(j_low_N)                             
          phidwn(j_low_N) = 0.0
-       endif
-       if(phidwn(j_low_S).lt.0.0) then
-         write(6,256) mp,lp,j_low_s,z(j_low_s),phidwn(j_low_s)
-         phidwn(j_low_S) = 0.0
        endif
        if(phiup(j_low_N).lt.0.0) then
          write(6,257) mp,lp,j_low_n,z(j_low_n),phiup(j_low_n)
          phiup(j_low_N) = 0.0
        endif
+
+      ENDDO
+
+      DO j_low_S=JMAX,j120S,-1
+
+       PHIDWN(j_low_S)=(.5*PRED(j_low_S)+PRODWN(I_energy,j_low_S))/
+     >                 (T2(j_low_S)-T1(j_low_S))
+       PHIUP(j_low_S)=PHIDWN(j_low_S)
+       if(phidwn(j_low_S).lt.0.0) then
+         write(6,256) mp,lp,j_low_s,z(j_low_s),phidwn(j_low_s)
+         write(6,*) i_energy,PRED(j_low_S),PRODWN(I_energy,j_low_S),
+     >              T2(j_low_S),T1(j_low_S)                             
+         phidwn(j_low_S) = 0.0
+       endif
        if(phiup(j_low_S).lt.0.0) then
          write(6,258) mp,lp,j_low_s,z(j_low_s),phiup(j_low_s)
          phiup(j_low_S) = 0.0
        endif
-
       ENDDO
 
  255  format('GHGM PHIDWN -VE North ',3i6,f10.1,e12.4)
