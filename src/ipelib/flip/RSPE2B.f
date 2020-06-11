@@ -289,15 +289,19 @@ C////////////main calculations  begin here ////////////
 
        if(phidwn(j_low_N).lt.0.0) then
          write(6,255) mp,lp,j_low_n,z(j_low_n),phidwn(j_low_n)
+         phidwn(j_low_N) = 0.0
        endif
        if(phidwn(j_low_S).lt.0.0) then
          write(6,256) mp,lp,j_low_s,z(j_low_s),phidwn(j_low_s)
+         phidwn(j_low_S) = 0.0
        endif
        if(phiup(j_low_N).lt.0.0) then
          write(6,257) mp,lp,j_low_n,z(j_low_n),phiup(j_low_n)
+         phiup(j_low_N) = 0.0
        endif
        if(phiup(j_low_S).lt.0.0) then
          write(6,258) mp,lp,j_low_s,z(j_low_s),phiup(j_low_s)
+         phiup(j_low_S) = 0.0
        endif
 
       ENDDO
