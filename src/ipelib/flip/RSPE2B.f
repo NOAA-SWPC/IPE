@@ -274,7 +274,7 @@ C////////////main calculations  begin here ////////////
 
       DO J=JMIN,JMAX
         if(PRODUP(I_energy,J).lt.0.0) PRODUP(I_energy,J)=0.0
-        if(PRODUP(I_energy,J).lt.0.0) PRODUP(I_energy,J)=0.0
+        if(PRODWN(I_energy,J).lt.0.0) PRODWN(I_energy,J)=0.0
       ENDDO
 
       !..   fluxes in local equil and set boundary conditions on fluxes
