@@ -272,6 +272,10 @@ C////////////main calculations  begin here ////////////
         ENDDO
       ENDDO
 
+      DO J=JMIN,JMAX
+        if(PRODUP(I_energy,J).lt.0.0) PRODUP(I_energy,J)=0.0
+        if(PRODUP(I_energy,J).lt.0.0) PRODUP(I_energy,J)=0.0
+      ENDDO
 
       !..   fluxes in local equil and set boundary conditions on fluxes
       ! low here refers to points from 90km to 120km (N and S)
