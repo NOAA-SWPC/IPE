@@ -917,6 +917,7 @@ CONTAINS
     INTEGER    :: lp_min, mp_min, isouth, inorth, ii, ispecial
     INTEGER    :: mp, lp, i, lpx, mpx, jth
     INTEGER    :: i_min(1:2)
+    INTEGER    :: i_convection_too_far_in_lp
     REAL(prec), PARAMETER :: rad_to_deg = 57.295779513
 
       CALL plasma % Calculate_Pole_Values( grid,                       &
@@ -932,6 +933,8 @@ CONTAINS
 
       DO 100 mp = plasma % mp_low, plasma % mp_high
         DO 200 lp = 1, perp_transport_max_lp
+
+          i_convection_too_far_in_lp = 0
 
           phi_t0   = grid % magnetic_longitude(mp) - v_ExB(1,lp,mp)*time_step/(r*sin( colat_90km(lp) ) )
 
@@ -1005,17 +1008,17 @@ CONTAINS
           ENDIF
 
           IF( lp_min == 0 )THEN
-            write(6,*) 'GHGM Still didnt get it trying again AGAIN ', mp , lp
+!           write(6,*) 'GHGM Still didnt get it trying again AGAIN ', mp , lp
 
             if((lp.ge.5).and.(lp.le.grid % NLP - 4)) then ! Make sure lp is within bounds                   
 
             IF( theta_t0 <= colat_90km(lp-3) .AND. theta_t0 >= colat_90km(lp-4) )THEN
               lp_min = lp - 3
-              write(6,*) 'GHGM 4 poleward ', mp , lp
+!             write(6,*) 'GHGM 4 poleward ', mp , lp
             ! Check equatorward
             ELSEIF( theta_t0 <= colat_90km(lp+4) .AND. theta_t0 >= colat_90km(lp+3) )THEN
               lp_min = lp + 4
-              write(6,*) 'GHGM 4 equatorward ', mp , lp
+!             write(6,*) 'GHGM 4 equatorward ', mp , lp
             ENDIF
 
           endif ! Make sure lp is within bounds
@@ -1023,7 +1026,8 @@ CONTAINS
           ENDIF
 
           IF( lp_min == 0 )THEN
-            write(6,*) 'GHGM OK I GIVE UP ', mp , lp
+            i_convection_too_far_in_lp = 1
+            write(6,*) 'GHGM convection too far ', mp , lp
           ENDIF
 
 ! GHGM - check that lp_min is not greater than NLP
@@ -1040,8 +1044,17 @@ CONTAINS
 !           lp_min = 2
 !         ENDIF
 
-          lp_t0(1) = lp_min-1
-          lp_t0(2) = lp_min
+          if(i_convection_too_far_in_lp.eq.1) then
+! Very rare problem where convection in lp is greater than +-4 - for this case
+! we set both lp indexes to just lp which means there will be no lp convection
+! for this tube
+            lp_t0(1) = lp
+            lp_t0(2) = lp
+          else
+! The normal situation... 
+            lp_t0(1) = lp_min-1
+            lp_t0(2) = lp_min
+          endif
 
           IF( phi_t0 <= grid % magnetic_longitude(mp) .AND. phi_t0 >= grid % magnetic_longitude(mp-1) )THEN
             mp_min = mp
