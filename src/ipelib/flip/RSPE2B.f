@@ -879,7 +879,7 @@ C......  And Wilkes, Applied Numerical Methods, Wiley, 1969, page 446
      >           mp,lp,i_which_call,ie)
       IMPLICIT NONE
       INTEGER J,FLDIM,K,NUM,LAST,FIRST,FIRSTP1,mp,lp,
-     >        i_which_call,ie
+     >        i_which_call,ie,ifail
       REAL A(FLDIM),B(FLDIM),C(FLDIM),D(FLDIM)
       REAL ALPHA(FLDIM),DELTA(FLDIM),GAMMA1(FLDIM)
       !..  COMPUTE INTERMEDIATE ARRAYS ALPHA & GAMMA
@@ -891,17 +891,31 @@ C......  And Wilkes, Applied Numerical Methods, Wiley, 1969, page 446
         GAMMA1(J)=(D(J)-A(J)*GAMMA1(J-1))/ALPHA(J)
       ENDDO
 
+      ifail = 0
+
       !..  COMPUTE FINAL SOLUTION VECTOR V
       DELTA(LAST)=GAMMA1(LAST)
       NUM=LAST-FIRST
       DO K=1,NUM
         J=LAST-K
         DELTA(J)=GAMMA1(J)-C(J)*DELTA(J+1)/ALPHA(J)
-        if(isnan(delta(j))) write(6,7777) mp,lp,k,j,num,
+        if(isnan(delta(j))) then 
+          write(6,7777) mp,lp,k,j,num,
      >    first,last,i_which_call,
      >    GAMMA1(J),C(J),DELTA(J+1),ALPHA(J),ie
- 7777 format('nan GHGM tridiagonal solver ',8i6,4e12.4,i6)
+ 7777     format('GHGM tridiagonal solver ',8i6,4e12.4,i6)
+          ifail = 1
+          exit
+        endif
       ENDDO
+
+      if(ifail.eq.1) then
+        DO K=1,NUM
+        J=LAST-K
+        delta(j) = 0.0
+        ENDDO
+      endif
+
         RETURN
         END
 C::::::::::::::::::::: T_XS_N2 :::::::::::::::::::::::::::
