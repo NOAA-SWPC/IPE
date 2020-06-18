@@ -199,6 +199,7 @@ CONTAINS
     INTEGER, OPTIONAL,            INTENT(out)   :: rc
     ! Local
     INTEGER :: lp, mp, localrc
+    INTEGER :: elapsed_hours, elapsed_minutes
     REAL(prec) :: max_v_exb_local
     REAL(prec) :: max_v_exb
 #ifdef HAVE_MPI
@@ -213,7 +214,14 @@ CONTAINS
       IF ( ipe_error_check(localrc, msg="call to Dynamo_Wrapper failed", &
         line=__LINE__, file=__FILE__, rc=rc) ) RETURN
       IF( mpi_layer % rank_id == 0 )THEN
-        print *,'Dynamo E field ', int(time_tracker % elapsed_sec / 60), ' mins UT'
+        elapsed_hours = int(time_tracker % elapsed_sec / 3660)
+        elapsed_minutes = (int(time_tracker % elapsed_sec / 60)) - (elapsed_hours * 60)                                                              
+       write(6,*) '*********************************'
+        print *,'peee Calling Dynamo E field, elapsed time = ', elapsed_hours, elapsed_minutes, &
+                int(time_tracker % elapsed_sec / 60)
+        write(798,*) 'peee Calling Dynamo E field, elapsed time = ', elapsed_hours, elapsed_minutes, &
+                int(time_tracker % elapsed_sec / 60)
+       write(6,*) '*********************************'
       ENDIF
 
     ELSE

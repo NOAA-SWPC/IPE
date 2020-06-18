@@ -234,6 +234,7 @@
       sinpm(:) = sin(phim(:))
 !
       z = 0.
+      skip=0
       do j=1,csize
          if (skip == 1) then
             skip = 0
@@ -286,6 +287,7 @@
       sinpm(:) = sin(phim(:))
 !     
       z = 0.
+      skip=0
       jloop: do j=1,csize
       if (skip == 1) then
          skip = 0
@@ -357,6 +359,7 @@
 
          prevth0 = th0
          nlms = 0.              ! whole array init 
+         skip=0
          do j=1,csize
             if (skip == 1) then
                skip = 0

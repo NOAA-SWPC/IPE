@@ -566,13 +566,22 @@ C.... Written by P. Richards June-September 2010.
 
       IF(sza_north.LT.103.0.OR.sza_south.LT.103.0) then
 
+! flux tube 158 has an apex height of 127.6
+! that's the last one we call photoelectrons on...
+!
+! GHGM - had an issue at 158 - trying 156 as the max
+!
+      IF(lp.LE.158) THEN
+
       CALL PE2S(F107,F107A,N,temp_ti_te,FPAS,electron_density,UVFAC,
      >          COLUM,IHEPLS,INPLS,INNO,mp,lp)
 
       ENDIF
 
+      ENDIF
+
       !-- Sum the EUV, photoelectron, and auroral production rate
-      CALL SUMPRD(JMIN,JMAX,AUR_PROD)
+      CALL SUMPRD(JMIN,JMAX,AUR_PROD,mp,lp)
 
       !.. Loop to calculate O+(4S) total ionization rate
       !.. PHION=total O+(4S) prod, including EUV, e*, dissoc of O2 and
@@ -627,7 +636,7 @@ C.... Written by P. Richards June-September 2010.
 !     ENDDO
 !2345 continue
 !     if(test_te.eq.1) then
-!!     write(6,*) 'GHGM TE greater than 5000K, resetting ',mp,lp
+!      write(6,*) 'GHGM TE greater than 5000K, resetting ',mp,lp
 !     DO J=JMIN,JMAX
 !       temp_ti_te(3,J)=904.0*DLOG(z(j))-3329.0
 !       IF(temp_ti_te(3,J).GT.3000.) temp_ti_te(3,J)=3000.
