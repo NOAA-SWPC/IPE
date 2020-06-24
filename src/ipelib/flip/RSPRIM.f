@@ -275,8 +275,6 @@ C      qiont !units number/m3/s
          EUVION(2,7,J)= EUVION(2,1,J)+EUVION(2,2,J)+EUVION(2,3,J)
          PEPION(2,7,J)= PEPION(2,1,J)+PEPION(2,2,J)+PEPION(2,3,J)
          PAUION(2,7,J)= PAUION(2,1,J)+PAUION(2,2,J)+PAUION(2,3,J)
-         if((mp.eq.17).and.(lp.eq.31).and.(j.eq.40))write(6,*)'yag ',
-     >     EUVION(2,7,J),PEPION(2,7,J),PAUION(2,7,J)
 
          EUVION(3,7,J)= EUVION(3,1,J)+EUVION(3,2,J)+EUVION(3,3,J)
          PEPION(3,7,J)= PEPION(3,1,J)+PEPION(3,2,J)+PEPION(3,3,J)

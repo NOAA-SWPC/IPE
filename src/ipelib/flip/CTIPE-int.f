@@ -572,7 +572,6 @@ C.... Written by P. Richards June-September 2010.
 ! GHGM - had an issue at 158 - trying 156 as the max
 !
       if(lp.le.158) then
-!     if(lp.le.156) then
 
       CALL PE2S(F107,F107A,N,temp_ti_te,FPAS,electron_density,UVFAC,
      >          COLUM,IHEPLS,INPLS,INNO,mp,lp)

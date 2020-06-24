@@ -286,6 +286,7 @@ CONTAINS
 
 #endif
 
+
         CALL plasma % Cross_Flux_Tube_Transport( grid, v_ExB, transport_time_step2, mpi_layer )
 
       ENDDO
@@ -294,6 +295,12 @@ CONTAINS
                                            neutrals, &
                                            forcing, &
                                            time_tracker )
+
+       if (mpi_layer % rank_id.eq.0) then
+       write(6,899) time_tracker % year, time_tracker % month, time_tracker % day, &       
+                    time_tracker % hour, time_tracker % minute
+ 899   format('Calling Plasma         ', i4,x,i2.2,x,i2.2,2x,i2.2,':'i2.2)
+       endif
 
       CALL plasma % FLIP_Wrapper( grid,         &
                                   neutrals,     &
@@ -917,7 +924,7 @@ CONTAINS
     INTEGER    :: lp_min, mp_min, isouth, inorth, ii, ispecial
     INTEGER    :: mp, lp, i, lpx, mpx, jth
     INTEGER    :: i_min(1:2)
-    INTEGER    :: i_convection_too_far_in_lp
+    LOGICAL    :: i_convection_too_far_in_lp
     REAL(prec), PARAMETER :: rad_to_deg = 57.295779513
 
       CALL plasma % Calculate_Pole_Values( grid,                       &
@@ -934,7 +941,7 @@ CONTAINS
       DO 100 mp = plasma % mp_low, plasma % mp_high
         DO 200 lp = 1, perp_transport_max_lp
 
-          i_convection_too_far_in_lp = 0
+          i_convection_too_far_in_lp = .FALSE.
 
           phi_t0   = grid % magnetic_longitude(mp) - v_ExB(1,lp,mp)*time_step/(r*sin( colat_90km(lp) ) )
 
@@ -971,18 +978,15 @@ CONTAINS
           ENDIF
 
           IF( lp_min == 0 )THEN
-!           write(6,*) 'GHGM Need to expand search ', mp , lp
 
             if((lp.ge.3).and.(lp.le.grid % NLP - 2)) then ! Make sure lp is within bounds                   
 
             ! Check poleward
             IF( theta_t0 <= colat_90km(lp-1) .AND. theta_t0 >= colat_90km(lp-2) )THEN
               lp_min = lp - 1
-!             write(6,*) 'GHGM 2 poleward ', mp , lp
             ! Check equatorward
             ELSEIF( theta_t0 <= colat_90km(lp+2) .AND. theta_t0 >= colat_90km(lp+1) )THEN
               lp_min = lp + 2
-!             write(6,*) 'GHGM 2 equatorward ', mp , lp
             ENDIF
 
           endif ! Make sure lp is within bounds
@@ -990,17 +994,14 @@ CONTAINS
           ENDIF
 
           IF( lp_min == 0 )THEN
-!           write(6,*) 'GHGM Still didnt get it trying again ', mp , lp
 
             if((lp.ge.4).and.(lp.le.grid % NLP - 3)) then ! Make sure lp is within bounds                   
 
             IF( theta_t0 <= colat_90km(lp-2) .AND. theta_t0 >= colat_90km(lp-3) )THEN
               lp_min = lp - 2
-!             write(6,*) 'GHGM 3 poleward ', mp , lp
             ! Check equatorward
             ELSEIF( theta_t0 <= colat_90km(lp+3) .AND. theta_t0 >= colat_90km(lp+2) )THEN
               lp_min = lp + 3
-!             write(6,*) 'GHGM 3 equatorward ', mp , lp
             ENDIF
 
           endif ! Make sure lp is within bounds
@@ -1008,17 +1009,14 @@ CONTAINS
           ENDIF
 
           IF( lp_min == 0 )THEN
-!           write(6,*) 'GHGM Still didnt get it trying again AGAIN ', mp , lp
 
             if((lp.ge.5).and.(lp.le.grid % NLP - 4)) then ! Make sure lp is within bounds                   
 
             IF( theta_t0 <= colat_90km(lp-3) .AND. theta_t0 >= colat_90km(lp-4) )THEN
               lp_min = lp - 3
-!             write(6,*) 'GHGM 4 poleward ', mp , lp
             ! Check equatorward
             ELSEIF( theta_t0 <= colat_90km(lp+4) .AND. theta_t0 >= colat_90km(lp+3) )THEN
               lp_min = lp + 4
-!             write(6,*) 'GHGM 4 equatorward ', mp , lp
             ENDIF
 
           endif ! Make sure lp is within bounds
@@ -1026,7 +1024,7 @@ CONTAINS
           ENDIF
 
           IF( lp_min == 0 )THEN
-            i_convection_too_far_in_lp = 1
+            i_convection_too_far_in_lp = .TRUE.
             write(6,*) 'GHGM convection too far ', mp , lp
           ENDIF
 
@@ -1044,7 +1042,7 @@ CONTAINS
 !           lp_min = 2
 !         ENDIF
 
-          if(i_convection_too_far_in_lp.eq.1) then
+          if(i_convection_too_far_in_lp) then
 ! Very rare problem where convection in lp is greater than +-4 - for this case
 ! we set both lp indexes to just lp which means there will be no lp convection
 ! for this tube
