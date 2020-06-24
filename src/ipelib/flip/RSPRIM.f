@@ -227,14 +227,13 @@ C.... P. Richards March 2011
       END
 C:::::::::::::::::::::::::: SUMPRD :::::::::::::::::::::::::
 C..... Sum the EUV, PE, and AUR production
-      SUBROUTINE SUMPRD(JMIN,JMAX
-     &,qiont !units number/m3/s
-     &)
+      SUBROUTINE SUMPRD(JMIN,JMAX,qiont,mp,lp)
+C      qiont !units number/m3/s
       !..EUVION PEXCIT PEPION OTHPR1 OTHPR2 SUMION SUMEXC PAUION PAUEXC NPLSPRD
       USE PRODUCTION !.. EUV, photoelectron, and auroral production
       INTEGER,INTENT(IN) :: JMIN,JMAX
       REAL*8,dimension(3,JMIN:JMAX),INTENT(IN) :: qiont !1:O,2:O2,3:N2 !units number/m3/s
-      INTEGER :: J,IS,IK
+      INTEGER :: J,IS,IK,mp,lp
       !--- Branching ratios for ion states were updated Sep 91 by P. Richards
       !--- N2+ from Doering and Goembel, JGR 1991, page 16025. fraction of
       !--- N+ from Richards and Torr JGR 1985, page 9917. fraction of O+ from

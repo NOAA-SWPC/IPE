@@ -224,13 +224,11 @@ CONTAINS
     INTEGER :: mpiError
 #endif
 
-! GHGM no transport for first call .....
-      if(time_tracker % utime.gt.0.00001) then
       CALL plasma % Test_Transport_Time_step( grid, v_ExB, time_step, mpi_layer, &
                                               max_transport_convection_ratio_local )
-!     write(6,7999) mpi_layer % rank_id , grid % mp_low, grid % mp_high, max_transport_convection_ratio_local, &
+!     write(6,7999) time_tracker % utime, mpi_layer % rank_id , grid % mp_low, grid % mp_high, max_transport_convection_ratio_local, &
 !                                          v_ExB(1,5:7,grid % mp_low), v_ExB(2,5:7,grid % mp_high)     
-!7999 format('GHGM convect ratio ', 3i4 , f12.1, 6e10.2)
+!7999 format('GHGM convect ratio ', f7.1, 3i4 , f12.1, 6e10.2)
 
 #ifdef HAVE_MPI
       CALL MPI_ALLREDUCE( max_transport_convection_ratio_local, &
@@ -288,16 +286,21 @@ CONTAINS
 
 #endif
 
+
         CALL plasma % Cross_Flux_Tube_Transport( grid, v_ExB, transport_time_step2, mpi_layer )
 
       ENDDO
-! GHGM no transport for first call .....
-      endif  ! if(time_tracker % utime.gt.0.00001) then
 
       CALL plasma % Auroral_Precipitation( grid, &
                                            neutrals, &
                                            forcing, &
                                            time_tracker )
+
+       if (mpi_layer % rank_id.eq.0) then
+       write(6,899) time_tracker % year, time_tracker % month, time_tracker % day, &       
+                    time_tracker % hour, time_tracker % minute
+ 899   format('Calling Plasma         ', i4,x,i2.2,x,i2.2,2x,i2.2,':'i2.2)
+       endif
 
       CALL plasma % FLIP_Wrapper( grid,         &
                                   neutrals,     &
@@ -915,11 +918,13 @@ CONTAINS
     REAL(prec) :: r, B_int, max_phi, ksi_fac
     REAL(prec) :: B(1:2,1:2), velocity(1:n_conv_spec,1:2,1:2), density(1:n_conv_spec,1:2,1:2), temperature(1:2,1:2), e_temperature(1:2,1:2)
     REAL(prec) :: coslam, sinim
+    REAL(prec) :: z , z_factor
     INTEGER    :: lp_t0(1:2)
     INTEGER    :: mp_t0(1:2)
     INTEGER    :: lp_min, mp_min, isouth, inorth, ii, ispecial
     INTEGER    :: mp, lp, i, lpx, mpx, jth
     INTEGER    :: i_min(1:2)
+    LOGICAL    :: i_convection_too_far_in_lp
     REAL(prec), PARAMETER :: rad_to_deg = 57.295779513
 
       CALL plasma % Calculate_Pole_Values( grid,                       &
@@ -935,6 +940,8 @@ CONTAINS
 
       DO 100 mp = plasma % mp_low, plasma % mp_high
         DO 200 lp = 1, perp_transport_max_lp
+
+          i_convection_too_far_in_lp = .FALSE.
 
           phi_t0   = grid % magnetic_longitude(mp) - v_ExB(1,lp,mp)*time_step/(r*sin( colat_90km(lp) ) )
 
@@ -971,18 +978,15 @@ CONTAINS
           ENDIF
 
           IF( lp_min == 0 )THEN
-            write(6,*) 'GHGM Need to expand search ', mp , lp
 
             if((lp.ge.3).and.(lp.le.grid % NLP - 2)) then ! Make sure lp is within bounds                   
 
             ! Check poleward
             IF( theta_t0 <= colat_90km(lp-1) .AND. theta_t0 >= colat_90km(lp-2) )THEN
               lp_min = lp - 1
-              write(6,*) 'GHGM 2 poleward ', mp , lp
             ! Check equatorward
             ELSEIF( theta_t0 <= colat_90km(lp+2) .AND. theta_t0 >= colat_90km(lp+1) )THEN
               lp_min = lp + 2
-              write(6,*) 'GHGM 2 equatorward ', mp , lp
             ENDIF
 
           endif ! Make sure lp is within bounds
@@ -990,17 +994,14 @@ CONTAINS
           ENDIF
 
           IF( lp_min == 0 )THEN
-            write(6,*) 'GHGM Still didnt get it trying again ', mp , lp
 
             if((lp.ge.4).and.(lp.le.grid % NLP - 3)) then ! Make sure lp is within bounds                   
 
             IF( theta_t0 <= colat_90km(lp-2) .AND. theta_t0 >= colat_90km(lp-3) )THEN
               lp_min = lp - 2
-              write(6,*) 'GHGM 3 poleward ', mp , lp
             ! Check equatorward
             ELSEIF( theta_t0 <= colat_90km(lp+3) .AND. theta_t0 >= colat_90km(lp+2) )THEN
               lp_min = lp + 3
-              write(6,*) 'GHGM 3 equatorward ', mp , lp
             ENDIF
 
           endif ! Make sure lp is within bounds
@@ -1008,17 +1009,14 @@ CONTAINS
           ENDIF
 
           IF( lp_min == 0 )THEN
-            write(6,*) 'GHGM Still didnt get it trying again AGAIN ', mp , lp
 
             if((lp.ge.5).and.(lp.le.grid % NLP - 4)) then ! Make sure lp is within bounds                   
 
             IF( theta_t0 <= colat_90km(lp-3) .AND. theta_t0 >= colat_90km(lp-4) )THEN
               lp_min = lp - 3
-              write(6,*) 'GHGM 4 poleward ', mp , lp
             ! Check equatorward
             ELSEIF( theta_t0 <= colat_90km(lp+4) .AND. theta_t0 >= colat_90km(lp+3) )THEN
               lp_min = lp + 4
-              write(6,*) 'GHGM 4 equatorward ', mp , lp
             ENDIF
 
           endif ! Make sure lp is within bounds
@@ -1026,7 +1024,8 @@ CONTAINS
           ENDIF
 
           IF( lp_min == 0 )THEN
-            write(6,*) 'GHGM OK I GIVE UP ', mp , lp
+            i_convection_too_far_in_lp = .TRUE.
+            write(6,*) 'GHGM convection too far ', mp , lp
           ENDIF
 
 ! GHGM - check that lp_min is not greater than NLP
@@ -1043,8 +1042,17 @@ CONTAINS
 !           lp_min = 2
 !         ENDIF
 
-          lp_t0(1) = lp_min-1
-          lp_t0(2) = lp_min
+          if(i_convection_too_far_in_lp) then
+! Very rare problem where convection in lp is greater than +-4 - for this case
+! we set both lp indexes to just lp which means there will be no lp convection
+! for this tube
+            lp_t0(1) = lp
+            lp_t0(2) = lp
+          else
+! The normal situation... 
+            lp_t0(1) = lp_min-1
+            lp_t0(2) = lp_min
+          endif
 
           IF( phi_t0 <= grid % magnetic_longitude(mp) .AND. phi_t0 >= grid % magnetic_longitude(mp-1) )THEN
             mp_min = mp
@@ -1085,10 +1093,6 @@ CONTAINS
 
             DO 300 i = 1, grid % flux_tube_max(lp)
 
-! only do convection for points over 200km.....
-
-              if(grid % altitude(i,lp).ge.200000.0_prec) then
-
               ! q interpolation
               q_value = grid % q_factor(i,lp,mp)
               DO mpx = 1, 2
@@ -1121,6 +1125,17 @@ CONTAINS
 
                     ENDIF
                   ENDDO
+!
+! GHGM - Below the bottom of the tube at the Northern end
+! the Q interpolation factors are greater than 1 (incorrect).
+! The following resets these values so the interpolation comes from the point
+! at 90km
+!
+                  if((abs(i_comp_weight(1)).gt.1).and.(abs(i_comp_weight(2)).gt.1)) then
+                      i_comp_weight(1) = 0.0
+                      i_comp_weight(2) = 1.0
+                  endif
+
 
                   B(lpx,mpx) = grid % magnetic_field_strength(isouth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(1) +&
                                grid % magnetic_field_strength(inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
@@ -1168,16 +1183,31 @@ CONTAINS
                 ksi_fac = grid % magnetic_field_strength(i,lp,mp)/B_int
               ENDIF
 
+              z = grid % altitude(i,lp)/1000.0_prec
+              if ((z.lt.200.0).and.(z.gt.100.0)) then
+              z_factor = (z - 100.0) / 100.0
+              ion_densities_int(1:n_conv_spec) = (z_factor * (ion_densities_int(1:n_conv_spec) - plasma % ion_densities_old(1:n_conv_spec,i,lp,mp))) &
+                                               + plasma % ion_densities_old(1:n_conv_spec,i,lp,mp)          
+              ion_velocities_int(1:n_conv_spec) = (z_factor * (ion_velocities_int(1:n_conv_spec) - plasma % ion_velocities_old(1:n_conv_spec,i,lp,mp))) &
+                                               + plasma % ion_velocities_old(1:n_conv_spec,i,lp,mp)          
+              ion_temperature_int = (z_factor * (ion_temperature_int - plasma % ion_temperature_old(i,lp,mp))) &
+                                               + plasma % ion_temperature_old(i,lp,mp)         
+              electron_temperature_int = (z_factor * (electron_temperature_int - plasma % electron_temperature_old(i,lp,mp))) &
+                                               + plasma % electron_temperature_old(i,lp,mp)         
+              endif
+              if (z.lt.100.0) then
+                 ion_densities_int(1:n_conv_spec) = plasma % ion_densities_old(1:n_conv_spec,i,lp,mp)          
+                 ion_velocities_int(1:n_conv_spec) = plasma % ion_velocities_old(1:n_conv_spec,i,lp,mp)          
+                 ion_temperature_int = plasma % ion_temperature_old(i,lp,mp)          
+                 electron_temperature_int = plasma % electron_temperature_old(i,lp,mp)          
+              endif
+
               plasma % ion_densities(1:n_conv_spec,i,lp,mp) = ion_densities_int(1:n_conv_spec)*( ksi_fac**2 )
               plasma % ion_velocities(1:n_conv_spec,i,lp,mp) = ion_velocities_int(1:n_conv_spec)
 !             plasma % ion_temperature(i,lp,mp) = ion_temperature_int
 !             plasma % electron_temperature(i,lp,mp) = electron_temperature_int
               plasma % ion_temperature(i,lp,mp) = ion_temperature_int*( ksi_fac**(4.0_prec/3.0_prec) )
               plasma % electron_temperature(i,lp,mp) = electron_temperature_int*( ksi_fac**(4.0_prec/3.0_prec) )
-
-
-
-              endif     ! if(grid % altitude(i,lp).ge.200000.0_prec)
 
  300        CONTINUE  !  i = 1, grid % flux_tube_max(lp)
 
@@ -1636,7 +1666,6 @@ CONTAINS
             plasma % electron_temperature(i,lp,mp) = TE_TIX(3,i)
 
           ENDDO
-
 
       ENDDO
     ENDDO
