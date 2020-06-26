@@ -1,7 +1,7 @@
 !
 ! Original file ~bozo/pgms/apex/magfld.f copied 2/25/00.
 !
-      SUBROUTINE COFRM_empirical (DATE)
+      SUBROUTINE COFRM_empirical (DATE,RC)
 C          Assign DGRF/IGRF spherical harmonic coefficients, to degree and
 C          order NMAX, for DATE, yyyy.fraction, into array G.  Coefficients
 C          are interpolated from the DGRF dates through the current IGRF year.
@@ -62,7 +62,13 @@ C          Mar 99 (Barnes):  Removed three branch if's from FELDG and changed
 C          statement labels to ascending order
 
 C          Jun 99 (Barnes):  Corrected RTOD definition in GD2CART.
-
+C
+      USE IPE_ERROR_MODULE
+C
+      REAL,    INTENT(IN)  :: DATE
+      INTEGER, INTENT(OUT) :: RC
+C
+      CHARACTER(LEN=1024) ERRMSG
 C
       PARAMETER (RTOD=5.72957795130823E1,DTOR=1.745329251994330E-2)
       DOUBLE PRECISION F,F0
@@ -293,6 +299,8 @@ C          D_/Dtime coefficients ht (IGRF for 1995-2000):
      9                                                    0.0,0.0,11*0.,
      A                                                        0.0,13*0./
  
+C
+      RC = IPE_SUCCESS
 C          Do not need to load new coefficients if date has not changed
       ICHG = 0
       IF (DATE .EQ. DATEL) GO TO 300
@@ -358,10 +366,11 @@ C          Interpolate coefficients
       RETURN
  
 C          Error trap diagnostics:
- 9100 WRITE(6,'('' '',/,
+ 9100 WRITE(ERRMSG,'('' '',/,
      +'' COFRM:  DATE'',F9.3,'' preceeds DGRF coefficients'',
      +                          '' presently coded.'')') DATE
-      STOP 'mor cod'
+      CALL IPE_ERROR_SET(MSG=ERRMSG, RC=RC)
+      RETURN
  9200 FORMAT(' ',/,
      +' COFRM:  DATE',F9.3,' is after the maximum',
      +                          ' recommended for extrapolation.')
@@ -707,7 +716,9 @@ C          Geocentric to geodetic
       COMMON /MAGCOF/ G(144),GV(144),ICHG,NMAX
       DATA NMAX,ICHG /10,-99999/
       end block data blkmagcof
-      SUBROUTINE SUBSOL_empirical (IYR,IDAY,IHR,IMN,SEC,SBSLLAT,SBSLLON)
+      SUBROUTINE SUBSOL_empirical (IYR,IDAY,IHR,IMN,SEC,SBSLLAT,SBSLLON,
+     +  RC)
+        USE ipe_error_module
 C          Find subsolar geographic latitude and longitude given the
 C          date and time (Universal Time).
 C
@@ -741,9 +752,13 @@ C                      between -180 and +180)
       PARAMETER (D2R=0.0174532925199432957692369076847 ,
      +           R2D=57.2957795130823208767981548147)
       PARAMETER (MSGUN=6)
+      INTEGER, INTENT(OUT) :: RC
       INTEGER IYR,YR,IDAY,IHR,IMN,NLEAP,NCENT,NROT
       REAL SEC,SBSLLAT,SBSLLON,L0,G0,DF,LF,GF,L,G,LAMBDA,EPSILON,N
      1   ,GRAD,LAMRAD,SINLAM,EPSRAD,DELTA,UT,ETDEG
+      CHARACTER(LEN=1024) MSGSTR
+
+      RC = IPE_SUCCESS
 C
 C Number of years from 2000 to IYR (negative if IYR < 2000):
       YR = IYR - 2000
@@ -753,17 +768,21 @@ C                 (negative if IYR is before 1997)
       NLEAP = (IYR-1601)/4
       NLEAP = NLEAP - 99
       IF (IYR.LE.1900) THEN
-	IF (IYR.LE.1600) THEN
-	 WRITE(MSGUN,*) 'SUBSOLR INVALID BEFORE 1601: INPUT YEAR = ',IYR       
-	 STOP
+        IF (IYR.LE.1600) THEN
+          WRITE(MSGSTR,
+     +      '("SUBSOLR INVALID BEFORE 1601: INPUT YEAR = ",I0)') IYR
+          CALL IPE_ERROR_SET(MSG=MSGSTR, RC=RC)
+          RETURN
 	ENDIF
 	NCENT = (IYR-1601)/100
 	NCENT = 3 - NCENT 
 	NLEAP = NLEAP + NCENT
       ENDIF
       IF (IYR.GE.2101) THEN
-	WRITE(MSGUN,*) 'SUBSOLR INVALID AFTER 2100:  INPUT YEAR = ',IYR
-	STOP
+        WRITE(MSGSTR,
+     +    '("SUBSOLR INVALID AFTER 2100: INPUT YEAR = ",I0)') IYR
+        CALL IPE_ERROR_SET(MSG=MSGSTR, RC=RC)
+        RETURN
       ENDIF
 C
 C L0 = Mean longitude of Sun at 12 UT on January 1 of IYR:

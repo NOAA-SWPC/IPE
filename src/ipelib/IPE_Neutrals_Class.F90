@@ -5,6 +5,7 @@ MODULE IPE_Neutrals_Class
   USE IPE_Grid_Class
   USE IPE_Time_Class
   USE IPE_Forcing_Class
+  USE ipe_error_module
 
   ! MSIS
   USE physics_msis ! gtd7
@@ -65,14 +66,18 @@ MODULE IPE_Neutrals_Class
 
 CONTAINS
 
-  SUBROUTINE Build_IPE_Neutrals( neutrals, nFluxTube, NLP, NMP, mp_low, mp_high )
+  SUBROUTINE Build_IPE_Neutrals( neutrals, nFluxTube, NLP, NMP, mp_low, mp_high, rc )
     IMPLICIT NONE
     CLASS( IPE_Neutrals ), INTENT(inout) :: neutrals
-    INTEGER, INTENT(in)                  :: nFluxTube
-    INTEGER, INTENT(in)                  :: NLP
-    INTEGER, INTENT(in)                  :: NMP
-    INTEGER, INTENT(in)                  :: mp_low, mp_high
+    INTEGER,               INTENT(in)    :: nFluxTube
+    INTEGER,               INTENT(in)    :: NLP
+    INTEGER,               INTENT(in)    :: NMP
+    INTEGER,               INTENT(in)    :: mp_low, mp_high
+    INTEGER, OPTIONAL,     INTENT(out)   :: rc
 
+    INTEGER :: stat
+
+    IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
     neutrals % nFluxTube = nFluxTube
     neutrals % NLP       = NLP
@@ -89,7 +94,10 @@ CONTAINS
               neutrals % temperature(1:nFluxTube,1:NLP,mp_low:mp_high), &
               neutrals % temperature_inf(1:nFluxTube,1:NLP,mp_low:mp_high), &
               neutrals % velocity_geographic(1:3,1:nFluxTube,1:NLP,mp_low:mp_high), &
-              neutrals % velocity_apex(1:3,nFluxTube,1:NLP,mp_low:mp_high) )
+              neutrals % velocity_apex(1:3,nFluxTube,1:NLP,mp_low:mp_high), &
+              stat = stat )
+    IF ( ipe_alloc_check( stat, msg="Failed to allocate neutrals internal arrays", &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     neutrals % helium              = 0.0_prec
     neutrals % oxygen              = 0.0_prec
@@ -109,7 +117,10 @@ CONTAINS
               neutrals % geo_nitrogen(1:nlon_geo,1:nlat_geo,1:nheights_geo),&
               neutrals % geo_hydrogen(1:nlon_geo,1:nlat_geo,1:nheights_geo),&
               neutrals % geo_temperature(1:nlon_geo,1:nlat_geo,1:nheights_geo), &
-              neutrals % geo_velocity(1:3,1:nlon_geo,1:nlat_geo,1:nheights_geo) )
+              neutrals % geo_velocity(1:3,1:nlon_geo,1:nlat_geo,1:nheights_geo), &
+              stat = stat )
+    IF ( ipe_alloc_check( stat, msg="Failed to allocate neutrals internal geo arrays", &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     neutrals % geo_helium             = 0.0_prec
     neutrals % geo_oxygen             = 0.0_prec
@@ -123,23 +134,47 @@ CONTAINS
   END SUBROUTINE Build_IPE_Neutrals
 
 
-  SUBROUTINE Trash_IPE_Neutrals( neutrals )
+  SUBROUTINE Trash_IPE_Neutrals( neutrals, rc )
 
     IMPLICIT NONE
 
     CLASS( IPE_Neutrals ), INTENT(inout) :: neutrals
+    INTEGER, OPTIONAL,     INTENT(out)   :: rc
 
+    INTEGER :: stat
 
-    IF ( ASSOCIATED( neutrals % helium              ) ) DEALLOCATE( neutrals % helium              )
-    IF ( ASSOCIATED( neutrals % hydrogen            ) ) DEALLOCATE( neutrals % hydrogen            )
-    IF ( ASSOCIATED( neutrals % molecular_nitrogen  ) ) DEALLOCATE( neutrals % molecular_nitrogen  )
-    IF ( ASSOCIATED( neutrals % molecular_oxygen    ) ) DEALLOCATE( neutrals % molecular_oxygen    )
-    IF ( ASSOCIATED( neutrals % nitrogen            ) ) DEALLOCATE( neutrals % nitrogen            )
-    IF ( ASSOCIATED( neutrals % oxygen              ) ) DEALLOCATE( neutrals % oxygen              )
-    IF ( ASSOCIATED( neutrals % temperature         ) ) DEALLOCATE( neutrals % temperature         )
-    IF ( ASSOCIATED( neutrals % temperature_inf     ) ) DEALLOCATE( neutrals % temperature_inf     )
-    IF ( ASSOCIATED( neutrals % velocity_apex       ) ) DEALLOCATE( neutrals % velocity_apex       )
-    IF ( ASSOCIATED( neutrals % velocity_geographic ) ) DEALLOCATE( neutrals % velocity_geographic )
+    IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
+
+    IF ( ASSOCIATED( neutrals % helium              ) ) &
+         DEALLOCATE( neutrals % helium              , stat=stat )
+    IF ( ipe_dealloc_check( stat, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    IF ( ASSOCIATED( neutrals % hydrogen            ) ) &
+         DEALLOCATE( neutrals % hydrogen            , stat=stat )
+    IF ( ipe_dealloc_check( stat, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    IF ( ASSOCIATED( neutrals % molecular_nitrogen  ) ) &
+         DEALLOCATE( neutrals % molecular_nitrogen  , stat=stat )
+    IF ( ipe_dealloc_check( stat, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    IF ( ASSOCIATED( neutrals % molecular_oxygen    ) ) &
+         DEALLOCATE( neutrals % molecular_oxygen    , stat=stat )
+    IF ( ipe_dealloc_check( stat, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    IF ( ASSOCIATED( neutrals % nitrogen            ) ) &
+         DEALLOCATE( neutrals % nitrogen            , stat=stat )
+    IF ( ipe_dealloc_check( stat, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    IF ( ASSOCIATED( neutrals % oxygen              ) ) &
+         DEALLOCATE( neutrals % oxygen              , stat=stat )
+    IF ( ipe_dealloc_check( stat, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    IF ( ASSOCIATED( neutrals % temperature         ) ) &
+         DEALLOCATE( neutrals % temperature         , stat=stat )
+    IF ( ipe_dealloc_check( stat, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    IF ( ASSOCIATED( neutrals % temperature_inf     ) ) &
+         DEALLOCATE( neutrals % temperature_inf     , stat=stat )
+    IF ( ipe_dealloc_check( stat, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    IF ( ASSOCIATED( neutrals % velocity_apex       ) ) &
+         DEALLOCATE( neutrals % velocity_apex       , stat=stat )
+    IF ( ipe_dealloc_check( stat, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    IF ( ASSOCIATED( neutrals % velocity_geographic ) ) &
+         DEALLOCATE( neutrals % velocity_geographic , stat=stat )
+    IF ( ipe_dealloc_check( stat, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
 
     DEALLOCATE( neutrals % geo_helium, &
@@ -149,12 +184,14 @@ CONTAINS
                  neutrals % geo_nitrogen, &
                  neutrals % geo_hydrogen, &
                  neutrals % geo_temperature, &
-                 neutrals % geo_velocity )
+                 neutrals % geo_velocity, &
+                 stat=stat )
+    IF ( ipe_dealloc_check( stat, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
   END SUBROUTINE Trash_IPE_Neutrals
 
 
-  SUBROUTINE Update_IPE_Neutrals( neutrals, params, grid, time, forcing, mpi_layer )
+  SUBROUTINE Update_IPE_Neutrals( neutrals, params, grid, time, forcing, mpi_layer, rc )
 
     CLASS( IPE_Neutrals         ), INTENT(inout) :: neutrals
     TYPE ( IPE_Model_Parameters ), INTENT(in   ) :: params
@@ -162,15 +199,20 @@ CONTAINS
     TYPE ( IPE_Time             ), INTENT(in   ) :: time
     TYPE ( IPE_Forcing          ), INTENT(in   ) :: forcing
     TYPE ( IPE_MPI_Layer        ), INTENT(in   ) :: mpi_layer
+    INTEGER, OPTIONAL,             INTENT(out  ) :: rc
 
     ! Local
     LOGICAL :: msis_switch
+    INTEGER :: localrc
+
+    IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
     msis_switch = mod(time % elapsed_sec,params % msis_time_step) == 0.0
 
     IF ( msis_switch .and. (time % elapsed_sec > 0._prec .or. .NOT. params % read_apex_neutrals) ) THEN
       IF( mpi_layer % rank_id == 0 ) write(6,*) 'Calling MSIS ', int(time % elapsed_sec / 60), ' Mins UT'
-      CALL neutrals % IPE_Neutrals_Empirical( grid, time, forcing )
+      CALL neutrals % IPE_Neutrals_Empirical( grid, time, forcing, rc=localrc )
+      IF ( ipe_error_check( localrc, msg="call to IPE_Neutrals_Empirical failed", rc=rc ) ) RETURN
     ENDIF
 
     CALL neutrals % IPE_Neutrals_Extrapolate( grid, forcing )
@@ -253,7 +295,7 @@ CONTAINS
   END SUBROUTINE IPE_Neutrals_Extrapolate
 
 
-  SUBROUTINE IPE_Neutrals_Empirical( neutrals, grid, time, forcing )
+  SUBROUTINE IPE_Neutrals_Empirical( neutrals, grid, time, forcing, rc )
   !
   ! Usage :
   !
@@ -266,8 +308,10 @@ CONTAINS
     TYPE( IPE_Grid ),      INTENT(in)    :: grid
     TYPE( IPE_Time ),      INTENT(in)    :: time
     TYPE( IPE_Forcing ),   INTENT(in)    :: forcing
+    INTEGER, OPTIONAL,     INTENT(out)   :: rc
 
     ! Local
+    INTEGER    :: localrc
     INTEGER    :: kp, lp, mp, day
     REAL(prec) :: geo_alt, geo_lat, geo_lon, utime
     REAL(prec), DIMENSION(7) :: AP
@@ -283,6 +327,8 @@ CONTAINS
 
     INTEGER, PARAMETER    :: msis_mass = 48
 
+
+    IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
     AP = forcing % GetAP( )
 
@@ -325,7 +371,10 @@ CONTAINS
                         hwm_f107d, &    ! Input, daily average of f10.7 flux for the previous day [ not used ]
                         hwm_ap,    &    ! Input, magnetic index ( daily ), current 3hr ap index
                         hwm_path,  &    ! Input, default datafile path
-                        w          )    ! Ouput, neutral wind velocity meridional-northwards(1) and zonal-eastwards(2) components
+                        w,         &    ! Ouput, neutral wind velocity meridional-northwards(1) and zonal-eastwards(2) components
+                        localrc )       ! Ouput, return code
+            IF ( ipe_error_check( localrc, msg="call to hwm14 failed", &
+              line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
             neutrals % velocity_geographic(1,kp,lp,mp) = w(2)
             neutrals % velocity_geographic(2,kp,lp,mp) = w(1)

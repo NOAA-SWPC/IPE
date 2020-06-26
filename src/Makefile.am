@@ -7,13 +7,15 @@ libipm_a_LIBADD  = ipelib/*.$(OBJEXT) \
 	ipelib/dynamo/*.$(OBJEXT) \
 	ipelib/empirical_efield/*.$(OBJEXT) \
 	ipelib/flip/*.$(OBJEXT) \
-	ipelib/msise00/*.$(OBJEXT)
+	ipelib/msise00/*.$(OBJEXT) \
+	ipelib/shared/*.$(OBJEXT)
 
 libipm_a_FCFLAGS = $(FC_MODINC) ipelib \
 	$(FC_MODINC) ipelib/dynamo \
         $(FC_MODINC) ipelib/empirical_efield \
         $(FC_MODINC) ipelib/flip \
-        $(FC_MODINC) ipelib/msise00
+        $(FC_MODINC) ipelib/msise00 \
+        $(FC_MODINC) ipelib/shared
 
 libipm_a_SOURCES = ipeCap.F90 ipeMethods.F90 IPE_Wrapper.F90
 
@@ -29,7 +31,8 @@ ipe_x_FCFLAGS = $(FC_MODINC) ipelib \
 	$(FC_MODINC) ipelib/dynamo \
         $(FC_MODINC) ipelib/empirical_efield \
         $(FC_MODINC) ipelib/flip \
-        $(FC_MODINC) ipelib/msise00
+        $(FC_MODINC) ipelib/msise00 \
+        $(FC_MODINC) ipelib/shared
 
 ipe_x_LDADD = $(builddir)/ipelib/libipe.a
 endif

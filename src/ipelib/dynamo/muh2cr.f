@@ -11,10 +11,12 @@ c
 c     mudcom.f
 c
 c
-      subroutine muh(pe,jntl)
+      subroutine muh(pe,jntl,rc)
       use dynamo_module,only: nc,cee
+      use ipe_error_module
       implicit none
       integer jntl
+      integer, intent(out) :: rc
 c
 c     set grid size params
 c
@@ -65,7 +67,7 @@ c      DATA MAXCYA/20/
       integer mm,nn,jj,jjj
       real pi
 
-
+      rc = IPE_SUCCESS
 c
 c     set input integer arguments
 c
@@ -180,7 +182,8 @@ c
 
 !      write (*,200) ierror,iprm(16)
   200 format(' ierror = ',i2, ' minimum work space = ',i7)
-      if (ierror.gt.0) call exit(0)
+      if (ipe_status_check(ierror.le.0,
+     +  msg="discretization call to muh2cr failed",rc=rc)) return
 c
 c     attempt solution
 c
@@ -192,7 +195,8 @@ c
 
 !      write (*,107) ierror
   107 format(' ierror = ',i2)
-      if (ierror.gt.0) call exit(0)
+      if (ipe_status_check(ierror.le.0,
+     +  msg="approximation call to muh2cr failed",rc=rc)) return
 C
 C     COPY PHI TO PE
 C
@@ -369,6 +373,7 @@ c
 	  klevel = k
 	  call dismh2cr(nx,ny,wk(ic),wk(itx),wk(ity),
      +                  wk,iwk,ierror)
+          if (ierror.gt.0) return
 	  end do
 	return
       end if   ! end of intl=0 initialization call block
@@ -738,16 +743,18 @@ c
       integer ibeta,ialfa,izmat,idmat
       common/mh2cr/ibeta,ialfa,izmat,idmat
       integer nnx,nny
+
+      ier = 0
 c
 c     CHECK FOR CONSISTENCYT WRT KLEVEL
 c
       NNX = ixp*2**(KLEVEL-1)+1
       NNY = jyq*2**(KLEVEL-1)+1
       IF(NNX.NE.NX.OR.NNY.NE.NY)THEN
-	WRITE(6,100)NX,NY,NNX,NNY,ixp,jyq,KLEVEL
+        WRITE(6,100)NX,NY,NNX,NNY,ixp,jyq,KLEVEL
   100   FORMAT(' INCONSISTENCY WRT LEVEL. NX,NY,NNX,NNY,ixp,jyq,',
      |    'klevel = ',8I6)
-c	STOP
+        ier = 99
       ENDIF
       CALL CEEE(CEE(NC(6-KLEVEL-4)),NX,NY,CF)  ! sub ceee is in mud.F
 c

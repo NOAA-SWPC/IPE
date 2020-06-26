@@ -52,6 +52,7 @@
 
       use weimer2005_ipe, only: EpotVal_new, SetModel_new, read_bndy,
      &                         read_potential, read_schatable, model
+      use ipe_error_module
  
       implicit none
 
@@ -60,9 +61,9 @@
       public :: ed1,           ! zonal electric field Ed1  [V/m] 
      &          ed2,           ! meridional electric field Ed2 [V/m] 
      &          potent,        ! electric potential [V]
-     &	        nmlon, nmlat,  ! dimension of mag. grid 
+     &          nmlon, nmlat,  ! dimension of mag. grid
      &          dlatm, dlonm,  ! grid spacing of mag. grid 
-     &	        ylonm, ylatm,  ! magnetic longitudes/latitudes (degc)
+     &          ylonm, ylatm,  ! magnetic longitudes/latitudes (degc)
      &          iday,iyear,iday_m,imo,f107d,by,bz,ut,
      &          bt, angle, v_sw, swden, tilt      !   by Zhuxiao, for IPE
 
@@ -211,7 +212,7 @@
 !
       contains
 
-      subroutine efield_init_ipe
+      subroutine efield_init_ipe(rc)
 !--------------------------------------------------------------------
 ! Purpose: read in and set up coefficients needed for electric field
 !          calculation (independent of time & geog. location)
@@ -220,39 +221,56 @@
 !
 ! Author: A. Maute Dec 2003  am 12/17/03 
 !-------------------------------------------------------------------
+      integer, optional, intent(out) :: rc
+
+      integer :: lrc
 
       character(len=*), parameter :: 
      &                  efield_lflux_file='global_idea_coeff_lflux.dat',
      &                  efield_hflux_file='global_idea_coeff_hflux.dat'
 
+      if (present(rc)) rc = IPE_SUCCESS
+
       model = my_model
 
-      call constants	 ! calculate constants
+      call constants     ! calculate constants
 !-----------------------------------------------------------------------
 ! low/midlatitude potential from Scherliess model
 !-----------------------------------------------------------------------
-      call read_acoef (efield_lflux_file, efield_hflux_file)	! read in A_klnm for given S_aM
-      call index_quiet  ! set up index for f_m(mlt),f_l(UT),f_-k(d)
-      call prep_fk	! set up the constant factors for f_k
-      call prep_pnm	! set up the constant factors for P_n^m & dP/d phi
+      call read_acoef (efield_lflux_file, efield_hflux_file, rc=lrc)    ! read in A_klnm for given S_aM
+      if (ipe_error_check(lrc, msg="call to read_acoef failed",
+     &  rc=rc)) return
+      call index_quiet(lrc)  ! set up index for f_m(mlt),f_l(UT),f_-k(d)
+      if (ipe_error_check(lrc, msg="call to index_quiet failed",
+     &  rc=rc)) return
+      call prep_fk      ! set up the constant factors for f_k
+      call prep_pnm     ! set up the constant factors for P_n^m & dP/d phi
 !-----------------------------------------------------------------------
 !following part should be independent of time & location if IMF constant
 !-----------------------------------------------------------------------
       call readcoef_ipe
 
       if (trim(model) == 'epot') then
-        call read_potential('global_idea_coeff_W05scEpot.dat')
+        call read_potential('global_idea_coeff_W05scEpot.dat',rc=lrc)
+        if (ipe_error_check(lrc, msg="failed to read potential (epot)",
+     &    rc=rc)) return
       else
-        call read_potential('global_idea_coeff_W05scBpot.dat')
+        call read_potential('global_idea_coeff_W05scBpot.dat',rc=lrc)
+        if (ipe_error_check(lrc, msg="failed to read potential (bpot)",
+     &    rc=rc)) return
       endif
 
-      call read_schatable('global_idea_coeff_W05SCHAtable.dat')
+      call read_schatable('global_idea_coeff_W05SCHAtable.dat',rc=lrc)
+      if (ipe_error_check(lrc, msg="failed to read schatable",
+     &  rc=rc)) return
 
-      call read_bndy('global_idea_coeff_W05scBndy.dat')
+      call read_bndy('global_idea_coeff_W05scBndy.dat',rc=lrc)
+      if (ipe_error_check(lrc, msg="failed to read boundary",
+     &  rc=rc)) return
 
       end subroutine efield_init_ipe
 
-      subroutine get_efield_ipe(i_rank)
+      subroutine get_efield_ipe(i_rank,rc)
 !-----------------------------------------------------------------------
 ! Purpose: calculates the global electric potential field on the
 !          geomagnetic grid (MLT in deg) and derives the electric field 
@@ -262,10 +280,11 @@
 ! Author: A. Maute Dec 2003  am 12/17/03    
 !-----------------------------------------------------------------------
 
-      integer, intent(in):: i_rank
-      integer :: idum1, idum2, tod ! time of day [s] 
-      real kp
+      integer,           intent(in)  :: i_rank
+      integer, optional, intent(out) :: rc
 
+      integer :: lrc, idum1, idum2, tod ! time of day [s]
+      real kp
 
 !-----------------------------------------------------------------------
 ! get current calendar day of year & date components 
@@ -281,7 +300,9 @@
 !-----------------------------------------------------------------------
 ! calculate global electric potential    
 !-----------------------------------------------------------------------
-      call GlobalElPotential
+      call GlobalElPotential(rc=lrc)
+      if (ipe_error_check(lrc,msg="call to GlobalElPotential failed",
+     &  rc=rc)) return
 !     print*,'pot_efield',potent(149,66),potent(149,64)
 
 !-----------------------------------------------------------------------
@@ -291,7 +312,7 @@
 
       end subroutine get_efield_ipe
 
-      subroutine GlobalElPotential
+      subroutine GlobalElPotential(rc)
 !-----------------------------------------------------------------------
 ! Purpose: calculates the global electric potential field on the
 !          geomagnetic grid (MLT in deg) 
@@ -307,16 +328,19 @@
 ! Author: A. Maute Dec 2003  am 12/17/03 
 !-----------------------------------------------------------------------
 
+      integer, optional, intent(out) :: rc
 !-----------------------------------------------------------------------
 ! local variables
 !-----------------------------------------------------------------------
-      integer  :: ilon, ilat, idlat
+      integer  :: ilon, ilat, idlat, lrc
       integer  :: ihlat_bnd(0:nmlon)     ! high latitude boundary
       integer  :: itrans_width(0:nmlon)  ! width of transition zone
       real :: mlt, mlon, mlat, mlat_90, pot
       real :: pot_midlat(0:nmlon,0:nmlat) ! potential from L. Scherliess model
       real :: pot_highlat(0:nmlon,0:nmlat) ! potential from Weimer model
       real :: pot_highlats(0:nmlon,0:nmlat)! smoothed potential from Weimer model
+
+      if (present(rc)) rc = IPE_SUCCESS
 
 !-----------------------------------------------------------------------
 ! convert to date and day	
@@ -349,7 +373,9 @@
         mlat_90 = 90. - ylatm(ilat)  ! mag. latitude
         do ilon = 0,nmlon
 
-          call EpotVal_new(mlat_90, ylonm(ilon)*deg2mlt, pot )
+          call EpotVal_new(mlat_90, ylonm(ilon)*deg2mlt, pot, rc=lrc )
+          if (ipe_error_check(lrc, msg="call to EpotVal_new failed",
+     &       rc=rc)) return
           pot = 1000.*pot
 
 !-----------------------------------------------------------------------
@@ -535,7 +561,7 @@
 
       end subroutine prep_pnm                                                                         
 
-      subroutine index_quiet
+      subroutine index_quiet(rc)
 !-----------------------------------------------------------------
 ! Purpose: set up index for factors f_m(mlt),f_l(UT),f_-k(d) to
 !    describe the electric potential Phi for the empirical model   
@@ -552,10 +578,14 @@
 
       implicit none
 
+      integer, intent(out) :: rc
+
 !----------------------------------------------------------------      
 !	... local variables
 !----------------------------------------------------------------                                                                   
       integer :: i, j, k, l, n, m
+
+      rc = IPE_SUCCESS
 
       i = 0 	! initialize
       j = 1 
@@ -584,15 +614,12 @@
       end do ! k
 
       imax = i - 1  
-      if(imax /= ni ) then    ! check if imax == ni 
-!       write(iulog,'(a19,i5,a18,i5)') 'index_quiet: imax= ',imax,  
-!    &     ' not equal to ni =',ni 
-        stop
-      end if							
+      if (ipe_status_check(imax == ni, msg="index_quiet: imax /= ni",
+     &  rc=rc)) return
 
       end subroutine index_quiet                                                           
 
-      subroutine read_acoef (efield_lflux_file, efield_hflux_file)
+      subroutine read_acoef (efield_lflux_file, efield_hflux_file, rc)
 !----------------------------------------------------------------     
 ! Purpose:  
 !    1. read in coefficients A_klmn^lf for solar cycle minimum and
@@ -613,12 +640,15 @@
 !     use ioFileMod,     only : getfil
 !     use units,         only : getunit, freeunit
 
-      character(len=*), intent(in) :: efield_lflux_file
-      character(len=*), intent(in) :: efield_hflux_file
+      character(len=*),  intent(in)  :: efield_lflux_file
+      character(len=*),  intent(in)  :: efield_hflux_file
+      integer, optional, intent(out) :: rc
 
       integer  :: i,ios,unit,istat
 !     character (len=13):: locfn
       character (len=256):: locfn
+
+      if (present(rc)) rc = IPE_SUCCESS
 
 !------------------------------------------------------------------    
 !  get coefficients file for solar minimum: 
@@ -633,6 +663,8 @@
 !------------------------------------------------------------------     
       open(unit=unit,file=trim(locfn), 
      &     status = 'old',iostat = ios)
+      if (ipe_iostatus_check(ios, msg="error opening file "//locfn,
+     &  rc=rc)) return
 !     if(ios.gt.0) then
 !     write(iulog,*) 
 !    &'read_acoef: error in opening coeff_lf file',
@@ -644,6 +676,8 @@
 ! read datafile with coefficients A_klnm
 !--------------------------------------------------------------------   
       read(unit,*,iostat = ios) a_lf
+      if (ipe_iostatus_check(ios, msg="error reading a_lf",
+     &  rc=rc)) return
 !     if(ios.gt.0) then
 !     write(iulog,*) 
 !    &'read_acoef: error in reading coeff_lf file',' unit ',unit
@@ -653,7 +687,9 @@
 !--------------------------------------------------------------------  
 ! close & free unit      
 !--------------------------------------------------------------------  
-      close(unit)
+      close(unit,iostat=ios)
+      if (ipe_iostatus_check(ios, msg="error closing file "//locfn,
+     &  rc=rc)) return
 
 !--------------------------------------------------------------------  
 !  get coefficients file for solar maximum: 
@@ -668,6 +704,8 @@
 !------------------------------------------------------------------
       open(unit=unit,file=trim(locfn), 
      &     status = 'old',iostat = ios)
+      if (ipe_iostatus_check(ios, msg="error opening file "//locfn,
+     &  rc=rc)) return
 !     if(ios.gt.0) then
 !      write(iulog,*) 
 !    &'read_acoef: error in opening coeff_hf file',' unit ',unit
@@ -678,6 +716,8 @@
 ! read datafile with coefficients A_klnm
 !----------------------------------------------------------------
       read(unit,*,iostat = ios) a_hf
+      if (ipe_iostatus_check(ios, msg="error reading a_hf",
+     &  rc=rc)) return
 !     if(ios.gt.0) then
 !      write(iulog,*) 
 !    &'read_acoef: error in reading coeff_hf file',' unit ',unit
@@ -687,7 +727,9 @@
 !---------------------------------------------------------------
 ! close & free unit      
 !-------------------------------------------------------------- 
-      close(unit)
+      close(unit,iostat=ios)
+      if (ipe_iostatus_check(ios, msg="error closing file "//locfn,
+     &  rc=rc)) return
 
       end subroutine read_acoef
 
@@ -1603,7 +1645,7 @@
 !*********************** Copyright 1996, Dan Weimer/MRC ***********************
 !==================================================================
 
-	SUBROUTINE readcoef_ipe ()
+      SUBROUTINE readcoef_ipe ()
 !
 !-----------------------------------------------------------------------
 !
@@ -1668,7 +1710,7 @@
 
 ! COORDINATE TRANSFORMATION UTILITIES
 !**********************************************************************        
-	FUNCTION get_tilt_ipe(YEAR,MONTH,DAY,HOUR)
+      FUNCTION get_tilt_ipe(YEAR,MONTH,DAY,HOUR)
 !
 !-----------------------------------------------------------------------
 !CC NCAR MODIFIED (3/96) CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
@@ -2025,7 +2067,7 @@
 !-----------------------------------------------------------------------
 !
 !!!compiler warning      IF (IYYY.EQ.0) PAUSE 'There is no Year Zero.'
-      IF (IYYY.EQ.0) STOP 'There is no Year Zero.'
+!     IF (IYYY.EQ.0) STOP 'There is no Year Zero.'
       IF (IYYY.LT.0) IYYY=IYYY+1
       IF (MM.GT.2) THEN
         JY=IYYY
