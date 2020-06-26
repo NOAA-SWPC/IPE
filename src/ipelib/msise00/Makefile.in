@@ -81,8 +81,8 @@ DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ar-lib.m4 \
 	$(top_srcdir)/m4/ax_compiler_vendor.m4 \
+	$(top_srcdir)/m4/ax_lib_comio.m4 \
 	$(top_srcdir)/m4/ax_lib_esmf.m4 \
-	$(top_srcdir)/m4/ax_lib_hdf5.m4 \
 	$(top_srcdir)/m4/fc_features.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
@@ -170,7 +170,12 @@ AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
-CPP = @CPP@
+COMIO_CONFIG = @COMIO_CONFIG@
+COMIO_FC = @COMIO_FC@
+COMIO_FFLAGS = @COMIO_FFLAGS@
+COMIO_FLIBS = @COMIO_FLIBS@
+COMIO_LDFLAGS = @COMIO_LDFLAGS@
+COMIO_VERSION = @COMIO_VERSION@
 CPPFLAGS = @CPPFLAGS@
 CYGPATH_W = @CYGPATH_W@
 DEFS = @DEFS@
@@ -178,7 +183,6 @@ DEPDIR = @DEPDIR@
 ECHO_C = @ECHO_C@
 ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
-EGREP = @EGREP@
 ESMFMKFILE = @ESMFMKFILE@
 ESMF_FC = @ESMF_FC@
 ESMF_FCFLAGS = @ESMF_FCFLAGS@
@@ -194,18 +198,6 @@ FC_MODEXT = @FC_MODEXT@
 FC_MODINC = @FC_MODINC@
 FFLAGS = @FFLAGS@
 GREP = @GREP@
-H5CC = @H5CC@
-H5FC = @H5FC@
-HDF5_CC = @HDF5_CC@
-HDF5_CFLAGS = @HDF5_CFLAGS@
-HDF5_CPPFLAGS = @HDF5_CPPFLAGS@
-HDF5_FC = @HDF5_FC@
-HDF5_FFLAGS = @HDF5_FFLAGS@
-HDF5_FLIBS = @HDF5_FLIBS@
-HDF5_LDFLAGS = @HDF5_LDFLAGS@
-HDF5_LIBS = @HDF5_LIBS@
-HDF5_TYPE = @HDF5_TYPE@
-HDF5_VERSION = @HDF5_VERSION@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -283,7 +275,7 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 noinst_LIBRARIES = libmsise.a
 libmsise_a_SOURCES = hwm14.f90 physics_constants.f90 physics_msis.f90 utils_constants.f90 utils_spline.f90 
-libmsise_a_FCFLAGS = $(FC_MODINC) .
+libmsise_a_FCFLAGS = $(FC_MODINC) .  $(FC_MODINC) ../shared
 EXTRA_DIST = hwm93.f90 nrlmsise00_driver.for nrlmsise00_sub.for test77gtd7.f testgtd7.f90 utils_spline.f90
 all: all-am
 

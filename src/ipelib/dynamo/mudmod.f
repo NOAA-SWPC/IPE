@@ -22,11 +22,13 @@ c                       MUDPACK version 5.0
 ! Use-associate coefficients cee and cofum from dynamo module in tiegcm1 
 ! (dynamo.F).
 !
-      subroutine mudmod(pe,jntl,isolve,ier)
+      subroutine mudmod(pe,jntl,isolve,ier,rc)
       use dynamo_module,only: cee
+      use ipe_error_module
       implicit none
       integer jntl,ier  ! output: not converged ier < 0
-      integer,intent(in) :: isolve
+      integer,intent(in)  :: isolve
+      integer,intent(out) :: rc
 c
 c     set grid size params
 c
@@ -69,6 +71,8 @@ c
       DATA MAXCYA/50/
       integer mm,nn,jj,jjj
       real pi
+
+      rc = IPE_SUCCESS
 
 !     write(6,"('Enter mudmod: jntl=',i3)") jntl
 c
@@ -176,17 +180,18 @@ c
 c     intialization call
 c
 !     write(*,104) intl
-  104 format(/' discretization call to mud2cr', ' intl = ', i2)
+  104 format(/' discretization call to mud2cm', ' intl = ', i2)
       call mud2cm(iprm,fprm,work,rhs,phi,mgopt,ierror,isolve)
 !     write (*,200) ierror,iprm(16)
   200 format(' ierror = ',i2, ' minimum work space = ',i7)
-      if (ierror.gt.0) call exit(0)
+      if (ipe_status_check(ierror.le.0,
+     |  msg="discretization call to mud2cm failed",rc=rc)) return
 c
 c     attempt solution
 c
       intl = 1
 !     write(*,106) intl,method,iguess
-  106 format(/' approximation call to mud2cr',
+  106 format(/' approximation call to mud2cm',
      +/' intl = ',i2, ' method = ',i2,' iguess = ',i2)
       
       call mud2cm(iprm,fprm,work,rhs,phi,mgopt,ierror,isolve)
@@ -195,7 +200,8 @@ c
       
 !     write (*,107) ierror
   107 format(' ierror = ',i2)
-      if (ierror.gt.0) call exit(0)
+      if (ipe_status_check(ierror.le.0,
+     |  msg="approximation call to mud2cm failed",rc=rc)) return
 C
 C     COPY PHI TO PE
 C
@@ -362,6 +368,7 @@ c
 	  klevel = k
 	  call dismd2cr(nx,ny,work(ic),work(itx),work(ity),
      +                  work,ierror,isolve)
+          if (ierror.gt.0) return ! fatal error occurred
 	  end do
 	return
       end if   ! end of intl=0 initialization call block

@@ -18,13 +18,15 @@ c     the common subroutine file "mudcom.f" is attached to the end
 ! 10/04 A.Maute adapt to coupling with plasmasphere (no old dynamo remove
 ! old dynamo ifs)
 !
-      subroutine mud(pe,jntl,isolve,ier)
+      subroutine mud(pe,jntl,isolve,ier,rc)
 !
       use dynamo_module,only: nc,cee
+      use ipe_error_module
 !
       implicit none
       integer jntl,ier ! output: not converged ier < 0
-      integer,intent(in) :: isolve
+      integer,intent(in)  :: isolve
+      integer,intent(out) :: rc
 c
 c     set grid size params
 c
@@ -67,6 +69,8 @@ c
       DATA MAXCYA/150/
       integer mm,nn,jj,jjj
       real pi
+
+      rc = IPE_SUCCESS
 c
 c     set input integer arguments
 c
@@ -174,7 +178,8 @@ c
       call mud2cr(iprm,fprm,work,rhs,phi,mgopt,ierror,isolve)
 !     write (*,200) ierror,iprm(16)
   200 format(' ierror = ',i2, ' minimum work space = ',i7)
-      if (ierror.gt.0) call exit(0)
+      if (ipe_status_check(ierror.le.0,
+     |  msg="discretization call to mud2cr failed",rc=rc)) return
 c
 c     attempt solution
 c
@@ -188,7 +193,8 @@ c
       
 !     write (*,107) ierror
   107 format(' ierror = ',i2)
-      if (ierror.gt.0) call exit(0)
+      if (ipe_status_check(ierror.le.0,
+     |  msg="approximation call to mud2cr failed",rc=rc)) return
 C
 C     COPY PHI TO PE
 C
@@ -402,6 +408,7 @@ c
 	  klevel = k
 	  call dismd2cr(nx,ny,work(ic),work(itx),work(ity),
      +                  work,ierror,isolve)
+          if (ierror.gt.0) return ! fatal error occurred
 	  end do
 	return
       end if   ! end of intl=0 initialization call block
@@ -732,6 +739,8 @@ c
 
       real           xa,xb,yc,yd,tolmax,relmax
       common/fmud2cr/xa,xb,yc,yd,tolmax,relmax
+
+      ier = 0
       
 !#include "params.h"
 !#include "ceee.h"
@@ -741,10 +750,11 @@ c
       NNX = ixp*2**(KLEVEL-1)+1
       NNY = jyq*2**(KLEVEL-1)+1
       IF(NNX.NE.NX.OR.NNY.NE.NY)THEN
-	WRITE(6,100)NX,NY,NNX,NNY,ixp,jyq,KLEVEL
+        WRITE(6,100)NX,NY,NNX,NNY,ixp,jyq,KLEVEL
   100   FORMAT(' INCONSISTENCY WRT LEVEL. NX,NY,NNX,NNY,ixp,jyq,',
      |    'klevel = ',7I5)
-	STOP
+        ier = 99
+        RETURN
       ENDIF
       if (isolve >= 0) then
         CALL CEEE(CEE(NC(6-KLEVEL)),NX,NY,CF)

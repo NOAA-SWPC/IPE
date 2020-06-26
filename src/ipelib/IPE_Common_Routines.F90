@@ -2,10 +2,6 @@ MODULE IPE_Common_Routines
 
 USE IPE_Precision
 
-#ifdef HAVE_NETCDF
-USE netcdf
-#endif
-
 IMPLICIT NONE
 
 CONTAINS
@@ -67,18 +63,6 @@ CONTAINS
       IF( PRESENT(thisunit) ) thisunit = NewUnit
 
   END FUNCTION NewUnit
-
-#ifdef HAVE_NETCDF
-  SUBROUTINE Check(status)
-    IMPLICIT NONE
-    INTEGER, INTENT (in) :: status
-
-     IF(status /= nf90_noerr) THEN
-       PRINT *, trim(nf90_strerror(status))
-       STOP "NetCDF Error, Stopped"
-     ENDIF
-  END SUBROUTINE Check
-#endif
 
   SUBROUTINE Hat_Weights( x_grid, x_interp, weights, indices, N )
     INTEGER, INTENT(in)     :: N

@@ -1075,6 +1075,6 @@ AC_SUBST([am__untar])
 
 m4_include([m4/ar-lib.m4])
 m4_include([m4/ax_compiler_vendor.m4])
+m4_include([m4/ax_lib_comio.m4])
 m4_include([m4/ax_lib_esmf.m4])
-m4_include([m4/ax_lib_hdf5.m4])
 m4_include([m4/fc_features.m4])

@@ -37,7 +37,7 @@ C.... Written by P. Richards June 2010.
         DOUBLE PRECISION WORK(15*SDIM),S(15*SDIM)
       END MODULE SOLVARR
 C::::::::::::::::::::::::::: Module THERMOSPHERE :::::::::::::::::
-C.... Contains the neutral densities and temperatures, O+ production, electron 
+C.... Contains the neutral densities and temperatures, O+ production, electron
 C.... heating
 C.... Written by P. Richards June 2010.
       MODULE THERMOSPHERE
@@ -70,7 +70,7 @@ C.... Written by P. Richards August 2010.
         IMPLICIT NONE
         !... Check dimensions are the same in all FLIP modules
         INTEGER, PARAMETER :: PDIM = 1115  !.. Field line grid dimension
-      !.. EUV and photoelectron production rates 
+      !.. EUV and photoelectron production rates
       REAL EUVION(3,12,PDIM),PEXCIT(3,12,PDIM),PEPION(3,12,PDIM)
       DOUBLE PRECISION OTHPR1(6,PDIM),OTHPR2(6,PDIM)
       !.. Total ionization and excitation rates (EUV + PE + Aurora)
@@ -81,7 +81,7 @@ C.... Written by P. Richards August 2010.
       DOUBLE PRECISION PHION(PDIM)    !.. Total O+ production
       END MODULE PRODUCTION
 C::::::::::::::::::::::::::: Module MINORNEUT :::::::::::::::::
-C.... Contains the minor neutral densities 
+C.... Contains the minor neutral densities
 C.... Written by P. Richards September 2010.
       !.. USE MINORNEUT N4S N2D NNO N2P N2A O1D O1S
       MODULE MINORNEUT
@@ -94,7 +94,7 @@ C.... Written by P. Richards September 2010.
 C::::::::::::::::::::::::::::::::: PHOTOIONIZATION_DATA :::::::::::::::
 C..... This module contains data for the PRIMPR photoionization routine
 C..... Written by P. Richards in August 2010
-      MODULE PHOTOIONIZATION_DATA  !.. NPOT LMAX PROB ZLAM SIGION SIGABS TPOT 
+      MODULE PHOTOIONIZATION_DATA  !.. NPOT LMAX PROB ZLAM SIGION SIGABS TPOT
       IMPLICIT NONE
       INTEGER, PARAMETER :: LMAX =37  !.. # of EUV wavelengths
       INTEGER NPOT(3)                 !.. # of ionization potentials
@@ -104,7 +104,7 @@ C..... Written by P. Richards in August 2010
       REAL SIGABS(3,LMAX)             !.. Absorption cross sections
       REAL TPOT(3,10)                 !.. Ionization potentials
 
-      DATA NPOT/5,5,6/   !.. # of O, O2, N2 ionization potentials 
+      DATA NPOT/5,5,6/   !.. # of O, O2, N2 ionization potentials
       !.. Ionization potentials
       DATA TPOT/13.6,12.1,15.6,16.9,16.5,16.7,18.6,18.2,18.8,
      >   28.5,20.0,25.0,40.0,25.0,29.0,0.0,0.0,37.0, 12*0.0/
@@ -270,16 +270,16 @@ C..... Written by P. Richards in August 2010
      > 0.078645,0.249993,0.000000,0.000000,0.000000,0.360000,
      > 0.296412,0.365000,0.204800,0.321373,0.205000,0.352000,
      > 0.209048,0.125000,0.083200,0.096724,0.055006,0.000000,
-     > 0.076443,0.249993,0.000000,0.000000,0.000000,0.360000/ 
+     > 0.076443,0.249993,0.000000,0.000000,0.000000,0.360000/
       END MODULE PHOTOIONIZATION_DATA
-      
+
 
 C:::::::::::::::::::::::::::::::::: CTIPINT :::::::::::::::::::::::::::::
-C.... Interface for CTIP model. This routine uploads the CTIPe variables to 
+C.... Interface for CTIP model. This routine uploads the CTIPe variables to
 C.... modules and calls the different FLIP routines.
-C.... The parameters ending in X are dummy variables to be transferred to 
-C.... the FLIP module variables. 
-C.... Dummy variables are also used because it is assumed that the values 
+C.... The parameters ending in X are dummy variables to be transferred to
+C.... the FLIP module variables.
+C.... Dummy variables are also used because it is assumed that the values
 C.... of FLIP variables are not preserved from call to call
 C---- Additional mods Change TI to (temp_ti_te(2,DIM)
 C---- Change SCOLUMN for grazing incidence
@@ -318,10 +318,10 @@ C.... Written by P. Richards June-September 2010.
      >             INPLS,  !..
      >             UTHRS,  !.. Universal time in hours !$$$
      >              EHTX,  !.. IN/OUT 2D array, Electron & ion heating rate (eV cm-3 s-1)
-     >          AUR_PROD,  !.. IN 2D, array, ionization rates 
+     >          AUR_PROD,  !.. IN 2D, array, ionization rates
      >            TE_TIX,  !.. IN/OUT: 2D array, Electron and ion temperatures (K) (see below)
-     >     XIONNX,XIONVX,  !.. IN/OUT: 2D array, Storage for ion densities and velocities 
-     >             NHEAT,  !.. OUT: array, Neutral heating rate (eV/cm^3/s) 
+     >     XIONNX,XIONVX,  !.. IN/OUT: 2D array, Storage for ion densities and velocities
+     >             NHEAT,  !.. OUT: array, Neutral heating rate (eV/cm^3/s)
      >             EFLAG,mp,lp,nflag_t,nflag_d)  !.. OUT: 2D array, Error Flags
       USE THERMOSPHERE       !.. ON HN N2N O2N HE TN UN EHT COLFAC
       USE MINORNEUT          !.. N4S N2D NNO N2P N2A O1D O1S
@@ -341,12 +341,12 @@ C.... Written by P. Richards June-September 2010.
       INTEGER I,J,JMINX,JMAXX !.. lcv + spatial grid indices
       INTEGER EFLAG(11,11)    !.. error flags, check =0 on return from FLIP
       INTEGER DEBUG           !.. switch to turn on debug writes 0=off, 1=on
-      !.. sw_HEplus,sw_Nplus turn on diffusive solutions if > 0. no solution if 0, 
+      !.. sw_HEplus,sw_Nplus turn on diffusive solutions if > 0. no solution if 0,
       !.. chemical equilibrium if < 0
-      REAL F107,F107A         !.. daily and 81 day average F10.7      !.. 
+      REAL F107,F107A         !.. daily and 81 day average F10.7      !..
       REAL EUVFLUX(37),UVFAC(59)  !.. Solar EUV fluxes and mult. factors
       DOUBLE PRECISION M_to_CM,M3_to_CM3,nT_TO_Gauss !.. Unit conversion factors
-      !.. Dummy variables ending in X for transferring CTIP to FLIP modules, 
+      !.. Dummy variables ending in X for transferring CTIP to FLIP modules,
       !.. see above for documentation
       DOUBLE PRECISION N4SX(CTIPDIM),NNOX(CTIPDIM),ZX(CTIPDIM)
       DOUBLE PRECISION UNX(CTIPDIM),COLFACX,BMX(CTIPDIM)
@@ -361,10 +361,10 @@ C.... Written by P. Richards June-September 2010.
       DOUBLE PRECISION AUR_PROD(3,CTIPDIM)
       !.. TINFX has to be an array for grazing incidence column densities
       DOUBLE PRECISION TINFX(CTIPDIM)  !.. Exospheric temperature
-      !.. End dummy variable declarations 
+      !.. End dummy variable declarations
       !.. HPEQ is equatorial H+ density = HPEQ * density of a full flux tube.
       !.. If 0.0 the densities from the previous time step are used.
-      !.. If positive, initial densities and temperatures are set. 
+      !.. If positive, initial densities and temperatures are set.
       !.. If negative, H+ and He+ densities are reset for flux tube depletion
       DOUBLE PRECISION HPEQ              !.. HPEQ is equatorial H+ density
       DOUBLE PRECISION DT,DTMIN,FD(9),BCKPRD,FPAS,HEPRAT,PCO,UTHRS !$$$
@@ -377,7 +377,7 @@ C.... Written by P. Richards June-September 2010.
       DOUBLE PRECISION RTS(99)           !.. Reaction rates
       DOUBLE PRECISION electron_density(CTIPDIM)     !.. electron density
       DOUBLE PRECISION O2DISF(CTIPDIM)   !.. O2 dissociation frequency
-      DOUBLE PRECISION sza_north, sza_south !solar zenith angles at the north and south end of a tube                         
+      DOUBLE PRECISION sza_north, sza_south !solar zenith angles at the north and south end of a tube
       INTEGER IWR         !$$$  for writing in files
       integer istop
 
@@ -418,7 +418,7 @@ C.... Written by P. Richards June-September 2010.
         UN(:)=0.0D0
         TINF(:)=0.0D0
         EHT(:,:)=0.0D0           !(3,TDIM)
-        COLFAC=0.0D0 
+        COLFAC=0.0D0
 
 !(3)AVE_PARAMS
       TEJ(:)=0.0D0 !(AVDIM)
@@ -457,7 +457,7 @@ C.... Written by P. Richards June-September 2010.
       N4S(:)=0.0D0 !(NDIM)
       NNO(:)=0.0D0 !(NDIM)
       !.. Load debug flag into EFLAG
-      EFLAG(11,11) =  0 !DEBUG 
+      EFLAG(11,11) =  0 !DEBUG
 
       !.. Check that dimensions agree
       IF(CTIPDIM.GT.FLDIM) THEN
@@ -494,7 +494,7 @@ C.... Written by P. Richards June-September 2010.
       ENDDO
 
       !.. Upload thermosphere parameters to THERMOSPHERE module
-      COLFAC=COLFACX  !.. O+ - O collision frequency Burnside factor 1-1.7 
+      COLFAC=COLFACX  !.. O+ - O collision frequency Burnside factor 1-1.7
       DO J=JMIN,JMAX
 ! GHGM - set N+ and He+ to zero
 !       if(uthrs.lt.2.0E-2) then
@@ -538,14 +538,14 @@ C.... Written by P. Richards June-September 2010.
         CALL PROFIN(IHEPLS,INPLS,PCO,F107,N,temp_ti_te,HPEQ,HEPRAT)
       ENDIF
 
-      !.. This routine adjusts the H+ and He+ densities for depleted flux tubes      
+      !.. This routine adjusts the H+ and He+ densities for depleted flux tubes
       !..  if HPEQ is negative. 0.1 < -HPEQ < 1.0
       IF(HPEQ.LT.-0.001) CALL NEW_HP(JMIN,JMAX,PCO,HPEQ,N,EFLAG)
 
       !.. Update solar EUV flux factors
       CALL FACEUV(F107,F107A,UVFAC,EUVFLUX)
 !      CALL FACSEE(F107,F107A,UVFAC,EUVFLUX)
-      
+
       !.. Update Schumann-Runge UV flux factors
       CALL FACSR(UVFAC,F107,F107A)
 
@@ -558,25 +558,25 @@ C.... Written by P. Richards June-September 2010.
      >                      XIONN(5,J)+XIONN(6,J)
       ENDDO
 
-      !.. 2-stream photoelectron routine to get electron heating 
+      !.. 2-stream photoelectron routine to get electron heating
       !.. rate and secondary ion production
 
       sza_north = sza(5) * 180.0 / 3.14159
       sza_south = sza(jmax - 4) * 180.0 / 3.14159
 
       IF(sza_north.LT.103.0.OR.sza_south.LT.103.0) then
-! 
+
 ! flux tube 158 has an apex height of 127.6
 ! that's the last one we call photoelectrons on...
 !
 ! GHGM - had an issue at 158 - trying 156 as the max
 !
-      if(lp.le.158) then
+      IF(lp.LE.158) THEN
 
       CALL PE2S(F107,F107A,N,temp_ti_te,FPAS,electron_density,UVFAC,
      >          COLUM,IHEPLS,INPLS,INNO,mp,lp)
 
-      endif
+      ENDIF
 
       ENDIF
 
@@ -585,13 +585,13 @@ C.... Written by P. Richards June-September 2010.
 
       !.. Loop to calculate O+(4S) total ionization rate
       !.. PHION=total O+(4S) prod, including EUV, e*, dissoc of O2 and
-      !.. minor ions. BCKPRD = small background production to eliminate 
+      !.. minor ions. BCKPRD = small background production to eliminate
       !,, instability below 200 km
 !     if((mp.eq.2).and.(lp.eq.27)) then
 !       write(6,*) 'GHGM UT ',UTHRS
 !       write(6,*) '**************'
 !     endif
-      DO J=JMIN,JMAX 
+      DO J=JMIN,JMAX
          PHION(J)=1.0E-22
          N(3,J)=1.0E-22
          DO I=1,9
@@ -625,7 +625,7 @@ C.... Written by P. Richards June-September 2010.
       n_save = n
       ti_save = temp_ti_te
       CALL TLOOPS(JMIN,JMAX,CTIPDIM,Z,N,temp_ti_te,DT,DTMIN,EFLAG,
-     >            mp,lp,nflag_t) 
+     >            mp,lp,nflag_t)
 ! GHGM - simple attempt to stop Te climbing above 5,000K
 !     test_te = 0
 !     DO J=JMIN,JMAX
@@ -647,9 +647,9 @@ C.... Written by P. Richards June-September 2010.
 !     if((mp.eq.2).and.(lp.eq.27)) then
 !       do j = jmin,jmax
 !         write(6,11) j,z(j),n(1,j),n(2,j),n(3,j),n(4,j),
-!    >    temp_ti_te(1,j),temp_ti_te(2,j),temp_ti_te(3,j)           
-!         write(6,11) j,z(j),XIONN(4,J),XIONN(5,J),XIONN(6,J), 
-!    >                XIONN(7,J),XIONN(8,J)    
+!    >    temp_ti_te(1,j),temp_ti_te(2,j),temp_ti_te(3,j)
+!         write(6,11) j,z(j),XIONN(4,J),XIONN(5,J),XIONN(6,J),
+!    >                XIONN(7,J),XIONN(8,J)
 !         write(6,*) '*******************************'
 !11       format(i6,f10.0,7e12.4)
 !       enddo
@@ -674,13 +674,12 @@ C.... Written by P. Richards June-September 2010.
 
       !.. Recalculate the minor ion densities with the new O+ density
       !.. Added by PGR 2012-11-29
-      DO J=JMIN,JMAX 
+      DO J=JMIN,JMAX
        IF(Z(J).GE.80.AND.Z(J).LE.700) THEN
           CALL CMINOR(0,J,0,IHEPLS,INPLS,INNO,FD,7,N,temp_ti_te,
      >                Z,EFLAG,mp,lp)
        ENDIF
       ENDDO
-
 
       !.. He+ solution
       IF(EFLAG(2,1).EQ.0.AND.IHEPLS.GT.0) THEN
@@ -770,4 +769,58 @@ C... Written by P. Richards September 2010
  111  FORMAT(/3X,'** CTIP dimension not equal to FLIP dimensions'
      >  /3X,'** Check dimensions in all FLIP modules')
       RETURN
-      END 
+      END
+C:::::::::::::::::: CTIP_CHECK_EFLAG ::::::::::::::::::::::::
+C... This routine checks the error flags and returns a string
+C... containing information about the error, if any.
+C... Written by R. Montuoro June 2020
+      LOGICAL FUNCTION CTIP_CHECK_EFLAG(ESTRING, !.. String containing error message
+     >                                  EFLAG)   !.. Error flag array
+      IMPLICIT NONE
+      CHARACTER(LEN=*), INTENT(OUT) :: ESTRING
+      INTEGER,          INTENT(IN)  :: EFLAG(11,11)    !.. error flags
+
+      CHARACTER(LEN=*), PARAMETER :: ERRMSG(10) = (/
+     >  'Convergence failure in Temperature solution (TLOOPS).'
+     >  //' Time step less than minimum.             ',
+     >  'Convergence failure in Temperature solution (TLOOPS).'
+     >  //' Incorrect input to the band solver BDSLV.',
+     >  'Convergence failure in O+ - H+ solution (DLOOPS).'
+     >  //' Time step less than minimum.                 ',
+     >  'Convergence failure in O+ - H+ solution (DLOOPS).'
+     >  //' Incorrect input to the band solver BDSLV.    ',
+     >  'Convergence failure in He+ solution (XION).'
+     >  //' Time step less than minimum.                       ',
+     >  'Convergence failure in He+ solution (XION).'
+     >  //' Incorrect input to the band solver BDSLV.          ',
+     >  'Convergence failure in He+ solution (XION).'
+     >  //' Time step less than minimum.                       ',
+     >  'Convergence failure in N+ solution (XION).'
+     >  //' Incorrect input to the band solver BDSLV.           ',
+     >  'Convergence failure in CMINOR.            '
+     >  //'                                                     ',
+     >  'CTIP dimension not equal to FLIP dimensions.'
+     >  //' Check dimensions in all FLIP modules              ' /)
+
+      INTEGER, PARAMETER :: ERRI(6) = (/ 1, 2, 3, 4, 5, 11 /)
+      INTEGER, PARAMETER :: ERRJ(6) = (/ 2, 2, 2, 2, 1,  1 /)
+
+      INTEGER I, J, K, N
+
+      CTIP_CHECK_EFLAG = .FALSE.
+      ESTRING = ""
+
+      N = 0
+      DO K = 1, 6
+        DO J = 1, ERRJ(K)
+          N = N + 1
+          I = ERRI(K)
+          CTIP_CHECK_EFLAG = EFLAG(I,J).NE.0
+          IF(CTIP_CHECK_EFLAG) THEN
+            ESTRING = ERRMSG(N)
+            RETURN
+          ENDIF
+        ENDDO
+      ENDDO
+
+      END FUNCTION CTIP_CHECK_EFLAG
