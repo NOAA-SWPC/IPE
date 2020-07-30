@@ -28,6 +28,7 @@ MODULE IPE_Model_Parameters_Class
     INTEGER        :: f107_kp_skip_size
     INTEGER        :: f107_kp_data_size
     INTEGER        :: f107_kp_read_in_start
+    INTEGER        :: f107_kp_realtime_interval
     LOGICAL        :: use_f107_kp_file
     CHARACTER(200) :: f107_kp_file
 
@@ -99,6 +100,7 @@ CONTAINS
     INTEGER        :: f107_kp_size
     INTEGER        :: f107_kp_interval
     INTEGER        :: f107_kp_skip_size
+    INTEGER        :: f107_kp_realtime_interval
     INTEGER        :: f107_kp_data_size
     INTEGER        :: f107_kp_read_in_start
     CHARACTER(200) :: f107_kp_file
@@ -137,13 +139,13 @@ CONTAINS
 
     ! Communication buffers
     CHARACTER(LEN=200), DIMENSION( 4) :: sbuf
-    INTEGER,            DIMENSION(20) :: ibuf
+    INTEGER,            DIMENSION(21) :: ibuf
     REAL(prec),         DIMENSION(21) :: rbuf
 
 
     NAMELIST / SpaceManagement / grid_file
     NAMELIST / TimeStepping    / time_step, start_time, end_time, msis_time_step, initial_timestamp
-    NAMELIST / Forcing         / solar_forcing_time_step, f107_kp_size, f107_kp_interval, f107_kp_skip_size, &
+    NAMELIST / Forcing         / solar_forcing_time_step, f107_kp_size, f107_kp_interval, f107_kp_skip_size, f107_kp_realtime_interval, &
                                  f107_kp_data_size, f107_kp_read_in_start, f107_kp_file, f107, f107_flag, f107_81day_avg, &
                                  kp, kp_flag, kp_flag, kp_1day_avg, ap, ap_flag, ap_1day_avg, nhemi_power, &
                                  nhemi_power_index, shemi_power, shemi_power_index, solarwind_By, solarwind_angle, &
@@ -175,6 +177,7 @@ CONTAINS
     f107_kp_skip_size = 0
     f107_kp_data_size = 1
     f107_kp_read_in_start = 0
+    f107_kp_realtime_interval = -1
     f107_kp_file      = ''
 
     ! Default settings
@@ -268,18 +271,18 @@ CONTAINS
       ! -- strings
       sbuf = (/ grid_file, initial_timestamp, f107_kp_file, mesh_write_file /)
       ! -- integers
-      ibuf(1:12) = (/ f107_kp_size, f107_kp_interval, f107_kp_skip_size, &
+      ibuf(1:13) = (/ f107_kp_size, f107_kp_interval, f107_kp_skip_size, f107_kp_realtime_interval, &
                       f107_kp_data_size, f107_kp_read_in_start, mesh_fill, mesh_write, &
                       f107_flag, kp_flag, ap_flag, nhemi_power_index, shemi_power_index /)
       ! -- logicals
-      IF ( read_apex_neutrals        ) ibuf(13) = 1
-      IF ( read_geographic_neutrals  ) ibuf(14) = 1
-      IF ( write_apex_neutrals       ) ibuf(15) = 1
-      IF ( write_geographic_neutrals ) ibuf(16) = 1
-      IF ( write_geographic_eldyn    ) ibuf(17) = 1
-      IF ( write_apex_eldyn          ) ibuf(18) = 1
-      IF ( params % use_f107_kp_file ) ibuf(19) = 1
-      IF ( dynamo_efield             ) ibuf(20) = 1
+      IF ( read_apex_neutrals        ) ibuf(14) = 1
+      IF ( read_geographic_neutrals  ) ibuf(15) = 1
+      IF ( write_apex_neutrals       ) ibuf(16) = 1
+      IF ( write_geographic_neutrals ) ibuf(17) = 1
+      IF ( write_geographic_eldyn    ) ibuf(18) = 1
+      IF ( write_apex_eldyn          ) ibuf(19) = 1
+      IF ( params % use_f107_kp_file ) ibuf(20) = 1
+      IF ( dynamo_efield             ) ibuf(21) = 1
 
       ! -- reals
       rbuf = (/ time_step, start_time, end_time, msis_time_step, solar_forcing_time_step, &
@@ -304,26 +307,27 @@ CONTAINS
     IF ( ipe_status_check( ierr == 0, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 #endif
 
-    params % f107_kp_size          = ibuf(1)
-    params % f107_kp_interval      = ibuf(2)
-    params % f107_kp_skip_size     = ibuf(3)
-    params % f107_kp_data_size     = ibuf(4)
-    params % f107_kp_read_in_start = ibuf(5)
-    params % mesh_fill             = ibuf(6)
-    params % mesh_write            = ibuf(7)
-    params % f107_flag             = ibuf(8)
-    params % kp_flag               = ibuf(9)
-    params % ap_flag               = ibuf(10)
-    params % nhemi_power_index     = ibuf(11)
-    params % shemi_power_index     = ibuf(12)
-    params % read_apex_neutrals        = ( ibuf(13) == 1 )
-    params % read_geographic_neutrals  = ( ibuf(14) == 1 )
-    params % write_apex_neutrals       = ( ibuf(15) == 1 )
-    params % write_geographic_neutrals = ( ibuf(16) == 1 )
-    params % write_geographic_eldyn    = ( ibuf(17) == 1 )
-    params % write_apex_eldyn          = ( ibuf(18) == 1 )
-    params % use_f107_kp_file          = ( ibuf(19) == 1 )
-    params % dynamo_efield             = ( ibuf(20) == 1 )
+    params % f107_kp_size              = ibuf(1)
+    params % f107_kp_interval          = ibuf(2)
+    params % f107_kp_skip_size         = ibuf(3)
+    params % f107_kp_realtime_interval = ibuf(4)
+    params % f107_kp_data_size         = ibuf(5)
+    params % f107_kp_read_in_start     = ibuf(6)
+    params % mesh_fill                 = ibuf(7)
+    params % mesh_write                = ibuf(8)
+    params % f107_flag                 = ibuf(9)
+    params % kp_flag                   = ibuf(10)
+    params % ap_flag                   = ibuf(11)
+    params % nhemi_power_index         = ibuf(12)
+    params % shemi_power_index         = ibuf(13)
+    params % read_apex_neutrals        = ( ibuf(14) == 1 )
+    params % read_geographic_neutrals  = ( ibuf(15) == 1 )
+    params % write_apex_neutrals       = ( ibuf(16) == 1 )
+    params % write_geographic_neutrals = ( ibuf(17) == 1 )
+    params % write_geographic_eldyn    = ( ibuf(18) == 1 )
+    params % write_apex_eldyn          = ( ibuf(19) == 1 )
+    params % use_f107_kp_file          = ( ibuf(20) == 1 )
+    params % dynamo_efield             = ( ibuf(21) == 1 )
 
 #ifdef HAVE_MPI
     CALL MPI_BCAST( rbuf, size(rbuf), mpi_layer % mpi_prec, 0, mpi_layer % mpi_communicator, ierr )
