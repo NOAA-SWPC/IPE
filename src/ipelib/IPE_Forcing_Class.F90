@@ -269,12 +269,13 @@ CONTAINS
       call forcing % read_f107kp_ipe_forcing( params % f107_kp_file,   &
                                               params % f107_kp_realtime_interval, &
                                               forcing % current_index, &
-                                              forcing % current_index - params % f107_kp_skip_size, &
+                                              forcing % max_read_index, &
                                               params % f107_kp_realtime_interval < 0, &
                                               localrc )
       IF( ipe_error_check( localrc, msg="call to Read_F107KP_IPE_Forcing failed", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     end if
+    CALL forcing % Estimate_AP_from_KP( forcing % current_index )
 
   END SUBROUTINE Update_Current_index
 
@@ -326,7 +327,7 @@ CONTAINS
 
     read_in_size = MIN(forcing % n_time_levels, data_size)
     DO i = read_in_start, read_in_size + read_in_start - 1
-
+!      write(6,*) "reading",i
       READ(fUnit, *, IOSTAT = iostat) date_work, &
                                      forcing % f107(i), &
                                      forcing % kp(i), &
