@@ -718,7 +718,7 @@ CONTAINS
     use params_module
     use cons_module
     use dynamo_module
-    use heelis_module, only:ctpoten
+    use heelis_module, only:ctpoten,theta0
     use module_magfield
     use ipe_error_module
 !!     use module_update_fli,ONLY:update_fli
@@ -740,9 +740,9 @@ CONTAINS
     INTEGER    :: tube_need(dyn_midpoint),ihem,lp_dyn
     INTEGER    :: localrc
     REAL(prec) :: mlat_plas,mlat_dyn
-    REAL(prec) :: fkp
+    REAL(prec) :: fkp,fkpa
     REAL(prec) :: ed_dyn(170,80,2)
-    REAL(prec) :: theta0(kmlat)
+!   REAL(prec) :: theta0(kmlat)
     REAL(prec) :: xlonm_deg_map(82)
     REAL(prec) :: ylatm_deg_map(kmlat)
     REAL(prec) :: ed1dy_map(82,kmlat)
@@ -760,8 +760,14 @@ CONTAINS
     swden= forcing % solarwind_density (forcing % current_index )
     stilt= get_tilt(time_tracker%year,time_tracker%month,time_tracker%day,time_tracker%utime)
 
+    fkpa=0.05+2.244*1E-4*swvel**real(4./3.)*bt**real(2./3.)*(sin(sangle*pi/180./2.)**real(8./3.))+2.844*1E-6*swden**real(1./2.)*swvel**2.
+!   print *,'fkp',swvel,sangle,swden,bt,fkp
     fkp= forcing % kp ( forcing % current_index )
-    ctpoten= 15.+15.*fkp+0.8*fkp**2
+!   if (fkpa.gt.9) fkpa=9.
+    ctpoten= 15.+15.*fkpa+0.8*fkpa**2
+!   ctpoten= 1E-4*swvel**2.+11.7*bt*sin(sangle*pi/180./2.)**3.
+!   print *,'fkp',fkp,ctpoten
+!   write(1000 + mpi_layer % rank_id, *) fkp, fkpa, ctpoten
     CALL init_heelis
 
     year=2000
@@ -905,6 +911,8 @@ CONTAINS
     CALL eldyn % Regrid_Potential( grid,mpi_layer, time_tracker,ed2dy_map,xlonm_deg_map,ylatm_deg_map, 1, 82,kmlat, rc=localrc )
     IF ( ipe_error_check( localrc, msg="call to Regrid_Potential (ed2dy_map) failed", line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     eldyn % electric_field(2,:,:) = eldyn % electric_potential
+
+    write(1000 + mpi_layer % rank_id, *) theta0(1),crit(1),crit(2)
 
   END SUBROUTINE Dynamo_Wrapper
 

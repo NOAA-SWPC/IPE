@@ -13,7 +13,7 @@
       use heelis_module !,ONLY:what?
       use module_magfield,only: sunlons 
       use cons_module,only: rtd,                                        &
-     &  crit,                                                           &! critical colatitudes crit(2)
+     &  crit,pi_dyn,                                                          &! critical colatitudes crit(2)
      &  xlonm,xlatm  ! magnetic grid lons, lats
       use dynamo_module,only: kmlat0,pfrac
       use params_module,only: kmlonp1
@@ -57,6 +57,9 @@
 ! Calculate fractional presence of dynamo equation at each northern
 ! hemisphere geomagnetic grid point. Output in pfrac(kmlonp1,kmlat0)
 !
+         crit(1)=theta0(1)+5.*pi_dyn/180.
+         crit(2)=theta0(1)+20.*pi_dyn/180.
+         print *,'in dynamo',theta0(1),crit(1),crit(2)
 	do i=1,kmlonp1
           pfrac(i,j) = (colatc(i,j)-crit(1))/(crit(2)-crit(1))
           if (pfrac(i,j) < 0.) pfrac(i,j) = 0.
