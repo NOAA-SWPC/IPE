@@ -1389,17 +1389,29 @@ CONTAINS
     REAL(sp) :: F107D, F107A
     CHARACTER(len=95) :: ERRMSG
     LOGICAL, EXTERNAL :: CTIP_CHECK_EFLAG
+!nm20200605 magnetopause loss
+    INTEGER,parameter  :: lp_boundary = 19 !69.66[deg],L=8.4
 
       F107D = forcing % f107( forcing % current_index )
       F107A = forcing % f107_81day_avg( forcing % current_index )
       UTHR  = time_tracker % hour + (time_tracker % minute) / 60.0
-      HPEQ_flip = HPEQ
+
+!nm20200605 magnetopause loss
+!      HPEQ_flip = HPEQ
+!
       nflag_t = 0
       nflag_d = 0
 
       DO mp = plasma % mp_low, plasma % mp_high
         DO lp = 1, plasma % NLP
 
+!nm20200605 magnetopause loss
+      IF ( lp <= lp_boundary ) THEN
+        HPEQ_flip = -0.10
+      ELSE
+        HPEQ_flip = 0.0
+      END IF
+!
           ! Copy over the grid information (for now)
           ZX(1:grid % flux_tube_max(lp))  = grid % altitude(1:grid % flux_tube_max(lp),lp)/1000.0_prec !convert from m to km
           PCO                             = grid % p_value(lp)  !Pvalue is a single value

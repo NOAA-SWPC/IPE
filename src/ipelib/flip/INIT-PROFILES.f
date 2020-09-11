@@ -1,6 +1,27 @@
 C........................ INIT-PROFILES.FOR.................................
 C.... This file contains routines for setting up initial profiles and 
 C.... Adjusting the H+ He+ depleted flux tube profiles
+C::::::::::::::::SET_HPEQ
+      SUBROUTINE SET_HPEQ(PCO,  !.. L-value 
+     >                   HPEQ)  !.. Fraction of a full flux tube (see below)
+
+
+      IMPLICIT NONE
+      DOUBLE PRECISION PCO,HPEQ,HP_FULL
+ 
+      !.. HPEQ enters as a fraction of a full flux tube but returns the
+      !.. equatorial H+ density
+      !If HPEQ out of range use a full flux tube
+      IF(DABS(HPEQ).LT.0.1.OR.DABS(HPEQ).GT.1.0) HPEQ=1.0
+      !... set default HPEQ for a full flux tube
+      HP_FULL=5.0E4/PCO**3
+      !... Take fraction HPEQ of HP_FULL
+      HPEQ=DABS(HPEQ)*HP_FULL
+      IF(HPEQ.LT.5) HPEQ=5   !.. don't let density get below 5 
+
+      RETURN
+      END
+
 C::::::::::::::::::::::::::::::: PROFIN ::::::::::::::::::::::::::::::::::
 C....... set up rough initial O+, H+, and temperature profiles
       SUBROUTINE PROFIN(IHEPLS,INPLS,PCO,F107,N,TI,HPEQ,HEPRAT)
@@ -90,13 +111,16 @@ C... Written by P. Richards September 2010
      >                 EFLAG)     !.. Error flag array
       USE ION_DEN_VEL   !.. O+ H+ He+ N+ NO+ O2+ N2+ O+(2D) O+(2P)
       IMPLICIT NONE
-      INTEGER J,JMIN,JMAX
+      INTEGER J,JMIN,JMAX,JEQ
       INTEGER EFLAG(11,11)         !.. error flags
       DOUBLE PRECISION ALPHA,HP_MIN,HPEQ,PCO,N(4,IDIM)
 
-      !.. Equatorial density for a depleted flux tube (~20% full).
+      !.. equatorial density for a depleted flux tube. Not less than 30
+      CALL SET_HPEQ(PCO,HPEQ)     !.. Set the equatorial [H+]
+
+      !.. Equatorial density for a depleted flux tube (~10% full).
       HP_MIN=300/PCO**2
-      IF(HP_MIN.LT.5.0) HP_MIN=5.0
+      IF(HP_MIN.LT.5.0) HP_MIN=5.0    !.. don't let density get below 5 
 
       ALPHA=HP_MIN/N(2,(JMIN+JMAX)/2)   !.. reduction factor at equator
 
