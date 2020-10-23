@@ -15,6 +15,8 @@
       use module_weimer2005Ipe,ONLY:setmodel2005Ipe,epotval2005Ipe
      &  ,fileLocation
       use cons_module,ONLY:xlatm_deg,xlonm_deg,pi,dtr,xlatm
+      use module_init_heelis!,only:init_heelis
+      use heelis_module,ONLY:ctpoten
       implicit none
       integer,optional,intent(out) :: rc
 
@@ -33,11 +35,12 @@
       if (present(rc)) rc = IPE_SUCCESS
 
       if (potential_model == 'HEELIS') then
+        call init_heelis
         call heelis
 
 !         write(unit=4025,FMT='(20E12.4)') phihm
       else if (potential_model == 'weimer2005') then
-        call heelis
+!       call heelis
 
         call setmodel2005Ipe(sangle,bt,stilt,swvel,swden
      &,fileLocation,'epot',rc=lrc)
@@ -77,7 +80,11 @@
            end if               !abs(mlat)
          end do mlatLoop      !j=1,kmlat
 
-!         write(unit=4025,FMT='(20E12.4)') phihm
+        ctpoten=(maxval(phihm)-minval(phihm))/1.0E+3
+        write(unit=4025,FMT='(3E12.4)') minval(phihm),maxval(phihm)
+     &  ,ctpoten
+        CALL init_heelis
+        call heelis
 
       else  !  potential_model='NONE'
         do j=1,kmlat0

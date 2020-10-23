@@ -712,7 +712,7 @@ CONTAINS
   SUBROUTINE Dynamo_Wrapper(eldyn,grid,forcing,time_tracker, plasma, mpi_layer, rc)
 
     use module_init_cons!,only:init_cons
-    use module_init_heelis!,only:init_heelis
+!   use module_init_heelis!,only:init_heelis
     use module_highlat!,only: highlat
     use module_sub_dynamo!,only: dynamo
     use params_module
@@ -760,15 +760,13 @@ CONTAINS
     swden= forcing % solarwind_density (forcing % current_index )
     stilt= get_tilt(time_tracker%year,time_tracker%month,time_tracker%day,time_tracker%utime)
 
-    fkpa=0.05+2.244*1E-4*swvel**real(4./3.)*bt**real(2./3.)*(sin(sangle*pi/180./2.)**real(8./3.))+2.844*1E-6*swden**real(1./2.)*swvel**2.
+!   fkpa=0.05+2.244*1E-4*swvel**real(4./3.)*bt**real(2./3.)*(sin(sangle*pi/180./2.)**real(8./3.))+2.844*1E-6*swden**real(1./2.)*swvel**2.
 !   print *,'fkp',swvel,sangle,swden,bt,fkp
     fkp= forcing % kp ( forcing % current_index )
 !   if (fkpa.gt.9) fkpa=9.
-    ctpoten= 15.+15.*fkpa+0.8*fkpa**2
-!   ctpoten= 1E-4*swvel**2.+11.7*bt*sin(sangle*pi/180./2.)**3.
-!   print *,'fkp',fkp,ctpoten
-!   write(1000 + mpi_layer % rank_id, *) fkp, fkpa, ctpoten
-    CALL init_heelis
+!   ctpoten= 15.+15.*fkpa+0.8*fkpa**2
+
+!   CALL init_heelis
 
     year=2000
 
@@ -912,7 +910,7 @@ CONTAINS
     IF ( ipe_error_check( localrc, msg="call to Regrid_Potential (ed2dy_map) failed", line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     eldyn % electric_field(2,:,:) = eldyn % electric_potential
 
-    write(1000 + mpi_layer % rank_id, *) theta0(1),crit(1),crit(2)
+!   write(1000 + mpi_layer % rank_id, *) theta0(1),crit(1),crit(2)
 
   END SUBROUTINE Dynamo_Wrapper
 
