@@ -303,45 +303,46 @@ CONTAINS
 
     IF (PRESENT(rc)) rc = IPE_SUCCESS
 
-    IF( dynamo_efield ) THEN
+!   IF( dynamo_efield ) THEN
 
-      CALL eldyn % Dynamo_Wrapper(grid, forcing, time_tracker, plasma, mpi_layer, rc=localrc )
-      IF ( ipe_error_check(localrc, msg="call to Dynamo_Wrapper failed", &
-        line=__LINE__, file=__FILE__, rc=rc) ) RETURN
-      IF( mpi_layer % rank_id == 0 )THEN
-       write(6,*) '*********************************'
-       write(6,899) time_tracker % year, time_tracker % month, time_tracker % day, &
-                    time_tracker % hour, time_tracker % minute
- 899   format('Calling Dynamo E field ', i4,x,i2.2,x,i2.2,2x,i2.2,':'i2.2)
-       write(6,*) '*********************************'
-      ENDIF
+!     CALL eldyn % Dynamo_Wrapper(grid, forcing, time_tracker, plasma, mpi_layer, rc=localrc )
+!     IF ( ipe_error_check(localrc, msg="call to Dynamo_Wrapper failed", &
+!       line=__LINE__, file=__FILE__, rc=rc) ) RETURN
+!     IF( mpi_layer % rank_id == 0 )THEN
+!      write(6,*) '*********************************'
+!      write(6,899) time_tracker % year, time_tracker % month, time_tracker % day, &
+!                   time_tracker % hour, time_tracker % minute
+!899   format('Calling Dynamo E field ', i4,x,i2.2,x,i2.2,2x,i2.2,':'i2.2)
+!      write(6,*) '*********************************'
+!     ENDIF
 
-    ELSE
+!   ELSE
 
-      CALL eldyn % Empirical_E_Field_Wrapper( grid, forcing, time_tracker, mpi_layer, rc=localrc )
-      IF ( ipe_error_check(localrc, msg="call to Empirical_E_Field_Wrapper failed", &
-        line=__LINE__, file=__FILE__, rc=rc) ) RETURN
-      IF( mpi_layer % rank_id == 0 )THEN
-        print *,'TZU-WEI calling empirical E field'
-      ENDIF
+!     CALL eldyn % Empirical_E_Field_Wrapper( grid, forcing, time_tracker, mpi_layer, rc=localrc )
+!     IF ( ipe_error_check(localrc, msg="call to Empirical_E_Field_Wrapper failed", &
+!       line=__LINE__, file=__FILE__, rc=rc) ) RETURN
+!     IF( mpi_layer % rank_id == 0 )THEN
+!       print *,'TZU-WEI calling empirical E field'
+!     ENDIF
 
-      ! Calculate the potential gradient in IPE coordinates.
-      CALL eldyn % Calculate_Potential_Gradient( grid )
+!     ! Calculate the potential gradient in IPE coordinates.
+!     CALL eldyn % Calculate_Potential_Gradient( grid )
 
-    ENDIF
+!   ENDIF
 
 !    IF( mpi_layer % rank_id == 0 )THEN
 !    print *,'in dynamo,',time_tracker % month, time_tracker % day, &
 !          time_tracker % hour, time_tracker % minute 
 !    ENDIF
-     filename='../wam_potentials/potential_SMG_20150318_000000.h5'
-!     write(filename(39:40),'(i2.2)') time_tracker % day
+     filename='../wam_potentials/potential_SMG_20150317_000000.h5'
+      write(filename(39:40),'(i2.2)') time_tracker % day
       write(filename(42:43),'(i2.2)') time_tracker % hour
       write(filename(44:45),'(i2.2)') time_tracker % minute
+     IF( mpi_layer % rank_id == 0 )THEN
       print *,'in dynamo',filename
+     ENDIF
 
         CALL eldyn % Read_Geospace_Potential_hdf5(io, filename)
-       print *,'reading Geospace'
         CALL eldyn % Interpolate_Geospace_to_MHDpotential ( grid, time_tracker, mpi_layer)
     ! Calculate ExB drift velocity
     CALL eldyn % Calculate_ExB_Velocity( grid , mpi_layer, max_v_exb_local )
