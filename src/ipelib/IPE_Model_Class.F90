@@ -206,7 +206,8 @@ CONTAINS
       IF ( ipe_error_check( localrc, msg="Failed to update neutrals", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
-      CALL ipe % eldyn % Update( ipe % grid, &
+      CALL ipe % eldyn % Update( ipe % io,  &
+                                 ipe % grid, &
                                  ipe % forcing, &
                                  ipe % time_tracker, &
                                  ipe % plasma, &

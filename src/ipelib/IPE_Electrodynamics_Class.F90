@@ -13,6 +13,7 @@ USE IPE_Plasma_Class
 USE efield_ipe
 USE dynamo_module
 USE ipe_error_module
+USE COMIO
 
 IMPLICIT NONE
 
@@ -50,6 +51,8 @@ IMPLICIT NONE
       PROCEDURE :: Build => Build_IPE_Electrodynamics
       PROCEDURE :: Trash => Trash_IPE_Electrodynamics
       PROCEDURE :: Update => Update_IPE_Electrodynamics
+      PROCEDURE, PRIVATE :: Read_Geospace_Potential_hdf5
+      PROCEDURE, PRIVATE :: Interpolate_Geospace_to_MHDpotential
       PROCEDURE, PRIVATE :: Empirical_E_Field_Wrapper
       PROCEDURE, PRIVATE :: Dynamo_Wrapper
       PROCEDURE, PRIVATE :: Regrid_Potential
@@ -61,6 +64,8 @@ IMPLICIT NONE
   LOGICAL, PRIVATE :: dynamo_efield
 
   REAL(prec), PRIVATE :: theta90_rad(0:nmlat)
+  REAL(prec), PRIVATE, ALLOCATABLE :: geospace_latitude(:),geospace_longitude(:), geospace_potential(:,:)
+
 
 CONTAINS
 
@@ -186,11 +191,100 @@ CONTAINS
 
   END SUBROUTINE Trash_IPE_Electrodynamics
 
+ SUBROUTINE Read_Geospace_Potential_hdf5( eldyn, io, filename )
+
+    CLASS( IPE_Electrodynamics ), INTENT(inout) :: eldyn
+    CLASS(COMIO_T)                :: io
+    CHARACTER(*),  INTENT(in)    :: filename
+
+    integer, dimension(:), pointer :: fdims => null()
+    integer, parameter :: lsize=181
+    integer :: lats, lons
+
+    CALL io % open(filename, "r")
+    IF ( io % err % check(msg="Failed to open file "//filename, &
+      file=__FILE__, line=__LINE__)) RETURN
+
+!   CALL io % domain("/potential", fdims)
+!   IF ( io % err % check(msg="Failed to setup I/O data decomposition", &
+!     file=__FILE__, line=__LINE__)) RETURN
+
+!   lats = fdims(1)
+!   lons = fdims(2)
+
+    if (.not.allocated(geospace_latitude))  allocate(geospace_latitude(lsize))
+    if (.not.allocated(geospace_longitude)) allocate(geospace_longitude(lsize))
+    if (.not.allocated(geospace_potential)) allocate(geospace_potential(lsize,lsize))
+
+    CALL io % domain((/lsize/), (/1/), (/lsize/))
+!   CALL io % domain(fdims(1), (/0/), fdims(1))
+    IF ( io % err % check(msg="Failed to setup I/O data decomposition", &
+      file=__FILE__, line=__LINE__)) RETURN
+
+    CALL io % read("/lat",geospace_latitude)
+    IF ( io % err % check(msg="Failed to read datase /lat", &
+      file=__FILE__, line=__LINE__)) RETURN
+
+    CALL io % read("/lon",geospace_longitude)
+    IF ( io % err % check(msg="Failed to read datase /lon", &
+      file=__FILE__, line=__LINE__)) RETURN
+
+    CALL io % domain((/lsize,lsize/), (/1, 1/), (/lsize,lsize/))
+    IF ( io % err % check(msg="Failed to setup I/O data decomposition", &
+      file=__FILE__, line=__LINE__)) RETURN
+
+    CALL io % read("/potential",geospace_potential)
+    IF ( io % err % check(msg="Failed to read datase /potential", &
+      file=__FILE__, line=__LINE__)) RETURN
+
+    CALL io % close()
+    IF ( io % err % check(msg="Failed to close file "//filename, &
+      file=__FILE__, line=__LINE__)) RETURN
 
 
-  SUBROUTINE Update_IPE_Electrodynamics( eldyn, grid, forcing, time_tracker, plasma, mpi_layer, rc )
+    print *,'Geospace',Maxval(geospace_potential),minval(geospace_potential)
+
+  END SUBROUTINE Read_Geospace_Potential_hdf5
+
+  SUBROUTINE Interpolate_Geospace_to_MHDpotential( eldyn, grid, time_tracker,mpi_layer)
+
+    IMPLICIT NONE
+
+    CLASS( IPE_Electrodynamics ), INTENT(inout) :: eldyn
+    TYPE( IPE_Grid ), INTENT(in)             :: grid
+    TYPE( IPE_Time ), INTENT(in)             :: time_tracker
+    TYPE( IPE_MPI_Layer ),        INTENT(in)    :: mpi_layer
+
+    ! Local
+    INTEGER :: j,latidx
+    integer, parameter :: n_lon_geospace = 181
+    integer, parameter :: n_lat_geospace = 181
+    REAL(prec) :: theta110_rad,geospace_latitude_90_rad(1:n_lat_geospace)
+    REAL(prec) :: colat_local(1:n_lat_geospace)
+    REAL(prec) :: potential_local(1:n_lon_geospace,1:n_lat_geospace)
+
+    DO j = 1, n_lat_geospace
+      theta110_rad   = ( 90.0_prec - geospace_latitude(j) ) * dtr
+      geospace_latitude_90_rad(j) =ASIN(SIN(theta110_rad)*SQRT((earth_radius+90000.0_prec)/(earth_radius+110000.0_prec)))
+      IF ( theta110_rad > half_pi ) geospace_latitude_90_rad(j) = pi - geospace_latitude_90_rad(j)
+    ENDDO
+
+    DO j = 1, n_lat_geospace
+      latidx = n_lat_geospace-j+1
+      colat_local(j)= geospace_latitude_90_rad(latidx)*rtd
+      potential_local(:,j)=geospace_potential(:,latidx)
+    END DO
+
+     CALL eldyn % Regrid_Potential( grid, mpi_layer, time_tracker, potential_local,geospace_longitude, colat_local, 1, n_lon_geospace, n_lat_geospace )
+
+!    eldyn % mhd_electric_potential= eldyn % electric_potential
+
+  END SUBROUTINE Interpolate_Geospace_to_MHDpotential
+
+  SUBROUTINE Update_IPE_Electrodynamics( eldyn, io, grid, forcing, time_tracker, plasma, mpi_layer, rc )
     IMPLICIT NONE
     CLASS( IPE_Electrodynamics ), INTENT(inout) :: eldyn
+    CLASS(COMIO_T)                :: io
     TYPE( IPE_Grid ),             INTENT(in)    :: grid
     TYPE( IPE_Forcing ),          INTENT(in)    :: forcing
     TYPE( IPE_Time ),             INTENT(in)    :: time_tracker
@@ -201,6 +295,8 @@ CONTAINS
     INTEGER :: lp, mp, localrc
     REAL(prec) :: max_v_exb_local
     REAL(prec) :: max_v_exb
+    REAL(prec) :: utime
+    CHARACTER(50) :: filename
 #ifdef HAVE_MPI
     INTEGER :: mpiError
 #endif
@@ -234,6 +330,19 @@ CONTAINS
 
     ENDIF
 
+!    IF( mpi_layer % rank_id == 0 )THEN
+!    print *,'in dynamo,',time_tracker % month, time_tracker % day, &
+!          time_tracker % hour, time_tracker % minute 
+!    ENDIF
+     filename='../wam_potentials/potential_SMG_20150318_000000.h5'
+!     write(filename(39:40),'(i2.2)') time_tracker % day
+      write(filename(42:43),'(i2.2)') time_tracker % hour
+      write(filename(44:45),'(i2.2)') time_tracker % minute
+      print *,'in dynamo',filename
+
+        CALL eldyn % Read_Geospace_Potential_hdf5(io, filename)
+       print *,'reading Geospace'
+        CALL eldyn % Interpolate_Geospace_to_MHDpotential ( grid, time_tracker, mpi_layer)
     ! Calculate ExB drift velocity
     CALL eldyn % Calculate_ExB_Velocity( grid , mpi_layer, max_v_exb_local )
 
