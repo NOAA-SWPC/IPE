@@ -242,8 +242,6 @@ CONTAINS
       file=__FILE__, line=__LINE__)) RETURN
 
 
-    print *,'Geospace',Maxval(geospace_potential),minval(geospace_potential)
-
   END SUBROUTINE Read_Geospace_Potential_hdf5
 
   SUBROUTINE Interpolate_Geospace_to_MHDpotential( eldyn, grid, time_tracker,mpi_layer)
@@ -256,7 +254,7 @@ CONTAINS
     TYPE( IPE_MPI_Layer ),        INTENT(in)    :: mpi_layer
 
     ! Local
-    INTEGER :: j,latidx
+    INTEGER :: j,latidx,localrc
     integer, parameter :: n_lon_geospace = 181
     integer, parameter :: n_lat_geospace = 181
     REAL(prec) :: theta110_rad,geospace_latitude_90_rad(1:n_lat_geospace)
@@ -275,7 +273,11 @@ CONTAINS
       potential_local(:,j)=geospace_potential(:,latidx)
     END DO
 
-     CALL eldyn % Regrid_Potential( grid, mpi_layer, time_tracker, potential_local,geospace_longitude, colat_local, 1, n_lon_geospace, n_lat_geospace )
+    IF( mpi_layer % rank_id == 0 )THEN
+    print *,'potential_local',Maxval(potential_local),minval(potential_local)
+    ENDIF
+     
+     CALL eldyn % Regrid_Potential(grid,mpi_layer,time_tracker,potential_local,geospace_longitude,colat_local,1,n_lon_geospace,n_lat_geospace, rc=localrc )
 
 !    eldyn % mhd_electric_potential= eldyn % electric_potential
 
@@ -338,12 +340,18 @@ CONTAINS
       write(filename(39:40),'(i2.2)') time_tracker % day
       write(filename(42:43),'(i2.2)') time_tracker % hour
       write(filename(44:45),'(i2.2)') time_tracker % minute
-     IF( mpi_layer % rank_id == 0 )THEN
-      print *,'in dynamo',filename
-     ENDIF
 
         CALL eldyn % Read_Geospace_Potential_hdf5(io, filename)
+!   print *,'Geospace',Maxval(geospace_potential),minval(geospace_potential)
+!   print *,'Geo-lon',Maxval(geospace_longitude),minval(geospace_longitude)
+!   print *,'Geo-lat',Maxval(geospace_latitude),minval(geospace_latitude)
         CALL eldyn % Interpolate_Geospace_to_MHDpotential ( grid, time_tracker, mpi_layer)
+      CALL eldyn % Calculate_Potential_Gradient( grid )
+     IF( mpi_layer % rank_id == 0 )THEN
+      print *,'in dynamo',filename
+      print *,'electric_field',maxval(eldyn % electric_field),minval(eldyn % electric_field)
+     ENDIF
+
     ! Calculate ExB drift velocity
     CALL eldyn % Calculate_ExB_Velocity( grid , mpi_layer, max_v_exb_local )
 
@@ -555,7 +563,7 @@ CONTAINS
     ! Local
     INTEGER :: mp, lp, i, j, i1, i2, j1, j2, ii, localrc
     INTEGER :: ilat(1:grid % NLP), jlon(grid % mp_low - grid % mp_halo:grid % mp_high+grid % mp_halo)
-    REAL(prec) :: lat, lon, dlon, difflon, mindiff
+    REAL(prec) :: lat, lon, dlon, difflon, mindiff,dlon_save
     REAL(prec) :: lat_weight(1:2), lon_weight(1:2)
     REAL(prec) :: mlon90_rad(start_index:nlon)
     REAL(prec) :: mlat90_rad(start_index:nlat)
@@ -573,12 +581,17 @@ CONTAINS
       mlat90_rad = dtr * colat
     ENDIF
 
+     IF( mpi_layer % rank_id == 0 )THEN
+    print *,'mlon90_rad_deg',mlon90_rad*180/pi
+    print *,'mlon90_rad',mlon90_rad
+     ENDIF
 
     ! Search for nearest grid points in the magnetic longitude/latitude grid
     DO mp = grid % mp_low - grid % mp_halo, grid % mp_high + grid % mp_halo
       lon = grid % magnetic_longitude(mp)
-
-
+      
+      mindiff = 1000.0_prec
+      if (lon >= 0.) then
       ! Note that the mlon90_rad(j) array is not monotonically increasing
       ! with index j. This happens because the empirical model provides data
       ! on the MLT grid so that magnetic longitude=0 may not occur at j=0.
@@ -587,7 +600,7 @@ CONTAINS
 
       ! Initial condition for the minimum difference is something absurd that
       ! is guaranteed to be larger than the differences calculated.
-      mindiff = 1000.0_prec
+!     mindiff = 1000.0_prec
       DO j = start_index, nlon
         difflon = ABS( mlon90_rad(j) - lon )
 
@@ -595,8 +608,23 @@ CONTAINS
           jlon(mp) = j
           mindiff = difflon
         ENDIF
+ 
 
       ENDDO
+
+      else
+
+      DO j = start_index, nlon
+        difflon = ABS( (mlon90_rad(j)-two_pi) - lon )
+
+        IF( difflon < mindiff )THEN
+          jlon(mp) = j
+          mindiff = difflon
+        ENDIF
+        
+
+      ENDDO
+      ENDIF
 
     ENDDO
 
@@ -692,7 +720,7 @@ CONTAINS
           ! greater than the IPE longitude point. Because of this, the bounding
           ! points are at [jlon(mp)-1] and at [jlon(mp)].
 
-          IF( lon > mlon90_rad(jlon(mp)) ) THEN
+          IF ((lon > mlon90_rad(jlon(mp))).or.(lon < 0. .and. lon > mlon90_rad(jlon(mp))-two_pi) ) THEN
 
             ! In this case the first longitude point on the empirical model grid
             ! is greater than the mp-longitude point on the IPE grid. Here, the
@@ -702,17 +730,25 @@ CONTAINS
             j2 = jlon(mp)+1
 
           ELSE
-
+             
             j1 = jlon(mp)-1
             j2 = jlon(mp)
+           
+!           IF (lon < (mlon90_rad(jlon(mp)-1)- two_pi)) THEN
+!           j1 = jlon(mp)-2
+!           j2 =  jlon(mp)-1
+!           ENDIF
 
           ENDIF
+
 
         ENDIF
 
         dlon = mlon90_rad(j1) - mlon90_rad(j2)
+        dlon_save=dlon
 !       IF( dlon > 0.0_prec )THEN
 ! GHGM .ge. (I think)
+        
         IF( dlon.ge.0.0_prec )THEN
 
           dlon = dlon - two_pi
@@ -731,8 +767,15 @@ CONTAINS
 
         ELSE
 
+          IF( mp == 0 )THEN
+
+            lon_weight(1) =  ( lon - (mlon90_rad(j2)-two_pi) )/dlon
+            lon_weight(2) = -( lon - (mlon90_rad(j1)-two_pi) )/dlon
+
+          ELSE
           lon_weight(1) =  ( lon - mlon90_rad(j2) )/dlon
           lon_weight(2) = -( lon - mlon90_rad(j1) )/dlon
+          ENDIF
 
         ENDIF
 
@@ -740,9 +783,19 @@ CONTAINS
                                               potential(j2,i1)*lat_weight(1)*lon_weight(2) +&
                                               potential(j1,i2)*lat_weight(2)*lon_weight(1) +&
                                               potential(j2,i2)*lat_weight(2)*lon_weight(2) )
+!      print *,'mlon90_rad',mlon90_rad*180/pi,mlon90_rad
+!      print *,'lon-lat',mp,lon,lat,jlon(mp),j1,j2,mlon90_rad(j1),mlon90_rad(j2),dlon_save
+!      print *,'lon_weight',lon_weight
+
+       if (lon_weight(1) > 1..or.lon_weight(2) >1.) print *,'wrong lon weight',mp,lon,lat,jlon(mp)
+       if (lat_weight(1) > 1..or.lat_weight(2) >1.) print *,'wrong lat weight',mp,lon,lat,jlon(mp)
 
       ENDDO
     ENDDO
+!    IF( mpi_layer % rank_id == 0 )THEN
+    print *,'potential_regrid',Maxval(potential),minval(potential)
+    print*,'electric_potential',Maxval(eldyn % electric_potential),minval(eldyn% electric_potential)
+!    ENDIF
 
   END SUBROUTINE Regrid_Potential
 
