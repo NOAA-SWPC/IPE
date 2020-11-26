@@ -94,7 +94,8 @@ CONTAINS
 
 
       ALLOCATE( eldyn % electric_potential(1:NLP,mp_low-halo:mp_high+halo), &
-                eldyn % electric_potential2(1:NLP,mp_low-halo:mp_high+halo), &
+!               eldyn % electric_potential2(1:NLP,mp_low-halo:mp_high+halo), &
+                eldyn % electric_potential2(1:NLP,1:NMP), &
                 eldyn % electric_field(1:2,1:NLP,mp_low:mp_high), &
                 eldyn % v_ExB_geographic(1:3,1:nFluxTube,1:NLP,mp_low:mp_high), &
                 eldyn % v_ExB_apex(1:3,1:NLP,mp_low:mp_high), &
@@ -271,12 +272,13 @@ CONTAINS
       latidx = n_lat_geospace-j+1
       colat_local(j)= geospace_latitude_90_rad(latidx)*rtd
       potential_local(:,j)=geospace_potential(:,latidx)
-    END DO
+    ENDDO
 
     IF( mpi_layer % rank_id == 0 )THEN
     print *,'potential_local',Maxval(potential_local),minval(potential_local)
-    ENDIF
-     
+    print *,'colat',colat_local
+    ENDIF 
+
      CALL eldyn % Regrid_Potential(grid,mpi_layer,time_tracker,potential_local,geospace_longitude,colat_local,1,n_lon_geospace,n_lat_geospace, rc=localrc )
 
 !    eldyn % mhd_electric_potential= eldyn % electric_potential
@@ -567,6 +569,8 @@ CONTAINS
     REAL(prec) :: lat_weight(1:2), lon_weight(1:2)
     REAL(prec) :: mlon90_rad(start_index:nlon)
     REAL(prec) :: mlat90_rad(start_index:nlat)
+    INTEGER :: mpierror, sendcount
+    REAL(prec) :: pot_out(1:grid%NLP, 1:grid%NMP)
 
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
@@ -631,6 +635,7 @@ CONTAINS
     DO lp = 1, grid % NLP
 
       lat = grid % magnetic_colatitude(1,lp)
+
       ! colatitude decreases with increasing lp
       ilat(lp) = nlat
       DO i = start_index, nlat
@@ -785,17 +790,38 @@ CONTAINS
                                               potential(j2,i2)*lat_weight(2)*lon_weight(2) )
 !      print *,'mlon90_rad',mlon90_rad*180/pi,mlon90_rad
 !      print *,'lon-lat',mp,lon,lat,jlon(mp),j1,j2,mlon90_rad(j1),mlon90_rad(j2),dlon_save
-!      print *,'lon_weight',lon_weight
+!      print *,'lon-lat',mp,lon,lat,ilat(lp),i1,i2,mlat90_rad(i1),mlat90_rad(i2)
+!      print *,'lon_weight',lon_weight,lat_weight
 
        if (lon_weight(1) > 1..or.lon_weight(2) >1.) print *,'wrong lon weight',mp,lon,lat,jlon(mp)
        if (lat_weight(1) > 1..or.lat_weight(2) >1.) print *,'wrong lat weight',mp,lon,lat,jlon(mp)
 
       ENDDO
     ENDDO
-!    IF( mpi_layer % rank_id == 0 )THEN
-    print *,'potential_regrid',Maxval(potential),minval(potential)
-    print*,'electric_potential',Maxval(eldyn % electric_potential),minval(eldyn% electric_potential)
-!    ENDIF
+
+   DO mp = grid % mp_low , grid % mp_high
+     DO lp = 1, grid % NLP
+          pot_out(lp,mp) = eldyn % electric_potential(lp,mp)
+     ENDDO
+   ENDDO
+
+   sendcount = grid % NLP*( grid % mp_high-grid % mp_low + 1 )
+   CALL MPI_Allgather( pot_out(1:grid % NLP,grid % mp_low:grid %mp_high), &
+                       sendcount,&
+                       mpi_layer % mpi_prec,&
+                       eldyn % electric_potential2, &
+                       sendcount, &
+                       mpi_layer % mpi_prec, &
+                       mpi_layer % mpi_communicator, &
+                       mpierror) 
+     IF( mpi_layer % rank_id == 0 )THEN
+    print *,'potential_regrid',Maxval(potential(:,90:181)),minval(potential(:,90:181))
+    print *,'electric_potential',Maxval(eldyn % electric_potential2),minval(eldyn% electric_potential2)
+     ENDIF
+
+!    write(1000 + mpi_layer % rank_id, *) potential
+!    write(2000 + mpi_layer % rank_id, *) eldyn % electric_potential2
+
 
   END SUBROUTINE Regrid_Potential
 
