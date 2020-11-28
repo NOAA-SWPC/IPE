@@ -271,7 +271,7 @@ CONTAINS
     DO j = 1, n_lat_geospace
       latidx = n_lat_geospace-j+1
       colat_local(j)= geospace_latitude_90_rad(latidx)*rtd
-      potential_local(:,j)=geospace_potential(:,latidx)
+      potential_local(:,j)=geospace_potential(:,latidx)*1000.0_prec
     ENDDO
 
     IF( mpi_layer % rank_id == 0 )THEN
