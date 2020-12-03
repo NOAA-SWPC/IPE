@@ -33,6 +33,7 @@ MODULE IPE_Model_Class
     TYPE( IPE_Electrodynamics )  :: eldyn
     TYPE( IPE_MPI_Layer )        :: mpi_layer
     CLASS( COMIO_T ), POINTER    :: io => NULL()
+    CLASS( COMIO_T ), POINTER    :: forcing_io => NULL()\
 
     CONTAINS
 
@@ -71,11 +72,15 @@ CONTAINS
       ipe % io => COMIO_T(fmt=COMIO_FMT_HDF5, &
                           comm=ipe % mpi_layer % mpi_communicator, &
                           info=ipe % mpi_layer % mpi_info)
+      ipe % forcing_io => COMIO_T(fmt=COMIO_FMT_PNETCDF, &
+                          comm=ipe % mpi_layer % mpi_communicator, &
+                          info=ipe % mpi_layer % mpi_info)
       IF ( ipe_status_check( .not.ipe % io % err % check(), &
         msg="Failed to initialize I/O layer", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     ELSE
       ipe % io => COMIO_T(fmt=COMIO_FMT_HDF5)
+      ipe % forcing_io => COMIO_T(fmt=COMIO_FMT_PNETCDF)
       IF ( ipe_status_check( .not.ipe % io % err % check(), &
         msg="Failed to initialize I/O layer", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
@@ -86,7 +91,7 @@ CONTAINS
 
     ! ////// Forcing ////// !
 
-    CALL ipe % forcing % Build( ipe % parameters, rc=localrc )
+    CALL ipe % forcing % Build( ipe % parameters, ipe % mpi_layer, ipe % forcing_io, rc=localrc )
     IF ( ipe_error_check( localrc, msg="Failed to initialize model forcing", &
       line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
@@ -196,6 +201,8 @@ CONTAINS
     DO i = 1, nSteps
 
       call ipe % forcing % Update_Current_Index( ipe % parameters, &
+                                                 ipe % mpi_layer, &
+                                                 ipe % forcing_io, &
                                                  ipe % time_tracker % elapsed_sec, &
                                                  rc = localrc )
       IF ( ipe_error_check( localrc, msg="Failed to update neutrals", &

@@ -43,7 +43,7 @@ libipe_a-IPE_Electrodynamics_Class.$(OBJEXT): libipe_a-IPE_Common_Routines.$(OBJ
 
 libipe_a-IPE_Forcing_Class.$(OBJEXT): libipe_a-IPE_Common_Routines.$(OBJEXT) \
 	libipe_a-IPE_Constants_Dictionary.$(OBJEXT) libipe_a-IPE_Model_Parameters_Class.$(OBJEXT) \
-	libipe_a-IPE_Precision.$(OBJEXT)
+	libipe_a-IPE_Precision.$(OBJEXT) libipe_a-IPE_MPI_Layer_Class.$(OBJEXT)
 
 libipe_a-IPE_Grid_Class.$(OBJEXT): libipe_a-IPE_Common_Routines.$(OBJEXT) \
 	libipe_a-IPE_Constants_Dictionary.$(OBJEXT) libipe_a-IPE_Model_Parameters_Class.$(OBJEXT) \
