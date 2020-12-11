@@ -259,8 +259,10 @@ CONTAINS
     integer, parameter :: n_lon_geospace = 181
     integer, parameter :: n_lat_geospace = 181
     REAL(prec) :: theta110_rad,geospace_latitude_90_rad(1:n_lat_geospace)
+    REAL(prec) :: longitude_updated(1:n_lon_geospace-1)
     REAL(prec) :: colat_local(1:n_lat_geospace)
     REAL(prec) :: potential_local(1:n_lon_geospace,1:n_lat_geospace)
+    REAL(prec) :: potential_updated(1:n_lon_geospace-1,1:n_lat_geospace)
 
     DO j = 1, n_lat_geospace
       theta110_rad   = ( 90.0_prec - geospace_latitude(j) ) * dtr
@@ -274,12 +276,20 @@ CONTAINS
       potential_local(:,j)=geospace_potential(:,latidx)*1000.0_prec
     ENDDO
 
+    potential_updated(1:91,:)=potential_local(91:n_lon_geospace,:)
+    potential_updated(92:n_lon_geospace-1,:)=potential_local(2:90,:)
+
+    longitude_updated=geospace_longitude(1:n_lon_geospace-1)
+  
     IF( mpi_layer % rank_id == 0 )THEN
     print *,'potential_local',Maxval(potential_local),minval(potential_local)
     print *,'colat',colat_local
     ENDIF 
 
-     CALL eldyn % Regrid_Potential(grid,mpi_layer,time_tracker,potential_local,geospace_longitude,colat_local,1,n_lon_geospace,n_lat_geospace, rc=localrc )
+
+
+!    CALL eldyn % Regrid_Potential(grid,mpi_layer,time_tracker,potential_local,geospace_longitude,colat_local,1,n_lon_geospace,n_lat_geospace, rc=localrc )
+     CALL eldyn % Regrid_Potential(grid,mpi_layer,time_tracker,potential_updated,longitude_updated,colat_local,1,n_lon_geospace-1,n_lat_geospace, rc=localrc )
 
 !    eldyn % mhd_electric_potential= eldyn % electric_potential
 
@@ -819,8 +829,8 @@ CONTAINS
     print *,'electric_potential',Maxval(eldyn % electric_potential2),minval(eldyn% electric_potential2)
      ENDIF
 
-!    write(1000 + mpi_layer % rank_id, *) potential
-!    write(2000 + mpi_layer % rank_id, *) eldyn % electric_potential2
+     write(1000 + mpi_layer % rank_id, *) potential
+     write(2000 + mpi_layer % rank_id, *) eldyn % electric_potential2
 
 
   END SUBROUTINE Regrid_Potential
