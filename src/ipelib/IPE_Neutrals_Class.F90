@@ -240,7 +240,8 @@ CONTAINS
     DO lp = 1, grid % NLP
 
       ! loop over hemispheres, starting with northern one
-      kpStart = grid % northern_top_index(lp)
+!GHGM kpStart = grid % northern_top_index(lp) - changed to one height level lower    
+      kpStart = grid % northern_top_index(lp) - 1
       kpStop  = grid % flux_tube_midpoint(lp)
 
       DO kpStep = 1, -1, -2
@@ -277,7 +278,8 @@ CONTAINS
 
         ENDDO
         ! preparing for the southern hemisphere
-        kpStart = grid % southern_top_index(lp)
+!GHGM   kpStart = grid % southern_top_index(lp) - changed to one height level lower    
+        kpStart = grid % southern_top_index(lp) + 1
         kpStop  = kpStop + 1
       ENDDO
     ENDDO
