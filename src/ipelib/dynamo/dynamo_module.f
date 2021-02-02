@@ -1,3 +1,17 @@
+!20111107: copied originally from tiegcm1.8_dynamo_lres
+! DATE: 08 September, 2011
+!********************************************
+!***      Copyright 2011 NAOMI MARUYAMA   ***
+!***      ALL RIGHTS RESERVED             ***
+!********************************************
+! LICENSE AGREEMENT Ionosphere Plasmasphere Electrodynamics (IPE) model
+! DEVELOPER: Dr. Naomi Maruyama
+! CONTACT INFORMATION:
+! E-MAIL : Naomi.Maruyama@noaa.gov
+! PHONE  : 303-497-4857
+! ADDRESS: 325 Broadway, Boulder, CO 80305
+!-------------------------------------------- 
+!
       module dynamo_module
 !----------------------------------------------------------------------- 
 ! BOP
@@ -133,9 +147,9 @@
 !nm20140804 #ifdef IRIX
 !nm20140804      integer,parameter :: isolve = 1
 !nm20140804 #else
-!      integer,parameter :: isolve = 2 ! default is 2 for new dynamo
+!     integer,parameter :: isolve = 2 ! default is 2 for new dynamo
       integer,parameter :: isolve = 1 
-!      integer,parameter :: isolve = 0
+!     integer,parameter :: isolve = 0
 !nm20140804 #endif
 !
 ! For dot products:

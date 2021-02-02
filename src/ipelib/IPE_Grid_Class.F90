@@ -62,7 +62,12 @@ MODULE IPE_Grid_Class
 
   END TYPE IPE_Grid
 
-REAL(prec), PARAMETER, PRIVATE :: dlonm90km = 4.5_prec
+
+!REAL(prec), PARAMETER, PRIVATE :: dlonm90km = 4.5_prec
+!REAL(prec), PARAMETER          :: dlonm90km = 4.5_prec
+ REAL(prec), PARAMETER          :: dlonm90km = 1.125_prec
+
+
 
 CONTAINS
 
@@ -181,7 +186,8 @@ CONTAINS
 
 
     DO i = mp_low-halo, mp_high+halo
-      grid % magnetic_longitude(i) = REAL( (i-1),prec )*dlonm90km*dtr
+     !grid % magnetic_longitude(i) = REAL( (i-1),prec )*dlonm90km*dtr
+      grid % magnetic_longitude(i) = REAL( (i-1),prec )*360.0_prec/nmp*dtr
     ENDDO
 
     DO i = 1, nlat_geo
