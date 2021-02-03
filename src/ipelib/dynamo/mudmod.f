@@ -23,9 +23,6 @@ c                       MUDPACK version 5.0
 ! (dynamo.F).
 !
       subroutine mudmod(pe,jntl,isolve,ier,rc)
-
-      use params_module, only : kmlat, kmlon
-
       use dynamo_module,only: cee
       use ipe_error_module
       implicit none
@@ -36,12 +33,7 @@ c
 c     set grid size params
 c
       integer iixp,jjyq,iiex,jjey,nnx,nny,llwork
-
-!     parameter (iixp = 5 , jjyq = 3, iiex = 5, jjey = 5 )
-      parameter (iixp = 20, jjyq = 6, iiex = 5, jjey = 5 )
-!     parameter (iiex = 5, iixp = kmlon / 2**(iiex-1))
-!     parameter (jjey = 5, jjyq = kmlat / 2**(jjey-1))
-
+      parameter (iixp = 5 , jjyq = 3, iiex = 5, jjey = 5 )
       parameter (nnx=iixp*2**(iiex-1)+1, nny=jjyq*2**(jjey-1)+1)
 !
 !     integer imx0, jmx0, imx1, jmx1,imx2,jmx2,imx3,jmx3,imx4,jmx4

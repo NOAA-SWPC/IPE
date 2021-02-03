@@ -12,9 +12,6 @@ c     mudcom.f
 c
 c
       subroutine muh(pe,jntl,rc)
-
-      use params_module, only : kmlat, kmlon
-
       use dynamo_module,only: nc,cee
       use ipe_error_module
       implicit none
@@ -28,11 +25,7 @@ c      parameter (iixp = 5 , jjyq = 3, iiex = 5, jjey = 5 )
 c      parameter (iixp = 10, jjyq = 6,iiex = 4, jjey = 4 )
 c      parameter (iixp = 20, jjyq = 12,iiex = 3, jjey = 3 )
 c      parameter (iixp = 40, jjyq = 24,iiex = 2, jjey = 2 )
-
-!     parameter (iixp = 80 , jjyq = 48,iiex = 1, jjey = 1 )
-      parameter (iixp = 320, jjyq = 96, iiex = 1, jjey = 1 )
-!     parameter (iixp = kmlon, jjyq = kmlat, iiex = 1, jjey = 1 )
-
+      parameter (iixp = 80 , jjyq = 48,iiex = 1, jjey = 1 )
       parameter (nnx=iixp*2**(iiex-1)+1, nny=jjyq*2**(jjey-1)+1)
 !
 !     integer imx0, jmx0, imx1, jmx1,imx2,jmx2,imx3,jmx3,imx4,jmx4
