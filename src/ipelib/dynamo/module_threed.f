@@ -1,16 +1,3 @@
-!20111107: copied originally from tiegcm1.8_dynamo_lres
-! DATE: 08 September, 2011
-!********************************************
-!***      Copyright 2011 NAOMI MARUYAMA   ***
-!***      ALL RIGHTS RESERVED             ***
-!********************************************
-! LICENSE AGREEMENT Ionosphere Plasmasphere Electrodynamics (IPE) model
-! DEVELOPER: Dr. Naomi Maruyama
-! CONTACT INFORMATION:
-! E-MAIL : Naomi.Maruyama@noaa.gov
-! PHONE  : 303-497-4857
-! ADDRESS: 325 Broadway, Boulder, CO 80305
-!-------------------------------------------- 
       module module_threed
 !----------------------------------------------------------------------- 
       PRIVATE
