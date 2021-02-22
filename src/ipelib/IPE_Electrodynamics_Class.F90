@@ -23,6 +23,8 @@ IMPLICIT NONE
     REAL(prec), ALLOCATABLE :: electric_potential(:,:)
     REAL(prec), ALLOCATABLE :: electric_potential2(:,:)
     REAL(prec), ALLOCATABLE :: electric_field(:,:,:)
+    REAL(prec), ALLOCATABLE :: selfdynamo_efield(:,:,:)
+    REAL(prec), ALLOCATABLE :: total_efield(:,:,:)
     REAL(prec), POINTER     :: v_ExB_geographic(:,:,:,:)  ! "zonal" and "meridional" direction on the geographic grid
     REAL(prec), ALLOCATABLE :: v_ExB_apex(:,:,:) ! "zonal" and "meridional" direction ( VEXBth, VEXBe ) on the apex grid
 
@@ -97,6 +99,8 @@ CONTAINS
 !               eldyn % electric_potential2(1:NLP,mp_low-halo:mp_high+halo), &
                 eldyn % electric_potential2(1:NLP,1:NMP), &
                 eldyn % electric_field(1:2,1:NLP,mp_low:mp_high), &
+                eldyn % selfdynamo_efield(1:2,1:NLP,mp_low:mp_high), &
+                eldyn % total_efield(1:2,1:NLP,mp_low:mp_high), &
                 eldyn % v_ExB_geographic(1:3,1:nFluxTube,1:NLP,mp_low:mp_high), &
                 eldyn % v_ExB_apex(1:3,1:NLP,mp_low:mp_high), &
                 eldyn % hall_conductivity(1:NLP,mp_low:mp_high), &
@@ -113,6 +117,8 @@ CONTAINS
       eldyn % electric_potential      = 0.0_prec
       eldyn % electric_potential2     = 0.0_prec
       eldyn % electric_field          = 0.0_prec
+      eldyn % selfdynamo_efield       = 0.0_prec
+      eldyn % total_efield          = 0.0_prec
       eldyn % v_ExB_geographic        = 0.0_prec
       eldyn % v_ExB_apex              = 0.0_prec
       eldyn % hall_conductivity       = 0.0_prec
@@ -167,6 +173,8 @@ CONTAINS
       DEALLOCATE( eldyn % electric_potential, &
                   eldyn % electric_potential2, &
                   eldyn % electric_field, &
+                  eldyn % total_efield, &
+                  eldyn % selfdynamo_efield, &
                   eldyn % v_ExB_geographic, &
                   eldyn % v_ExB_apex, &
                   eldyn % hall_conductivity, &
@@ -317,32 +325,32 @@ CONTAINS
 
     IF (PRESENT(rc)) rc = IPE_SUCCESS
 
-!   IF( dynamo_efield ) THEN
+    IF( dynamo_efield ) THEN
 
-!     CALL eldyn % Dynamo_Wrapper(grid, forcing, time_tracker, plasma, mpi_layer, rc=localrc )
-!     IF ( ipe_error_check(localrc, msg="call to Dynamo_Wrapper failed", &
-!       line=__LINE__, file=__FILE__, rc=rc) ) RETURN
-!     IF( mpi_layer % rank_id == 0 )THEN
-!      write(6,*) '*********************************'
-!      write(6,899) time_tracker % year, time_tracker % month, time_tracker % day, &
-!                   time_tracker % hour, time_tracker % minute
-!899   format('Calling Dynamo E field ', i4,x,i2.2,x,i2.2,2x,i2.2,':'i2.2)
-!      write(6,*) '*********************************'
-!     ENDIF
+      CALL eldyn % Dynamo_Wrapper(grid, forcing, time_tracker, plasma, mpi_layer, rc=localrc )
+      IF ( ipe_error_check(localrc, msg="call to Dynamo_Wrapper failed", &
+        line=__LINE__, file=__FILE__, rc=rc) ) RETURN
+      IF( mpi_layer % rank_id == 0 )THEN
+       write(6,*) '*********************************'
+       write(6,899) time_tracker % year, time_tracker % month, time_tracker % day, &
+                    time_tracker % hour, time_tracker % minute
+ 899   format('Calling Dynamo E field ', i4,x,i2.2,x,i2.2,2x,i2.2,':'i2.2)
+       write(6,*) '*********************************'
+      ENDIF
 
-!   ELSE
+    ELSE
 
-!     CALL eldyn % Empirical_E_Field_Wrapper( grid, forcing, time_tracker, mpi_layer, rc=localrc )
-!     IF ( ipe_error_check(localrc, msg="call to Empirical_E_Field_Wrapper failed", &
-!       line=__LINE__, file=__FILE__, rc=rc) ) RETURN
-!     IF( mpi_layer % rank_id == 0 )THEN
-!       print *,'TZU-WEI calling empirical E field'
-!     ENDIF
+      CALL eldyn % Empirical_E_Field_Wrapper( grid, forcing, time_tracker, mpi_layer, rc=localrc )
+      IF ( ipe_error_check(localrc, msg="call to Empirical_E_Field_Wrapper failed", &
+        line=__LINE__, file=__FILE__, rc=rc) ) RETURN
+      IF( mpi_layer % rank_id == 0 )THEN
+        print *,'TZU-WEI calling empirical E field'
+      ENDIF
 
-!     ! Calculate the potential gradient in IPE coordinates.
-!     CALL eldyn % Calculate_Potential_Gradient( grid )
+      ! Calculate the potential gradient in IPE coordinates.
+      CALL eldyn % Calculate_Potential_Gradient( grid )
 
-!   ENDIF
+    ENDIF
 
 !    IF( mpi_layer % rank_id == 0 )THEN
 !    print *,'in dynamo,',time_tracker % month, time_tracker % day, &
@@ -358,10 +366,16 @@ CONTAINS
 !   print *,'Geo-lon',Maxval(geospace_longitude),minval(geospace_longitude)
 !   print *,'Geo-lat',Maxval(geospace_latitude),minval(geospace_latitude)
         CALL eldyn % Interpolate_Geospace_to_MHDpotential ( grid, time_tracker, mpi_layer)
-      CALL eldyn % Calculate_Potential_Gradient( grid )
+        CALL eldyn % Calculate_Potential_Gradient( grid )
+
+    eldyn % total_efield(1,:,:) = eldyn % electric_field(1,:,:) + eldyn % selfdynamo_efield(1,:,:)
+    eldyn % total_efield(2,:,:) = eldyn % electric_field(2,:,:) + eldyn % selfdynamo_efield(2,:,:)
+
      IF( mpi_layer % rank_id == 0 )THEN
       print *,'in dynamo',filename
-      print *,'electric_field',maxval(eldyn % electric_field),minval(eldyn % electric_field)
+      print *,'geospace_efield',maxval(eldyn % electric_field),minval(eldyn % electric_field)
+      print *,'dynamo_efield',maxval(eldyn % selfdynamo_efield),minval(eldyn % selfdynamo_efield)
+      print *,'total_efield',maxval(eldyn % total_efield),minval(eldyn % total_efield)
      ENDIF
 
     ! Calculate ExB drift velocity
@@ -441,8 +455,11 @@ CONTAINS
       DO lp = 1, grid % NLP
          DO i_90km = 1, grid % flux_tube_max(lp)
 
-        eldyn % v_ExB_apex(1,lp,mp) = eldyn % electric_field(2,lp,mp)/grid % apex_be3(lp,mp)
-        eldyn % v_ExB_apex(2,lp,mp) = -eldyn % electric_field(1,lp,mp)/grid % apex_be3(lp,mp)
+        eldyn % v_ExB_apex(1,lp,mp) = eldyn % total_efield(2,lp,mp)/grid % apex_be3(lp,mp)
+        eldyn % v_ExB_apex(2,lp,mp) = -eldyn % total_efield(1,lp,mp)/grid % apex_be3(lp,mp)
+
+!       eldyn % v_ExB_apex(1,lp,mp) = eldyn % electric_field(2,lp,mp)/grid % apex_be3(lp,mp)
+!       eldyn % v_ExB_apex(2,lp,mp) = -eldyn % electric_field(1,lp,mp)/grid % apex_be3(lp,mp)
 !         eldyn % v_ExB_apex(1,lp,mp) = v_boost_factor * (eldyn % electric_field(2,lp,mp)/grid % apex_be3(lp,mp))
 !         eldyn % v_ExB_apex(2,lp,mp) = v_boost_factor * (-eldyn % electric_field(1,lp,mp)/grid % apex_be3(lp,mp))
 
@@ -595,10 +612,10 @@ CONTAINS
       mlat90_rad = dtr * colat
     ENDIF
 
-     IF( mpi_layer % rank_id == 0 )THEN
-    print *,'mlon90_rad_deg',mlon90_rad*180/pi
-    print *,'mlon90_rad',mlon90_rad
-     ENDIF
+!    IF( mpi_layer % rank_id == 0 )THEN
+!   print *,'mlon90_rad_deg',mlon90_rad*180/pi
+!   print *,'mlon90_rad',mlon90_rad
+!    ENDIF
 
     ! Search for nearest grid points in the magnetic longitude/latitude grid
     DO mp = grid % mp_low - grid % mp_halo, grid % mp_high + grid % mp_halo
@@ -1099,11 +1116,11 @@ CONTAINS
 
     CALL eldyn % Regrid_Potential( grid,mpi_layer, time_tracker,ed1dy_map,xlonm_deg_map,ylatm_deg_map, 1, 82,kmlat, rc=localrc )
     IF ( ipe_error_check( localrc, msg="call to Regrid_Potential (ed1dy_map) failed", line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-    eldyn % electric_field(1,:,:) = eldyn % electric_potential
+    eldyn % selfdynamo_efield(1,:,:) = eldyn % electric_potential
 
     CALL eldyn % Regrid_Potential( grid,mpi_layer, time_tracker,ed2dy_map,xlonm_deg_map,ylatm_deg_map, 1, 82,kmlat, rc=localrc )
     IF ( ipe_error_check( localrc, msg="call to Regrid_Potential (ed2dy_map) failed", line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-    eldyn % electric_field(2,:,:) = eldyn % electric_potential
+    eldyn % selfdynamo_efield(2,:,:) = eldyn % electric_potential
 
   END SUBROUTINE Dynamo_Wrapper
 
