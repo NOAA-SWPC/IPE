@@ -25,8 +25,7 @@
      &  dt1dts(kmlat)  ! dt0dts/abs(sinim) (non-zero at equator)
 !
 ! Critical colatitude limits for use of Heelis potential in dynamo:
-      real:: 
-     &  crit(2)
+      real:: crit(2)
 !     real,parameter ::                                                 &
 !    &  crit(2) = (/0.261799387, 0.523598775/) ! original values
 !    &  crit(2) = (/0.523598775, 0.61086524/)  ! plasmasphere has zero  

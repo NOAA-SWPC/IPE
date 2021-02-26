@@ -718,10 +718,8 @@ CONTAINS
     use params_module
     use cons_module
     use dynamo_module
-!   use heelis_module, only:ctpoten
     use module_magfield
     use ipe_error_module
-!!     use module_update_fli,ONLY:update_fli
 
     CLASS( IPE_Electrodynamics ), INTENT(inout) :: eldyn
     TYPE( IPE_Forcing ),          INTENT(in)    :: forcing
@@ -759,7 +757,6 @@ CONTAINS
     swden= forcing % solarwind_density (forcing % current_index )
     stilt= get_tilt(time_tracker%year,time_tracker%month,time_tracker%day,time_tracker%utime)
     fkp= forcing % kp ( forcing % current_index )
-!   ctpoten= 15.+15.*fkp+0.8*fkp**2
 
     year=2000
 
@@ -902,7 +899,6 @@ CONTAINS
     CALL eldyn % Regrid_Potential( grid,mpi_layer, time_tracker,ed2dy_map,xlonm_deg_map,ylatm_deg_map, 1, 82,kmlat, rc=localrc )
     IF ( ipe_error_check( localrc, msg="call to Regrid_Potential (ed2dy_map) failed", line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     eldyn % electric_field(2,:,:) = eldyn % electric_potential
-
 
   END SUBROUTINE Dynamo_Wrapper
 
