@@ -1,6 +1,3 @@
-!--------------------------------------------  
-!20120829: copied from magfield.f and splitted  
-!
       module module_magfield
 !
 ! Sub sunloc is called once per timestep from advance to determine
