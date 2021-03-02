@@ -1523,9 +1523,9 @@ CONTAINS
             ! Ion Densities
             plasma % ion_densities(1:9,i,lp,mp) = XIONNX(1:9,i)
             ! Electron Density
-            plasma % electron_density(i,lp,mp) = XIONNX(1,i) + XIONNX(2,i) + XIONNX(3,i) + XIONNX(4,i) + XIONNX(5,i) + XIONNX(6,i) + XIONNX(7,i) + XIONNX(8,i) + XIONNX(9,i)
+!           plasma % electron_density(i,lp,mp) = XIONNX(1,i) + XIONNX(2,i) + XIONNX(3,i) + XIONNX(4,i) + XIONNX(5,i) + XIONNX(6,i) + XIONNX(7,i) + XIONNX(8,i) + XIONNX(9,i)
 ! Just make electron density be Oplus + Hplus for now
-!           plasma % electron_density(i,lp,mp) = XIONNX(1,i) + XIONNX(2,i)
+            plasma % electron_density(i,lp,mp) = XIONNX(1,i) + XIONNX(2,i)
             ! Along Flux Tube Ion Velocities
             plasma % ion_velocities(1:9,i,lp,mp) = XIONVX(1:9,i)
 
