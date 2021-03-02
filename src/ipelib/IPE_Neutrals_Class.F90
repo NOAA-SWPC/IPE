@@ -191,10 +191,10 @@ CONTAINS
   END SUBROUTINE Trash_IPE_Neutrals
 
 
-  SUBROUTINE Update_IPE_Neutrals( neutrals, params, grid, time, forcing, mpi_layer, rc )
+  SUBROUTINE Update_IPE_Neutrals( neutrals, parameters, grid, time, forcing, mpi_layer, rc )
 
     CLASS( IPE_Neutrals         ), INTENT(inout) :: neutrals
-    TYPE ( IPE_Model_Parameters ), INTENT(in   ) :: params
+    TYPE ( IPE_Model_Parameters ), INTENT(in   ) :: parameters
     TYPE ( IPE_Grid             ), INTENT(in   ) :: grid
     TYPE ( IPE_Time             ), INTENT(in   ) :: time
     TYPE ( IPE_Forcing          ), INTENT(in   ) :: forcing
@@ -207,9 +207,9 @@ CONTAINS
 
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
-    msis_switch = mod(time % elapsed_sec,params % msis_time_step) == 0.0
+    msis_switch = mod(time % elapsed_sec,parameters % msis_time_step) == 0.0
 
-    IF ( msis_switch .and. (time % elapsed_sec > 0._prec .or. .NOT. params % read_apex_neutrals) ) THEN
+    IF ( msis_switch .and. (time % elapsed_sec > 0._prec .or. .NOT. parameters % read_apex_neutrals) ) THEN
       IF( mpi_layer % rank_id == 0 ) write(6,*) 'Calling MSIS ', int(time % elapsed_sec / 60), ' Mins UT'
       CALL neutrals % IPE_Neutrals_Empirical( grid, time, forcing, rc=localrc )
       IF ( ipe_error_check( localrc, msg="call to IPE_Neutrals_Empirical failed", rc=rc ) ) RETURN

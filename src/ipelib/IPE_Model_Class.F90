@@ -233,6 +233,7 @@ CONTAINS
                                   ipe % mpi_layer, &
                                   ipe % eldyn % v_ExB_apex, &
                                   ipe % parameters % time_step, &
+                                  ipe % parameters % colfac, &
                                   rc = localrc )
       IF ( ipe_error_check( localrc, msg="Failed to update plasma", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
@@ -262,7 +263,7 @@ CONTAINS
     IF ( ipe_error_check( localrc, msg="Failed to read file "//filename, &
       line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
-    CALL ipe % plasma % Calculate_Field_Line_Integrals( ipe % grid, ipe % neutrals, ipe % mpi_layer )
+    CALL ipe % plasma % Calculate_Field_Line_Integrals( ipe % grid, ipe % neutrals, ipe % parameters % colfac, ipe % mpi_layer )
 
   END SUBROUTINE Initialize_IPE_Model
 

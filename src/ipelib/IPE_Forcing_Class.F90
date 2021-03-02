@@ -67,12 +67,12 @@ IMPLICIT NONE
 
 CONTAINS
 
-  SUBROUTINE Build_IPE_Forcing( forcing, params, mpi_layer, io, rc )
+  SUBROUTINE Build_IPE_Forcing( forcing, parameters, mpi_layer, io, rc )
 
     IMPLICIT NONE
 
     CLASS( IPE_Forcing ),          INTENT(out) :: forcing
-    CLASS( IPE_Model_Parameters ), INTENT(in)  :: params
+    CLASS( IPE_Model_Parameters ), INTENT(in)  :: parameters
     CLASS( IPE_MPI_Layer ),        INTENT(in)  :: mpi_layer
     CLASS( COMIO_t ),              INTENT(in)  :: io
     INTEGER, OPTIONAL,             INTENT(out) :: rc
@@ -85,9 +85,9 @@ CONTAINS
 
     forcing % coupled = .false.
 
-    dt            = params % solar_forcing_time_step
+    dt            = parameters % solar_forcing_time_step
 
-    forcing % dt            = params % solar_forcing_time_step
+    forcing % dt            = parameters % solar_forcing_time_step
     forcing % current_time  = 0.0_prec
     forcing % current_index = 1
 
@@ -99,7 +99,7 @@ CONTAINS
     forcing % emaps     = 0.0_prec
     forcing % cmaps     = 0.0_prec
     forcing % djspectra = 0.0_prec
-    CALL forcing % Read_IFP_IPE_Forcing( params, &
+    CALL forcing % Read_IFP_IPE_Forcing( parameters, &
                                          mpi_layer, &
                                          io, &
                                          localrc )
@@ -235,12 +235,12 @@ CONTAINS
   END FUNCTION GetKP
 
 
-  SUBROUTINE Update_Current_Index( forcing, params, mpi_layer, io, deltime, rc )
+  SUBROUTINE Update_Current_Index( forcing, parameters, mpi_layer, io, deltime, rc )
 
     IMPLICIT NONE
 
     CLASS( IPE_Forcing ),          INTENT(inout) :: forcing
-    CLASS( IPE_Model_Parameters ), INTENT(in)    :: params
+    CLASS( IPE_Model_Parameters ), INTENT(in)    :: parameters
     CLASS( IPE_MPI_Layer ),        INTENT(in)    :: mpi_layer
     CLASS( COMIO_t ),              INTENT(in)    :: io
     REAL(prec),                    INTENT(in)    :: deltime
@@ -248,10 +248,10 @@ CONTAINS
 
     ! Local
     INTEGER :: localrc
-    write (6,*) 'ak', params % use_ifp_file, params % ifp_realtime_interval, mod(INT( deltime ), params % ifp_realtime_interval)
-    if ( params % use_ifp_file .and. params % ifp_realtime_interval > 0 .and. &
-         mod(INT( deltime ), params % ifp_realtime_interval) .eq. 0 ) then
-      call forcing % Read_IFP_IPE_Forcing( params, &
+    write (6,*) 'ak', parameters % use_ifp_file, parameters % ifp_realtime_interval, mod(INT( deltime ), parameters % ifp_realtime_interval)
+    if ( parameters % use_ifp_file .and. parameters % ifp_realtime_interval > 0 .and. &
+         mod(INT( deltime ), parameters % ifp_realtime_interval) .eq. 0 ) then
+      call forcing % Read_IFP_IPE_Forcing( parameters, &
                                            mpi_layer, &
                                            io, &
                                            localrc )
@@ -316,12 +316,12 @@ CONTAINS
 
   END SUBROUTINE Manage_Write_Lock
 
-  SUBROUTINE Read_IFP_IPE_Forcing( forcing, params, mpi_layer, io, rc )
+  SUBROUTINE Read_IFP_IPE_Forcing( forcing, parameters, mpi_layer, io, rc )
 
     IMPLICIT NONE
 
     CLASS( IPE_Forcing ),          INTENT(inout) :: forcing
-    CLASS( IPE_Model_Parameters ), INTENT(in)    :: params
+    CLASS( IPE_Model_Parameters ), INTENT(in)    :: parameters
     CLASS( IPE_MPI_Layer ),        INTENT(in)    :: mpi_layer
     CLASS( COMIO_t ),              INTENT(in)    :: io
     INTEGER,                       INTENT(out)   :: rc
@@ -333,7 +333,7 @@ CONTAINS
 
     rc = IPE_SUCCESS
 
-    if ( params % use_ifp_file ) then
+    if ( parameters % use_ifp_file ) then
       call forcing % check_write_lock(localrc)
       IF( ipe_error_check( localrc, msg="call to Check_Write_Lock failed", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
@@ -341,8 +341,8 @@ CONTAINS
       IF( ipe_error_check( localrc, msg="call to Manage_Write_Lock(create) failed", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
-      call io % open(params % ifp_file, "r")
-      if (io % err % check(msg="Unable to open" // params % ifp_file, file=__FILE__,line=__LINE__)) return
+      call io % open(parameters % ifp_file, "r")
+      if (io % err % check(msg="Unable to open" // parameters % ifp_file, file=__FILE__,line=__LINE__)) return
 
       call io % description("skip", forcing % ifp_skip)
       call io % description("ifp_interval", forcing % ifp_interval)
@@ -377,29 +377,29 @@ CONTAINS
       IF( ipe_error_check( localrc, msg="call to Manage_Write_Lock(destroy) failed", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     else ! fixed parameters
-      call forcing % allocate_ifp_ipe_forcing(int( (params % end_time - params % start_time)/params % time_step ), localrc)
+      call forcing % allocate_ifp_ipe_forcing(int( (parameters % end_time - parameters % start_time)/parameters % time_step ), localrc)
       IF( ipe_error_check( localrc, msg="call to Allocate_IFP_IPE_Forcing failed", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-      forcing % f107              = params % f107
-      forcing % f107_81day_avg    = params % f107_81day_avg
-      forcing % kp                = params % kp
-      forcing % kp_1day_avg       = params % kp_1day_avg
-      forcing % ap                = params % ap
-      forcing % ap_1day_avg       = params % ap_1day_avg
-      forcing % nhemi_power       = params % nhemi_power
-      forcing % nhemi_power_index = params % nhemi_power_index
-      forcing % shemi_power       = params % shemi_power
-      forcing % shemi_power_index = params % shemi_power_index
+      forcing % f107              = parameters % f107
+      forcing % f107_81day_avg    = parameters % f107_81day_avg
+      forcing % kp                = parameters % kp
+      forcing % kp_1day_avg       = parameters % kp_1day_avg
+      forcing % ap                = parameters % ap
+      forcing % ap_1day_avg       = parameters % ap_1day_avg
+      forcing % nhemi_power       = parameters % nhemi_power
+      forcing % nhemi_power_index = parameters % nhemi_power_index
+      forcing % shemi_power       = parameters % shemi_power
+      forcing % shemi_power_index = parameters % shemi_power_index
 
-      forcing % solarwind_angle    = params % solarwind_angle
-      forcing % solarwind_velocity = params % solarwind_velocity
-      forcing % solarwind_density  = params % solarwind_density
-      forcing % solarwind_Bz       = params % solarwind_Bz
+      forcing % solarwind_angle    = parameters % solarwind_angle
+      forcing % solarwind_velocity = parameters % solarwind_velocity
+      forcing % solarwind_density  = parameters % solarwind_density
+      forcing % solarwind_Bz       = parameters % solarwind_Bz
       forcing % solarwind_Bt       = sqrt( forcing % solarwind_By**2 +&
                                            forcing % solarwind_Bz**2 )
     end if
     ! By is always set by parameter for now
-    forcing % solarwind_By       = params % solarwind_By
+    forcing % solarwind_By       = parameters % solarwind_By
   END SUBROUTINE Read_IFP_IPE_Forcing
 
 
