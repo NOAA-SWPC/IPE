@@ -718,6 +718,7 @@ CONTAINS
     use params_module
     use cons_module
     use dynamo_module
+    use heelis_module, only:ctpoten
     use module_magfield
     use ipe_error_module
 
@@ -757,6 +758,7 @@ CONTAINS
     swden= forcing % solarwind_density (forcing % current_index )
     stilt= get_tilt(time_tracker%year,time_tracker%month,time_tracker%day,time_tracker%utime)
     fkp= forcing % kp ( forcing % current_index )
+    ctpoten= 15.+15.*fkp+0.8*fkp**2
 
     year=2000
 
