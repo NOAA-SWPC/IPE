@@ -57,7 +57,7 @@
 ! Calculate fractional presence of dynamo equation at each northern
 ! hemisphere geomagnetic grid point. Output in pfrac(kmlonp1,kmlat0)
 !
-         crit(1)=theta0(1)+10.*pi_dyn/180.
+         crit(1)=theta0(1)+5.*pi_dyn/180.
          crit(2)=theta0(1)+20.*pi_dyn/180.
 	do i=1,kmlonp1
           pfrac(i,j) = (colatc(i,j)-crit(1))/(crit(2)-crit(1))
