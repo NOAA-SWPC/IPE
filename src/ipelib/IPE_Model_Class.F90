@@ -24,15 +24,15 @@ MODULE IPE_Model_Class
 
   TYPE IPE_Model
 
-    TYPE( IPE_Time )             :: time_tracker
-    TYPE( IPE_Model_Parameters ) :: parameters
-    TYPE( IPE_Grid )             :: grid
-    TYPE( IPE_Forcing )          :: forcing
-    TYPE( IPE_Neutrals )         :: neutrals
-    TYPE( IPE_Plasma )           :: plasma
-    TYPE( IPE_Electrodynamics )  :: eldyn
-    TYPE( IPE_MPI_Layer )        :: mpi_layer
-    CLASS( COMIO_T ), POINTER    :: io => NULL()
+    TYPE( IPE_Time )              :: time_tracker
+    TYPE( IPE_Model_Parameters )  :: parameters
+    TYPE( IPE_Grid )              :: grid
+    TYPE( IPE_Forcing )           :: forcing
+    TYPE( IPE_Neutrals )          :: neutrals
+    TYPE( IPE_Plasma )            :: plasma
+    TYPE( IPE_Electrodynamics )   :: eldyn
+    TYPE( IPE_MPI_Layer )         :: mpi_layer
+    CLASS( COMIO_T ), ALLOCATABLE :: io
 
     CONTAINS
 
@@ -68,15 +68,17 @@ CONTAINS
 
     ! Initialize I/O
     IF ( ipe % mpi_layer % enabled ) THEN
-      ipe % io => COMIO_T(fmt=COMIO_FMT_HDF5, &
-                          comm=ipe % mpi_layer % mpi_communicator, &
-                          info=ipe % mpi_layer % mpi_info)
-      IF ( ipe_status_check( .not.ipe % io % err % check(), &
+      call COMIO_Create(ipe % io, COMIO_FMT_HDF5, &
+                        comm=ipe % mpi_layer % mpi_communicator, &
+                        info=ipe % mpi_layer % mpi_info, &
+                        rc=localrc)
+      IF ( ipe_error_check( localrc, &
         msg="Failed to initialize I/O layer", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     ELSE
-      ipe % io => COMIO_T(fmt=COMIO_FMT_HDF5)
-      IF ( ipe_status_check( .not.ipe % io % err % check(), &
+      call COMIO_Create(ipe % io, COMIO_FMT_HDF5, &
+                        rc=localrc)
+      IF ( ipe_error_check( localrc, &
         msg="Failed to initialize I/O layer", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     END IF
