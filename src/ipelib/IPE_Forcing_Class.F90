@@ -349,7 +349,6 @@ CONTAINS
 
       call io % domain("f107", dims)
       if (io % err % check(msg="Unable to domain", file=__FILE__,line=__LINE__)) return
-      write(6,*) dims
 
       call forcing % allocate_ifp_ipe_forcing(dims(1), localrc)
       IF( ipe_error_check( localrc, msg="call to Allocate_IFP_IPE_Forcing failed", &

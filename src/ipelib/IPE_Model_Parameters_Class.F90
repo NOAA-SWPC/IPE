@@ -255,8 +255,6 @@ CONTAINS
         IF ( ipe_iostatus_check( iostatus, msg="Failed to inquire file "//ifp_file, &
           line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
       ENDIF
-      write(6,*) 'ifp', TRIM( ifp_file ), parameters % use_ifp_file
-      write(6,*) 'ifp_interval', ifp_realtime_Interval
 
       ! prepare buffers
       ! -- strings
