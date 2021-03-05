@@ -66,11 +66,11 @@ REAL(prec), PARAMETER, PRIVATE :: dlonm90km = 4.5_prec
 
 CONTAINS
 
-  SUBROUTINE Build_IPE_Grid( grid, io, mpl, params, filename, rc )
+  SUBROUTINE Build_IPE_Grid( grid, io, mpl, parameters, filename, rc )
     CLASS(IPE_Grid)                              :: grid
     CLASS(COMIO_T)                               :: io
     CLASS( IPE_MPI_Layer ),        INTENT(inout) :: mpl
-    TYPE ( IPE_Model_Parameters ), INTENT(in)    :: params
+    TYPE ( IPE_Model_Parameters ), INTENT(in)    :: parameters
     CHARACTER(len=*),              INTENT(in)    :: filename
     INTEGER, OPTIONAL,             INTENT(out)   :: rc
 
@@ -83,7 +83,7 @@ CONTAINS
       msg="Unable to read grid from file "//filename, &
       file=__FILE__,line=__LINE__)) RETURN
 
-    CALL Initialize_IPE_Grid( grid, params, localrc )
+    CALL Initialize_IPE_Grid( grid, parameters, localrc )
     IF ( ipe_error_check( localrc, &
       msg="Unable to initialize grid", &
       file=__FILE__,line=__LINE__)) RETURN
@@ -246,12 +246,12 @@ CONTAINS
   END SUBROUTINE Trash_IPE_Grid
 
 
-  SUBROUTINE Initialize_IPE_Grid( grid, params, rc )
+  SUBROUTINE Initialize_IPE_Grid( grid, parameters, rc )
 
     IMPLICIT NONE
 
     CLASS( IPE_Grid ),             INTENT(inout) :: grid
-    TYPE ( IPE_Model_Parameters ), INTENT(in)    :: params
+    TYPE ( IPE_Model_Parameters ), INTENT(in)    :: parameters
     INTEGER,                       INTENT(out)   :: rc
 
     INTEGER :: im, in, is, lp, jtop
@@ -272,8 +272,8 @@ CONTAINS
       im = (is + in) / 2
       grid % flux_tube_midpoint(lp) = im
 
-      IF ( grid % altitude(im,lp) > params % mesh_height_max ) THEN
-        jtop = MAXLOC( grid % altitude(in:im,lp), DIM = 1, MASK = grid % altitude(in:im,lp) <= params % mesh_height_max )
+      IF ( grid % altitude(im,lp) > parameters % mesh_height_max ) THEN
+        jtop = MAXLOC( grid % altitude(in:im,lp), DIM = 1, MASK = grid % altitude(in:im,lp) <= parameters % mesh_height_max )
         IF ( jtop > 0 ) THEN
           grid % northern_top_index(lp) = jtop + in - 1
           grid % southern_top_index(lp) = is - jtop + 1

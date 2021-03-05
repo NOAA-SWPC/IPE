@@ -33,6 +33,7 @@ MODULE IPE_Model_Class
     TYPE( IPE_Electrodynamics )   :: eldyn
     TYPE( IPE_MPI_Layer )         :: mpi_layer
     CLASS( COMIO_T ), ALLOCATABLE :: io
+    CLASS( COMIO_T ), ALLOCATABLE :: forcing_io
 
     CONTAINS
 
@@ -75,8 +76,20 @@ CONTAINS
       IF ( ipe_error_check( localrc, &
         msg="Failed to initialize I/O layer", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+      call COMIO_Create(ipe % forcing_io, COMIO_FMT_PNETCDF, &
+                        comm=ipe % mpi_layer % mpi_communicator, &
+                        info=ipe % mpi_layer % mpi_info, &
+                        rc=localrc)
+      IF ( ipe_error_check( localrc, &
+        msg="Failed to initialize Forcing I/O layer", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     ELSE
       call COMIO_Create(ipe % io, COMIO_FMT_HDF5, &
+                        rc=localrc)
+      IF ( ipe_error_check( localrc, &
+        msg="Failed to initialize I/O layer", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+      call COMIO_Create(ipe % forcing_io, COMIO_FMT_PNETCDF, &
                         rc=localrc)
       IF ( ipe_error_check( localrc, &
         msg="Failed to initialize I/O layer", &
@@ -88,7 +101,7 @@ CONTAINS
 
     ! ////// Forcing ////// !
 
-    CALL ipe % forcing % Build( ipe % parameters, rc=localrc )
+    CALL ipe % forcing % Build( ipe % parameters, ipe % mpi_layer, ipe % forcing_io, rc=localrc )
     IF ( ipe_error_check( localrc, msg="Failed to initialize model forcing", &
       line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
@@ -197,7 +210,13 @@ CONTAINS
 
     DO i = 1, nSteps
 
-      call ipe % forcing % Update_Current_Index( ipe % parameters, ipe % time_tracker % elapsed_sec )
+      call ipe % forcing % Update_Current_Index( ipe % parameters, &
+                                                 ipe % mpi_layer, &
+                                                 ipe % forcing_io, &
+                                                 ipe % time_tracker % elapsed_sec, &
+                                                 rc = localrc )
+      IF ( ipe_error_check( localrc, msg="Failed to update neutrals", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
       CALL ipe % neutrals % Update( ipe % parameters, &
                                     ipe % grid, &
@@ -224,6 +243,7 @@ CONTAINS
                                   ipe % mpi_layer, &
                                   ipe % eldyn % v_ExB_apex, &
                                   ipe % parameters % time_step, &
+                                  ipe % parameters % colfac, &
                                   rc = localrc )
       IF ( ipe_error_check( localrc, msg="Failed to update plasma", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
@@ -253,7 +273,7 @@ CONTAINS
     IF ( ipe_error_check( localrc, msg="Failed to read file "//filename, &
       line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
-    CALL ipe % plasma % Calculate_Field_Line_Integrals( ipe % grid, ipe % neutrals, ipe % mpi_layer )
+    CALL ipe % plasma % Calculate_Field_Line_Integrals( ipe % grid, ipe % neutrals, ipe % parameters % colfac, ipe % mpi_layer )
 
   END SUBROUTINE Initialize_IPE_Model
 

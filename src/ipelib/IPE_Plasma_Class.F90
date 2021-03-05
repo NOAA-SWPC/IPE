@@ -62,7 +62,7 @@ MODULE IPE_Plasma_Class
   INTEGER, PARAMETER, PRIVATE    :: n_ion_species = 9
   REAL(prec), PARAMETER, PRIVATE :: safe_density_minimum = 1.0e+06_prec
   REAL(prec), PARAMETER, PRIVATE :: safe_temperature_minimum = 100.0_prec
-  REAL(prec), PARAMETER, PRIVATE :: colfac = 1.3_prec
+! REAL(prec), PARAMETER, PRIVATE :: colfac = 1.3_prec
   REAL(prec), PARAMETER, PRIVATE :: qeoNao10 = 9.6489E7_prec        !  qe/m_e*1000 [C/g]
   REAL(prec), PARAMETER, PRIVATE :: qeomeo10 = 1.7588028E11_prec    ! qe/m_e*1000 [C/g]
   REAL(prec), PARAMETER, PRIVATE :: rmassinv_nop = 1.0_prec / NO_mass ! inverted rmass
@@ -220,7 +220,7 @@ CONTAINS
   END SUBROUTINE Trash_IPE_Plasma
  
 
-  SUBROUTINE Update_IPE_Plasma( plasma, grid, neutrals, forcing, time_tracker, mpi_layer, v_ExB, time_step, rc )
+  SUBROUTINE Update_IPE_Plasma( plasma, grid, neutrals, forcing, time_tracker, mpi_layer, v_ExB, time_step, colfac, rc )
     IMPLICIT NONE
     CLASS( IPE_Plasma ),   INTENT(inout) :: plasma
     TYPE( IPE_Grid ),      INTENT(in)    :: grid
@@ -230,6 +230,7 @@ CONTAINS
     TYPE( IPE_MPI_Layer ), INTENT(in)    :: mpi_layer
     REAL(prec),            INTENT(in)    :: v_ExB(1:3,1:grid % NLP,grid % mp_low:grid % mp_high)
     REAL(prec),            INTENT(in)    :: time_step
+    REAL(prec),            INTENT(in)    :: colfac   
     INTEGER, OPTIONAL,     INTENT(out)   :: rc
 
     ! Local
@@ -329,10 +330,10 @@ CONTAINS
                                   neutrals,     &
                                   forcing,      &
                                   time_tracker, &
-                                  time_step,nflag_t,nflag_d )
+                                  time_step, colfac, nflag_t,nflag_d )
 
       !TWFANG, calculate field line integrals for dynamo solver
-      CALL plasma % Calculate_Field_Line_Integrals(grid, neutrals, mpi_layer)
+      CALL plasma % Calculate_Field_Line_Integrals(grid, neutrals, colfac, mpi_layer)
 
   END SUBROUTINE Update_IPE_Plasma
 
@@ -1347,8 +1348,7 @@ CONTAINS
   END SUBROUTINE Auroral_Precipitation
 
 
-  SUBROUTINE FLIP_Wrapper( plasma, grid, neutrals, forcing, time_tracker, flip_time_step, &
-    nflag_t,nflag_d )
+  SUBROUTINE FLIP_Wrapper( plasma, grid, neutrals, forcing, time_tracker, flip_time_step, colfac, nflag_t,nflag_d )
     IMPLICIT NONE
     CLASS( IPE_Plasma ), INTENT(inout) :: plasma
     TYPE( IPE_Grid ), INTENT(in)       :: grid
@@ -1356,6 +1356,7 @@ CONTAINS
     TYPE( IPE_Forcing ), INTENT(in)    :: forcing
     TYPE( IPE_Time ), INTENT(in)       :: time_tracker
     REAL(prec), INTENT(in)             :: flip_time_step
+    REAL(prec), INTENT(in)             :: colfac
     ! Local
     INTEGER  :: i, lp, mp, iprint, ii
     INTEGER  :: JMINX, JMAXX
@@ -1591,7 +1592,7 @@ CONTAINS
   END FUNCTION Solar_Zenith_Angle
 
 
-  SUBROUTINE Calculate_Field_Line_Integrals( plasma, grid, neutrals, mpi_layer )
+  SUBROUTINE Calculate_Field_Line_Integrals( plasma, grid, neutrals, colfac, mpi_layer )
 
 
     ! this routine takes in the plasma, grid, and neutral fields and returns the six conductivities on IPE
@@ -1602,6 +1603,7 @@ CONTAINS
     TYPE( IPE_Grid ), INTENT(in)        :: grid
     TYPE( IPE_Neutrals ), INTENT(in)    :: neutrals
     TYPE( IPE_MPI_Layer ), INTENT(in)   :: mpi_layer
+    REAL(prec),            INTENT(in)   :: colfac
     ! Local
     INTEGER    :: i, ihem, istart, istop, istep, mp, lp
     REAL(prec) :: Ue(1:2),r_factor,qe_fac
@@ -1703,7 +1705,7 @@ CONTAINS
                                  effective_temp,                          &
                                  neutrals % temperature(i,lp,mp),         &
                                  grid % magnetic_field_strength(i,lp,mp), &
-                                 rnu_o2p,rnu_op,rnu_nop,rnu_ne)
+                                 rnu_o2p,rnu_op,rnu_nop,rnu_ne,colfac)
 
 !! get pedersen & hall conductivities
 !! more ion spieces can be added for calculating electron density
@@ -1844,9 +1846,9 @@ CONTAINS
   END SUBROUTINE Calculate_Field_Line_Integrals
 
 
-  SUBROUTINE calc_collfreq(o1_cm3,o2_cm3,n2_cm3,tnti,tn,apex_Bmag,rnu_o2p,rnu_op,rnu_nop,rnu_ne)
+  SUBROUTINE calc_collfreq(o1_cm3,o2_cm3,n2_cm3,tnti,tn,apex_Bmag,rnu_o2p,rnu_op,rnu_nop,rnu_ne,colfac)    
       IMPLICIT NONE
-      REAL(prec), INTENT(in)::o1_cm3,o2_cm3,n2_cm3,tnti,tn,apex_Bmag
+      REAL(prec), INTENT(in)::o1_cm3,o2_cm3,n2_cm3,tnti,tn,apex_Bmag,colfac
       REAL(prec), INTENT(out):: rnu_o2p,rnu_op,rnu_nop,rnu_ne
 
 ! local

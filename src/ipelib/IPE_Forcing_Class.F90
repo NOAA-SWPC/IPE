@@ -4,26 +4,26 @@ USE IPE_Precision
 USE IPE_Constants_Dictionary
 USE IPE_Common_Routines
 USE IPE_Model_Parameters_Class
+USE IPE_MPI_Layer_Class
 USE ipe_error_module
+USE comio
 
 IMPLICIT NONE
 
   TYPE IPE_Forcing
 
-    ! forcing % n_time_levels = f107_kp_data_size    = f107_kp_size
     LOGICAL                 :: coupled
 
-    INTEGER                 :: n_time_levels
     REAL(prec)              :: dt
-    REAL(prec), ALLOCATABLE :: time(:)
     REAL(prec)              :: current_time
     INTEGER                 :: current_index
+    INTEGER                 :: max_read_index
+    INTEGER                 :: ifp_interval
+    INTEGER                 :: ifp_skip
     !
     REAL(prec), ALLOCATABLE :: f107(:)
-    INTEGER, ALLOCATABLE    :: f107_flag(:)
     REAL(prec), ALLOCATABLE :: f107_81day_avg(:)
     REAL(prec), ALLOCATABLE :: kp(:)
-    INTEGER, ALLOCATABLE    :: kp_flag(:)
     REAL(prec), ALLOCATABLE :: kp_1day_avg(:)
     REAL(prec), ALLOCATABLE :: ap(:)
     REAL(prec), ALLOCATABLE :: ap_1day_avg(:)
@@ -56,100 +56,55 @@ IMPLICIT NONE
       PROCEDURE :: GetAP
       PROCEDURE :: GetKP
 
-      PROCEDURE :: Read_F107KP_IPE_Forcing
-      PROCEDURE :: Read_Tiros_IPE_Forcing
+      PROCEDURE, PRIVATE :: Allocate_IFP_IPE_Forcing
+      PROCEDURE, PRIVATE :: Check_Write_Lock
+      PROCEDURE, PRIVATE :: Manage_Write_Lock
 
-      PROCEDURE, PRIVATE :: Estimate_AP_from_KP
+      PROCEDURE :: Read_IFP_IPE_Forcing
+      PROCEDURE :: Read_Tiros_IPE_Forcing
 
   END TYPE IPE_Forcing
 
 CONTAINS
 
-  SUBROUTINE Build_IPE_Forcing( forcing, params, rc )
+  SUBROUTINE Build_IPE_Forcing( forcing, parameters, mpi_layer, io, rc )
 
     IMPLICIT NONE
 
     CLASS( IPE_Forcing ),          INTENT(out) :: forcing
-    CLASS( IPE_Model_Parameters ), INTENT(in)  :: params
+    CLASS( IPE_Model_Parameters ), INTENT(in)  :: parameters
+    CLASS( IPE_MPI_Layer ),        INTENT(in)  :: mpi_layer
+    CLASS( COMIO_t ),              INTENT(in)  :: io
     INTEGER, OPTIONAL,             INTENT(out) :: rc
 
     ! Local
-    INTEGER :: n_time_levels, localrc, stat
+    INTEGER :: localrc, stat
     REAL(preC) :: dt
 
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
     forcing % coupled = .false.
 
-    n_time_levels = params % f107_kp_size
-    dt            = params % solar_forcing_time_step
+    dt            = parameters % solar_forcing_time_step
 
-    forcing % n_time_levels = params % f107_kp_size + params % f107_kp_read_in_start
-    forcing % dt            = params % solar_forcing_time_step
+    forcing % dt            = parameters % solar_forcing_time_step
     forcing % current_time  = 0.0_prec
     forcing % current_index = 1
 
-    ALLOCATE( forcing % time(params % f107_kp_read_in_start+1:forcing % n_time_levels), &
-              forcing % f107(params % f107_kp_read_in_start+1:forcing % n_time_levels), &
-              forcing % f107_flag(params % f107_kp_read_in_start+1:forcing % n_time_levels), &
-              forcing % f107_81day_avg(params % f107_kp_read_in_start+1:forcing % n_time_levels), &
-              forcing % kp(params % f107_kp_read_in_start+1:forcing % n_time_levels), &
-              forcing % kp_flag(params % f107_kp_read_in_start+1:forcing % n_time_levels), &
-              forcing % kp_1day_avg(params % f107_kp_read_in_start+1:forcing % n_time_levels), &
-              forcing % ap(params % f107_kp_read_in_start+1:forcing % n_time_levels), &
-              forcing % ap_1day_avg(params % f107_kp_read_in_start+1:forcing % n_time_levels), &
-              forcing % nhemi_power(params % f107_kp_read_in_start+1:forcing % n_time_levels), &
-              forcing % nhemi_power_index(params % f107_kp_read_in_start+1:forcing % n_time_levels), &
-              forcing % shemi_power(params % f107_kp_read_in_start+1:forcing % n_time_levels), &
-              forcing % shemi_power_index(params % f107_kp_read_in_start+1:forcing % n_time_levels), &
-              forcing % solarwind_Bt(params % f107_kp_read_in_start+1:forcing % n_time_levels), &
-              forcing % solarwind_angle(params % f107_kp_read_in_start+1:forcing % n_time_levels), &
-              forcing % solarwind_velocity(params % f107_kp_read_in_start+1:forcing % n_time_levels), &
-              forcing % solarwind_Bz(params % f107_kp_read_in_start+1:forcing % n_time_levels), &
-              forcing % solarwind_By(params % f107_kp_read_in_start+1:forcing % n_time_levels), &
-              forcing % solarwind_density(params % f107_kp_read_in_start+1:forcing % n_time_levels), &
-              forcing % emaps(1:maps_ipe_size(1),1:maps_ipe_size(2),1:maps_ipe_size(3)), &
+    ALLOCATE( forcing % emaps(1:maps_ipe_size(1),1:maps_ipe_size(2),1:maps_ipe_size(3)), &
               forcing % cmaps(1:maps_ipe_size(1),1:maps_ipe_size(2),1:maps_ipe_size(3)), &
               forcing % djspectra(1:n_flux_ipe,1:n_bands_ipe), &
               stat = stat )
-    IF ( ipe_alloc_check(stat, msg="Failed to allocate forcing internal arrays", &
-      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-
-    ! Default settings
-    forcing % f107              = params % f107
-    forcing % f107_flag         = params % f107_flag
-    forcing % f107_81day_avg    = params % f107_81day_avg
-    forcing % kp                = params % kp
-    forcing % kp_flag           = params % kp_flag
-    forcing % kp_1day_avg       = params % kp_1day_avg
-    forcing % ap                = params % ap
-    forcing % ap_1day_avg       = params % ap_1day_avg
-    forcing % nhemi_power       = params % nhemi_power
-    forcing % nhemi_power_index = params % nhemi_power_index
-    forcing % shemi_power       = params % shemi_power
-    forcing % shemi_power_index = params % shemi_power_index
-
-    forcing % solarwind_angle    = params % solarwind_angle
-    forcing % solarwind_velocity = params % solarwind_velocity
-    forcing % solarwind_density  = params % solarwind_density
-    forcing % solarwind_Bz       = params % solarwind_Bz
-    forcing % solarwind_By       = params % solarwind_By
-    forcing % solarwind_Bt       = sqrt( forcing % solarwind_By**2 +&
-                                         forcing % solarwind_Bz**2 )
 
     forcing % emaps     = 0.0_prec
     forcing % cmaps     = 0.0_prec
     forcing % djspectra = 0.0_prec
-    IF( params % use_f107_kp_file )THEN
-      CALL forcing % Read_F107KP_IPE_Forcing( params % f107_kp_file,          &
-                                              params % f107_kp_data_size,     &
-                                              params % f107_kp_read_in_start+1, &
-                                              localrc )
-      IF( ipe_error_check( localrc, msg="call to Read_F107KP_IPE_Forcing failed", &
-        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-    ENDIF
-
-    CALL forcing % Estimate_AP_from_KP( params % f107_kp_read_in_start+1 )
+    CALL forcing % Read_IFP_IPE_Forcing( parameters, &
+                                         mpi_layer, &
+                                         io, &
+                                         localrc )
+    IF( ipe_error_check( localrc, msg="call to Read_IFP_IPE_Forcing failed", &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     CALL forcing % Read_Tiros_IPE_Forcing( localrc )
     IF( ipe_error_check( localrc, msg="call to Read_Tiros_IPE_Forcing failed", &
@@ -157,6 +112,42 @@ CONTAINS
 
   END SUBROUTINE Build_IPE_Forcing
 
+  SUBROUTINE Allocate_IFP_IPE_Forcing ( forcing, n_time_levels, rc )
+
+    IMPLICIT NONE
+
+    CLASS( IPE_Forcing ), INTENT(inout) :: forcing
+    INTEGER,              INTENT(in)    :: n_time_levels
+    INTEGER, OPTIONAL,    INTENT(out)   :: rc
+
+    INTEGER :: stat
+
+    IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
+
+    if ( allocated ( forcing % f107 ) ) call forcing % trash()
+
+    ALLOCATE( forcing % f107(n_time_levels), &
+              forcing % f107_81day_avg(n_time_levels), &
+              forcing % kp(n_time_levels), &
+              forcing % kp_1day_avg(n_time_levels), &
+              forcing % ap(n_time_levels), &
+              forcing % ap_1day_avg(n_time_levels), &
+              forcing % nhemi_power(n_time_levels), &
+              forcing % nhemi_power_index(n_time_levels), &
+              forcing % shemi_power(n_time_levels), &
+              forcing % shemi_power_index(n_time_levels), &
+              forcing % solarwind_Bt(n_time_levels), &
+              forcing % solarwind_angle(n_time_levels), &
+              forcing % solarwind_velocity(n_time_levels), &
+              forcing % solarwind_Bz(n_time_levels), &
+              forcing % solarwind_By(n_time_levels), &
+              forcing % solarwind_density(n_time_levels), &
+              stat = stat )
+    IF ( ipe_alloc_check(stat, msg="Failed to allocate forcing internal arrays", &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+
+
+  END SUBROUTINE Allocate_IFP_IPE_Forcing
 
   SUBROUTINE Trash_IPE_Forcing( forcing, rc )
 
@@ -169,12 +160,9 @@ CONTAINS
 
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
-    DEALLOCATE( forcing % time, &
-                forcing % f107, &
-                forcing % f107_flag, &
+    DEALLOCATE( forcing % f107, &
                 forcing % f107_81day_avg, &
                 forcing % kp, &
-                forcing % kp_flag, &
                 forcing % kp_1day_avg, &
                 forcing % ap, &
                 forcing % ap_1day_avg, &
@@ -220,6 +208,7 @@ CONTAINS
 
   END FUNCTION GetAP
 
+
   FUNCTION GetKP( forcing ) RESULT( KP )
 
     CLASS( IPE_Forcing ) :: forcing
@@ -246,100 +235,172 @@ CONTAINS
   END FUNCTION GetKP
 
 
-  SUBROUTINE Update_Current_Index( forcing, params, deltime )
+  SUBROUTINE Update_Current_Index( forcing, parameters, mpi_layer, io, deltime, rc )
 
     IMPLICIT NONE
 
     CLASS( IPE_Forcing ),          INTENT(inout) :: forcing
-    CLASS( IPE_Model_Parameters ), INTENT(in)    :: params
+    CLASS( IPE_Model_Parameters ), INTENT(in)    :: parameters
+    CLASS( IPE_MPI_Layer ),        INTENT(in)    :: mpi_layer
+    CLASS( COMIO_t ),              INTENT(in)    :: io
     REAL(prec),                    INTENT(in)    :: deltime
+    INTEGER,                       INTENT(out)   :: rc
 
-    forcing % current_index = INT( deltime / real(params % f107_kp_interval) ) + &
-                                      1 + params % f107_kp_skip_size
-  END SUBROUTINE Update_Current_index
+    ! Local
+    INTEGER :: localrc
+    write (6,*) 'ak', parameters % use_ifp_file, parameters % ifp_realtime_interval, mod(INT( deltime ), parameters % ifp_realtime_interval)
+    if ( parameters % use_ifp_file .and. parameters % ifp_realtime_interval > 0 .and. &
+         mod(INT( deltime ), parameters % ifp_realtime_interval) .eq. 0 ) then
+      call forcing % Read_IFP_IPE_Forcing( parameters, &
+                                           mpi_layer, &
+                                           io, &
+                                           localrc )
+      IF( ipe_error_check( localrc, msg="call to Read_F107KP_IPE_Forcing failed", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    end if
 
+    forcing % current_index = INT( deltime / real(forcing % ifp_interval) ) + forcing % ifp_skip + 1
 
-  SUBROUTINE Read_F107KP_IPE_Forcing( forcing, filename, data_size, read_in_start, rc )
+  END SUBROUTINE Update_Current_Index
+
+  SUBROUTINE Check_Write_Lock( forcing, rc )
 
     IMPLICIT NONE
 
-    CLASS( IPE_Forcing ), INTENT(inout) :: forcing
-    CHARACTER(*),         INTENT(in)    :: filename
-    INTEGER,              INTENT(in)    :: data_size
-    INTEGER,              INTENT(in)    :: read_in_start
-    INTEGER,              INTENT(out)   :: rc
+    CLASS( IPE_Forcing ), INTENT(in)  :: forcing
+    INTEGER,              INTENT(out) :: rc
 
-    ! Local
-    INTEGER       :: fUnit
-    INTEGER       :: i, iostat, read_in_size
-    CHARACTER(20) :: date_work
+    character(len=22), parameter :: filename = "input_parameters.wlock"
+    logical :: not_ready
+    integer :: iostat
 
     rc = IPE_SUCCESS
 
-    OPEN( UNIT   = NewUnit(fUnit), &
-          FILE   = TRIM(filename), &
-          FORM   = 'FORMATTED',    &
-          ACTION = 'READ',         &
-          STATUS = 'OLD' ,         &
-          IOSTAT = iostat )
-    IF ( ipe_iostatus_check( iostat, msg="Error opening forcing file "//filename, &
-      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    not_ready = .true.
+    do while (not_ready)
+      inquire(file=filename, exist=not_ready, iostat=iostat)
+      if (not_ready) call sleep(1)
+    end do
 
-    ! Skip over the header information
-    DO i = 1, 5
+  END SUBROUTINE Check_Write_Lock
 
-      READ(fUnit, *, IOSTAT = iostat )
-      IF ( ipe_iostatus_check( iostat, msg="Error advancing forcing file "//filename, &
+  SUBROUTINE Manage_Write_Lock( forcing, me, create, rc )
+
+    IMPLICIT NONE
+
+    CLASS( IPE_Forcing ), INTENT(in)  :: forcing
+    INTEGER,              INTENT(in)  :: me
+    LOGICAL,              INTENT(in)  :: create
+    INTEGER,              INTENT(out) :: rc
+
+    character(len=26), parameter :: filename = "input_parameters.rlock.ipe"
+    character(len=29)            :: lockfile
+    integer, parameter           :: unit = 79
+    integer                      :: localrc
+
+    rc = IPE_SUCCESS
+
+    write (lockfile, "(A22,I0.3)") filename, me
+    open(unit, file=lockfile, status="replace", action="write", iostat=localrc)
+      IF( ipe_error_check( localrc, msg="writing lockfile "//trim(lockfile)//" failed", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    if (create) then
+      close(unit, iostat=localrc)
+      IF( ipe_error_check( localrc, msg="closing lockfile "//trim(lockfile)//" failed", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    else
+      close(unit, status="delete", iostat=localrc)
+      IF( ipe_error_check( localrc, msg="destroying lockfile "//trim(lockfile)//" failed", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    end if
+
+  END SUBROUTINE Manage_Write_Lock
+
+  SUBROUTINE Read_IFP_IPE_Forcing( forcing, parameters, mpi_layer, io, rc )
+
+    IMPLICIT NONE
+
+    CLASS( IPE_Forcing ),          INTENT(inout) :: forcing
+    CLASS( IPE_Model_Parameters ), INTENT(in)    :: parameters
+    CLASS( IPE_MPI_Layer ),        INTENT(in)    :: mpi_layer
+    CLASS( COMIO_t ),              INTENT(in)    :: io
+    INTEGER,                       INTENT(out)   :: rc
+
+    ! Local
+    integer, parameter      :: fmt =  COMIO_FMT_PNETCDF
+    integer, pointer        :: dims(:)
+    integer                 :: localrc
+
+    rc = IPE_SUCCESS
+
+    if ( parameters % use_ifp_file ) then
+      call forcing % check_write_lock(localrc)
+      IF( ipe_error_check( localrc, msg="call to Check_Write_Lock failed", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+      call forcing % manage_write_lock(mpi_layer % rank_id, .true., localrc)
+      IF( ipe_error_check( localrc, msg="call to Manage_Write_Lock(create) failed", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
-    END DO
+      call io % open(parameters % ifp_file, "r")
+      if (io % err % check(msg="Unable to open" // parameters % ifp_file, file=__FILE__,line=__LINE__)) return
 
-    read_in_size = MIN(forcing % n_time_levels, data_size)
-    DO i = read_in_start, read_in_size + read_in_start - 1
+      call io % description("skip", forcing % ifp_skip)
+      call io % description("ifp_interval", forcing % ifp_interval)
+      if (io % err % check(msg="Unable to description", file=__FILE__,line=__LINE__)) return
 
-      READ(fUnit, *, IOSTAT = iostat) date_work, &
-                                     forcing % f107(i), &
-                                     forcing % kp(i), &
-                                     forcing % f107_flag(i), &
-                                     forcing % kp_flag(i), &
-                                     forcing % f107_81day_avg(i), &
-                                     forcing % kp_1day_avg(i), &
-                                     forcing % nhemi_power(i), &
-                                     forcing % nhemi_power_index(i), &
-                                     forcing % shemi_power(i), &
-                                     forcing % shemi_power_index(i), &
-                                     forcing % solarwind_Bt(i), &
-                                     forcing % solarwind_angle(i), &
-                                     forcing % solarwind_velocity(i), &
-                                     forcing % solarwind_Bz(i), &
-                                     forcing % solarwind_density(i)
-      IF ( ipe_iostatus_check( iostat, msg="Error reading forcing file "//filename, &
+      call io % domain("f107", dims)
+      if (io % err % check(msg="Unable to domain", file=__FILE__,line=__LINE__)) return
+      write(6,*) dims
+
+      call forcing % allocate_ifp_ipe_forcing(dims(1), localrc)
+      IF( ipe_error_check( localrc, msg="call to Allocate_IFP_IPE_Forcing failed", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
-    END DO
+      call io % read("f107",  forcing % f107)
+      call io % read("f107d", forcing % f107_81day_avg)
+      call io % read("kp",    forcing % kp)
+      call io % read("kpa",   forcing % kp_1day_avg)
+      call io % read("ap",    forcing % ap)
+      call io % read("apa",   forcing % ap_1day_avg)
+      call io % read("nhp",   forcing % nhemi_power)
+      call io % read("nhpi",  forcing % nhemi_power_index)
+      call io % read("shp",   forcing % shemi_power)
+      call io % read("shpi",  forcing % shemi_power_index)
+      call io % read("swden", forcing % solarwind_density)
+      call io % read("swang", forcing % solarwind_angle)
+      call io % read("swvel", forcing % solarwind_velocity)
+      call io % read("swbz",  forcing % solarwind_Bz)
+      call io % read("swbt",  forcing % solarwind_Bt)
+      call io % close()
 
-    CLOSE(fUnit, IOSTAT = iostat)
-    IF ( ipe_iostatus_check( iostat, msg="Error closing forcing file "//filename, &
-      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+      call forcing % manage_write_lock(mpi_layer % rank_id, .false., localrc)
+      IF( ipe_error_check( localrc, msg="call to Manage_Write_Lock(destroy) failed", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    else ! fixed parameters
+      call forcing % allocate_ifp_ipe_forcing(int( (parameters % end_time - parameters % start_time)/parameters % time_step ), localrc)
+      IF( ipe_error_check( localrc, msg="call to Allocate_IFP_IPE_Forcing failed", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+      forcing % f107              = parameters % f107
+      forcing % f107_81day_avg    = parameters % f107_81day_avg
+      forcing % kp                = parameters % kp
+      forcing % kp_1day_avg       = parameters % kp_1day_avg
+      forcing % ap                = parameters % ap
+      forcing % ap_1day_avg       = parameters % ap_1day_avg
+      forcing % nhemi_power       = parameters % nhemi_power
+      forcing % nhemi_power_index = parameters % nhemi_power_index
+      forcing % shemi_power       = parameters % shemi_power
+      forcing % shemi_power_index = parameters % shemi_power_index
 
-    DO i = read_in_start + read_in_size, forcing % n_time_levels
-        forcing % f107(i)               = forcing % f107(read_in_size)
-        forcing % f107_81day_avg(i)     = forcing % f107_81day_avg(read_in_size)
-        forcing % kp(i)                 = forcing % kp(read_in_size)
-        forcing % kp_1day_avg(i)        = forcing % kp_1day_avg(read_in_size)
-        forcing % nhemi_power(i)        = forcing % nhemi_power(read_in_size)
-        forcing % nhemi_power_index(i)  = forcing % nhemi_power_index(read_in_size)
-        forcing % shemi_power(i)        = forcing % shemi_power(read_in_size)
-        forcing % shemi_power_index(i)  = forcing % shemi_power_index(read_in_size)
-        forcing % solarwind_Bt(i)       = forcing % solarwind_Bt(read_in_size)
-        forcing % solarwind_angle(i)    = forcing % solarwind_angle(read_in_size)
-        forcing % solarwind_velocity(i) = forcing % solarwind_velocity(read_in_size)
-        forcing % solarwind_Bz(i)       = forcing % solarwind_Bz(read_in_size)
-        forcing % solarwind_density(i)  = forcing % solarwind_density(read_in_size)
-
-    END DO
-
-  END SUBROUTINE Read_F107KP_IPE_Forcing
+      forcing % solarwind_angle    = parameters % solarwind_angle
+      forcing % solarwind_velocity = parameters % solarwind_velocity
+      forcing % solarwind_density  = parameters % solarwind_density
+      forcing % solarwind_Bz       = parameters % solarwind_Bz
+      forcing % solarwind_Bt       = sqrt( forcing % solarwind_By**2 +&
+                                           forcing % solarwind_Bz**2 )
+    end if
+    ! By is always set by parameter for now
+    forcing % solarwind_By       = parameters % solarwind_By
+  END SUBROUTINE Read_IFP_IPE_Forcing
 
 
   SUBROUTINE Read_Tiros_IPE_Forcing( forcing, rc )
@@ -413,40 +474,5 @@ CONTAINS
       line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
   END SUBROUTINE Read_Tiros_IPE_Forcing
-!
-
-  SUBROUTINE Estimate_AP_from_KP( forcing, read_in_start )
-
-    IMPLICIT NONE
-
-    CLASS( IPE_Forcing ), INTENT(inout) :: forcing
-    INTEGER,              INTENT(in   ) :: read_in_start
-
-    ! Local
-    REAL(prec) :: lookup, remainder
-    INTEGER    :: i
-    INTEGER, PARAMETER  :: table(1:29) = (/  0,   2,   3, & ! 0-0.67
-                                             4,   5,   6, & ! 1-1.67
-                                             7,   9,  12, & ! 2-2.67
-                                             15,  18,  22, & ! 3-3.67
-                                             27,  32,  39, & ! 4-4.67
-                                             48,  56,  67, & ! 5-5.67
-                                             80,  94, 111, & ! 6-6.67
-                                             132, 154, 179, & ! 7-7.67
-                                             207, 236, 300, & ! 8-8.67
-                                             400, 999/)       ! 9-dumm
-    DO i=read_in_start, forcing % n_time_levels
-
-      lookup    = forcing % kp(i)*3.0_prec + 1.0_prec
-      remainder = lookup - INT(lookup)
-      forcing % ap(i) = (1.0_prec - remainder) * table(INT(lookup)) + remainder *table(INT(lookup)+1)
-
-      lookup    = forcing % kp_1day_avg(i)*3.0_prec + 1.0_prec
-      remainder = lookup - INT(lookup)
-      forcing % ap_1day_avg(i) = (1.0_prec - remainder) * table(INT(lookup)) + remainder *table(INT(lookup)+1)
-
-    END DO
-
-  END SUBROUTINE Estimate_AP_from_KP
 !
 END MODULE IPE_Forcing_Class
