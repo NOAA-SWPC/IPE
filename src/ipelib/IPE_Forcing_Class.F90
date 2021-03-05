@@ -248,7 +248,6 @@ CONTAINS
 
     ! Local
     INTEGER :: localrc
-    write (6,*) 'ak', parameters % use_ifp_file, parameters % ifp_realtime_interval, mod(INT( deltime ), parameters % ifp_realtime_interval)
     if ( parameters % use_ifp_file .and. parameters % ifp_realtime_interval > 0 .and. &
          mod(INT( deltime ), parameters % ifp_realtime_interval) .eq. 0 ) then
       call forcing % Read_IFP_IPE_Forcing( parameters, &
