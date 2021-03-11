@@ -110,7 +110,7 @@ MODULE IPE_Plasma_Class
   REAL(dp), PARAMETER, PRIVATE :: DTMIN    = 1.0D0
   REAL(dp), PARAMETER, PRIVATE :: FPAS     = 0.0D0
   REAL(dp), PARAMETER, PRIVATE :: HEPRAT   = 9.0D-2
-  REAL(dp), PARAMETER, PRIVATE :: HPEQ     = 0.0D0
+!  REAL(dp), PARAMETER, PRIVATE :: HPEQ     = 0.0D0
   ! IHEPLS,INPLS turn on diffusive solutions if > 0. no solution if 0, chemical equilibrium if < 0
   INTEGER, PARAMETER, PRIVATE  :: IHEPLS   = 1
   INTEGER, PARAMETER, PRIVATE  :: INPLS    = 1
@@ -220,7 +220,7 @@ CONTAINS
   END SUBROUTINE Trash_IPE_Plasma
  
 
-  SUBROUTINE Update_IPE_Plasma( plasma, grid, neutrals, forcing, time_tracker, mpi_layer, v_ExB, time_step, colfac, rc )
+  SUBROUTINE Update_IPE_Plasma( plasma, grid, neutrals, forcing, time_tracker, mpi_layer, v_ExB, time_step, colfac, hpeq, rc )
     IMPLICIT NONE
     CLASS( IPE_Plasma ),   INTENT(inout) :: plasma
     TYPE( IPE_Grid ),      INTENT(in)    :: grid
@@ -231,6 +231,7 @@ CONTAINS
     REAL(prec),            INTENT(in)    :: v_ExB(1:3,1:grid % NLP,grid % mp_low:grid % mp_high)
     REAL(prec),            INTENT(in)    :: time_step
     REAL(prec),            INTENT(in)    :: colfac   
+    REAL(prec),            INTENT(in)    :: hpeq   
     INTEGER, OPTIONAL,     INTENT(out)   :: rc
 
     ! Local
@@ -330,7 +331,7 @@ CONTAINS
                                   neutrals,     &
                                   forcing,      &
                                   time_tracker, &
-                                  time_step, colfac, nflag_t,nflag_d )
+                                  time_step, colfac, hpeq, nflag_t,nflag_d )
 
       !TWFANG, calculate field line integrals for dynamo solver
       CALL plasma % Calculate_Field_Line_Integrals(grid, neutrals, colfac, mpi_layer)
@@ -1348,7 +1349,7 @@ CONTAINS
   END SUBROUTINE Auroral_Precipitation
 
 
-  SUBROUTINE FLIP_Wrapper( plasma, grid, neutrals, forcing, time_tracker, flip_time_step, colfac, nflag_t,nflag_d )
+  SUBROUTINE FLIP_Wrapper( plasma, grid, neutrals, forcing, time_tracker, flip_time_step, colfac, hpeq, nflag_t,nflag_d )
     IMPLICIT NONE
     CLASS( IPE_Plasma ), INTENT(inout) :: plasma
     TYPE( IPE_Grid ), INTENT(in)       :: grid
@@ -1357,6 +1358,7 @@ CONTAINS
     TYPE( IPE_Time ), INTENT(in)       :: time_tracker
     REAL(prec), INTENT(in)             :: flip_time_step
     REAL(prec), INTENT(in)             :: colfac
+    REAL(prec), INTENT(in)             :: hpeq
     ! Local
     INTEGER  :: i, lp, mp, iprint, ii
     INTEGER  :: JMINX, JMAXX

@@ -247,6 +247,7 @@ CONTAINS
                                   ipe % eldyn % v_ExB_apex, &
                                   ipe % parameters % time_step, &
                                   ipe % parameters % colfac, &
+                                  ipe % parameters % hpeq, &
                                   rc = localrc )
       IF ( ipe_error_check( localrc, msg="Failed to update plasma", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
