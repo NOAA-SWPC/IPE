@@ -67,6 +67,8 @@ MODULE IPE_Model_Parameters_Class
 
     ! >> Operations
     REAL(prec) :: colfac
+    REAL(prec) :: offset1_deg
+    REAL(prec) :: offset2_deg
 
     CONTAINS
 
@@ -125,11 +127,13 @@ CONTAINS
     REAL(prec) :: solarwind_density
     ! >> Ops
     REAL(prec) :: colfac
+    REAL(prec) :: offset1_deg
+    REAL(prec) :: offset2_deg
 
     ! Communication buffers
     CHARACTER(LEN=200), DIMENSION( 4) :: sbuf
     INTEGER,            DIMENSION(13) :: ibuf
-    REAL(prec),         DIMENSION(22) :: rbuf
+    REAL(prec),         DIMENSION(24) :: rbuf
 
 
     NAMELIST / SpaceManagement / grid_file
@@ -143,7 +147,7 @@ CONTAINS
                                  write_geographic_eldyn, write_apex_eldyn, file_output_frequency
     NAMELIST / IPECAP          / mesh_height_min, mesh_height_max, mesh_fill, mesh_write, mesh_write_file
     NAMELIST / ElDyn           / dynamo_efield
-    NAMELIST / OPERATIONAL     / colfac
+    NAMELIST / OPERATIONAL     / colfac, offset1_deg, offset2_deg
 
     ! Begin
     IF (PRESENT(rc)) rc = IPE_SUCCESS
@@ -204,6 +208,8 @@ CONTAINS
 
     ! Operational
     colfac                 = 1.3_prec
+    offset1_deg         = 5.0_prec
+    offset2_deg         = 20.0_prec
 
     ! Initialize buffers
     sbuf = ""
@@ -277,7 +283,7 @@ CONTAINS
                 mesh_height_min, mesh_height_max, f107, f107_81day_avg, kp, kp_1day_avg, ap,   &
                 ap_1day_avg, nhemi_power, shemi_power, solarwind_By, solarwind_angle,          &
                 solarwind_velocity, solarwind_Bz, solarwind_density, file_output_frequency, &
-                colfac /)
+                colfac, offset1_deg, offset2_deg /)
 
     ENDIF
 
@@ -337,6 +343,8 @@ CONTAINS
     parameters % solarwind_density       = rbuf(20)
     parameters % file_output_frequency   = rbuf(21)
     parameters % colfac                  = rbuf(22)
+    parameters % offset1_deg             = rbuf(23)
+    parameters % offset2_deg             = rbuf(24)
 
     parameters % n_model_updates = INT( ( parameters % end_time - parameters % start_time ) / parameters % file_output_frequency )
 

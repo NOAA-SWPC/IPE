@@ -231,6 +231,8 @@ CONTAINS
                                  ipe % forcing, &
                                  ipe % time_tracker, &
                                  ipe % plasma, &
+                                 ipe % parameters % offset1_deg, &
+                                 ipe % parameters % offset2_deg, &
                                  ipe % mpi_layer, &
                                  rc = localrc )
       IF ( ipe_error_check( localrc, msg="Failed to update electrodynamics", &

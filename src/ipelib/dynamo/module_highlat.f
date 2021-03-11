@@ -5,7 +5,7 @@
       
       contains 
 !-----------------------------------------------------------------------
-      subroutine highlat(rc)
+      subroutine highlat(offset1_deg_r8,offset2_deg_r8,rc)
       use ipe_error_module
       use params_module,ONLY: kmlonp1,kmlat,kmlon
       use dynamo_module,ONLY: kmlat0,phihm,potential_model
@@ -20,11 +20,16 @@
 
 
       implicit none
+      real*8,intent(in) :: offset1_deg_r8,offset2_deg_r8
+      real :: offset1_deg,offset2_deg
       integer,optional,intent(out) :: rc
 
       integer :: i,j,lrc
       real*8,parameter::fill=1.0E36 !fill in value outside the boundary
       real*8 ::mlat,mlt,epot
+
+      offset1_deg = real(offset1_deg_r8)
+      offset2_deg = real(offset2_deg_r8)
 !   
 ! am 10/04 remove weimer part: first test without any potential model
 ! Dynamo calls Heelis (heelis.F), Weimer (wei01gcm.F), or neither
@@ -38,7 +43,7 @@
 
       if (potential_model == 'HEELIS') then
         call init_heelis
-        call heelis
+        call heelis(offset1_deg,offset2_deg)
 
 !         write(unit=4025,FMT='(20E12.4)') phihm
       else if (potential_model == 'weimer2005') then
@@ -84,14 +89,14 @@
 
         ctpoten=(maxval(phihm)-minval(phihm))/1.0E+3
         call init_heelis
-        call colath
+        call colath(offset1_deg,offset2_deg)
       else  !  potential_model='NONE'
         do j=1,kmlat0
           do i=1,kmlonp1
             phihm(i,j) = 0.
           enddo ! i=1,kmlonp1
         enddo ! j=1,kmlat0
-        call colath
+        call colath(offset1_deg,offset2_deg)
       endif
       
       end subroutine highlat
