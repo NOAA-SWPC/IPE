@@ -41,12 +41,11 @@
 !
       if (present(rc)) rc = IPE_SUCCESS
 
-      if (potential_model == 'HEELIS') then
+      if ( potential_model == 1 ) then ! 1 is HEELIS
         call init_heelis
         call heelis(offset1_deg,offset2_deg)
 
-!         write(unit=4025,FMT='(20E12.4)') phihm
-      else if (potential_model == 'weimer2005') then
+      else if ( potential_model == 2 ) then ! 2 is WEIMER2005
 
         call setmodel2005Ipe(sangle,bt,stilt,swvel,swden
      &,fileLocation,'epot',rc=lrc)
@@ -90,7 +89,7 @@
         ctpoten=(maxval(phihm)-minval(phihm))/1.0E+3
         call init_heelis
         call colath(offset1_deg,offset2_deg)
-      else  !  potential_model='NONE'
+      else  !  0 - potential_model='NONE'
         do j=1,kmlat0
           do i=1,kmlonp1
             phihm(i,j) = 0.
