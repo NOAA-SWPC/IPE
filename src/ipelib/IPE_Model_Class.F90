@@ -233,6 +233,7 @@ CONTAINS
                                  ipe % plasma, &
                                  ipe % parameters % offset1_deg, &
                                  ipe % parameters % offset2_deg, &
+                                 ipe % parameters % potential_model, &
                                  ipe % mpi_layer, &
                                  rc = localrc )
       IF ( ipe_error_check( localrc, msg="Failed to update electrodynamics", &

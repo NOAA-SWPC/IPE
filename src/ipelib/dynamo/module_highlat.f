@@ -5,10 +5,11 @@
       
       contains 
 !-----------------------------------------------------------------------
-      subroutine highlat(offset1_deg_r8,offset2_deg_r8,rc)
+      subroutine highlat(offset1_deg_r8,offset2_deg_r8,potential_model,
+     &           rc)
       use ipe_error_module
       use params_module,ONLY: kmlonp1,kmlat,kmlon
-      use dynamo_module,ONLY: kmlat0,phihm,potential_model
+      use dynamo_module,ONLY: kmlat0,phihm
       use module_sub_heelis,ONLY: heelis
       use module_colath,ONLY:colath
       use module_magfield
@@ -21,6 +22,7 @@
 
       implicit none
       real*8,intent(in) :: offset1_deg_r8,offset2_deg_r8
+      integer,intent(in) :: potential_model
       real :: offset1_deg,offset2_deg
       integer,optional,intent(out) :: rc
 

@@ -69,6 +69,7 @@ MODULE IPE_Model_Parameters_Class
     REAL(prec) :: colfac
     REAL(prec) :: offset1_deg
     REAL(prec) :: offset2_deg
+    INTEGER    :: potential_model
 
     CONTAINS
 
@@ -129,10 +130,11 @@ CONTAINS
     REAL(prec) :: colfac
     REAL(prec) :: offset1_deg
     REAL(prec) :: offset2_deg
+    INTEGER    :: potential_model
 
     ! Communication buffers
     CHARACTER(LEN=200), DIMENSION( 4) :: sbuf
-    INTEGER,            DIMENSION(13) :: ibuf
+    INTEGER,            DIMENSION(14) :: ibuf
     REAL(prec),         DIMENSION(24) :: rbuf
 
 
@@ -147,7 +149,7 @@ CONTAINS
                                  write_geographic_eldyn, write_apex_eldyn, file_output_frequency
     NAMELIST / IPECAP          / mesh_height_min, mesh_height_max, mesh_fill, mesh_write, mesh_write_file
     NAMELIST / ElDyn           / dynamo_efield
-    NAMELIST / OPERATIONAL     / colfac, offset1_deg, offset2_deg
+    NAMELIST / OPERATIONAL     / colfac, offset1_deg, offset2_deg, potential_model                                    
 
     ! Begin
     IF (PRESENT(rc)) rc = IPE_SUCCESS
@@ -210,6 +212,7 @@ CONTAINS
     colfac                 = 1.3_prec
     offset1_deg         = 5.0_prec
     offset2_deg         = 20.0_prec
+    potential_model     = 2
 
     ! Initialize buffers
     sbuf = ""
@@ -277,6 +280,8 @@ CONTAINS
       IF ( write_apex_eldyn          ) ibuf(11) = 1
       IF ( parameters % use_ifp_file     ) ibuf(12) = 1
       IF ( dynamo_efield             ) ibuf(13) = 1
+      ! -- integer for operations
+      ibuf(14) = potential_model
 
       ! -- reals
       rbuf = (/ time_step, start_time, end_time, msis_time_step, solar_forcing_time_step, &
@@ -315,6 +320,7 @@ CONTAINS
     parameters % write_apex_eldyn          = ( ibuf(11) == 1 )
     parameters % use_ifp_file              = ( ibuf(12) == 1 )
     parameters % dynamo_efield             = ( ibuf(13) == 1 )
+    parameters % potential_model           = ibuf(14)
 
 #ifdef HAVE_MPI
     CALL MPI_BCAST( rbuf, size(rbuf), mpi_layer % mpi_prec, 0, mpi_layer % mpi_communicator, ierr )

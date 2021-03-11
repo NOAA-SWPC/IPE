@@ -141,9 +141,6 @@
 ! For dot products:
       real,parameter :: unitvm(kmlon)=1.
 !
-!     high latitude potential is now an integer: 2=weimer2005 1=heelis 0=none                 
-      integer, parameter :: potential_model = 2
-!
 ! Electric potential from heelis or weimer:
       real,dimension(kmlonp1,kmlat0) :: pfrac  ! NH fraction of potential
       real,dimension(kmlonp1,kmlat)  :: phihm  ! potential in magnetic
