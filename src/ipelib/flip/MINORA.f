@@ -3,7 +3,7 @@ C.... This function is the main sequencing control for the He+ and N+
 C.... routines. It is similar to subroutine LOOPS on RSLPSD.FOR. Look 
 C.... there for comments.
 C.... Cleaned up and commented by P. Richards in April 2000
-      SUBROUTINE dloops_heplus_nplus(TI,    !.. O+,H+ & Ti,Te
+      SUBROUTINE dloops_heplus(TI,    !.. O+,H+ & Ti,Te
      >              DTIN,    !.. Time step in
      >             DTMIN,    !.. Minimum time step
      >            IHEPNP,    !.. He+ - N+ switch
@@ -31,8 +31,7 @@ C.... Cleaned up and commented by P. Richards in April 2000
       DATA XMASS/23.4164D-24,26.7616D-24,6.6904D-24,6*0.0/
       DATA NION/1/      ! # species: do not change
 
-      IF(IABS(IHEPNP).EQ.9)  XMAS=XMASS(3)  !.. FOR He+
-      IF(IABS(IHEPNP).EQ.11) XMAS=XMASS(1)  !.. FOR N+
+      XMAS=XMASS(3)  !.. FOR He+
 
       ZLBHE=200         !.. set He+ lower boundary
       ZLBNP=115         !.. set N+ lower boundary
@@ -45,16 +44,8 @@ C.... Cleaned up and commented by P. Richards in April 2000
       !..transferring minor ion densities from storage in XION to the 
       !.. solution variable N
       DO J=JMIN,JMAX
-         !... for N+
-         IF(IABS(IHEPNP).EQ.11) THEN
-           N(1,J)=XIONN(4,J)
-           N(3,J)=XIONN(5,J)+XIONN(6,J)+XIONN(7,J)+XIONN(8,J)
-         ENDIF
-         !... for He+
-         IF(IABS(IHEPNP).EQ.9) THEN
            N(1,J)=XIONN(3,J)
            N(3,J)=XIONN(4,J)+XIONN(5,J)+XIONN(6,J)+XIONN(7,J)+XIONN(8,J)
-         ENDIF
          !..store minor ion density to calculate dn/dt
          NMSAVE(1,J)=N(1,J)    !.. density at previous intermediate time step
          NMORIG(1,J)=N(1,J)    !.. Original density at previous time step
@@ -62,36 +53,14 @@ C.... Cleaned up and commented by P. Richards in April 2000
          DCRQ(2,J)=1.0
       ENDDO
 
-!dbg20120301: this part was commented out on 20110815, but un-comment again to solve for N+ problem: "IN BDSLV &&&&&&& BANDWIDTH IS TOO LARGE " i don't remember why we decided to comment out here and i cannot find a program to setup the local chem equil anywhere else???
-!dbg20110815      !.. Use local equilibrium for densities if flux tube apex height < 200 km
-!      IF(Z(JEQ).LT.200.0) THEN 
-!        DO J=JMIN,JMAX
-!          IF(IABS(IHEPNP).EQ.9) CALL MCHEMQ(J,DUM,N,TI,FLDIM)
-!          IF(IABS(IHEPNP).EQ.11) CALL NCHEMQ(J,DUM,N,TI,FLDIM)
-!          N(1,J)=DUM(1)
-!        ENDDO
-!        RETURN
-!      ENDIF
-!dbg20110815
       !.. Use local equilibrium for He+ densities if apex height < ZLBHE
-      IF(IHEPNP.EQ.9.AND.Z(JEQ).LE.ZLBHE) THEN
+      IF((JEQ).LE.ZLBHE) THEN
         DO J=JMIN,JMAX
           CALL MCHEMQ(J,DUM,N,TI,FLDIM)
           XIONN(3,J)=DUM(1)      !.. He+
         ENDDO
         RETURN
       ENDIF
-
-      !.. Use local equilibrium for N+ densities if apex height < ZLBNP
-      IF(IHEPNP.EQ.11.AND.Z(JEQ).LE.ZLBNP) THEN
-        DO J=JMIN,JMAX
-          CALL NCHEMQ(J,DUM,N,TI,FLDIM)
-          XIONN(4,J)=DUM(1)      !.. N+
-        ENDDO
-        RETURN
-      ENDIF 
-!dbg20110815
-
 
       !... calculate average values for quantities that don't
       !... change in Newton iteration
@@ -103,13 +72,11 @@ C- OUTER LOOP Return here on Non-Convergence with reduced time step
 
         !.. Update indices for the lower boundaries North. 
         DO J=JMIN,JEQ-1
-          IF(IABS(IHEPNP).EQ.9.AND.Z(J).LE.ZLBHE) JBNN=J
-          IF(IABS(IHEPNP).EQ.11.AND.Z(J).LE.ZLBNP) JBNN=J
+          IF(Z(J).LE.ZLBHE) JBNN=J
         ENDDO
         !.. Update indices for the lower boundaries South. 
         DO J=JMAX,JEQ,-1
-          IF(IABS(IHEPNP).EQ.9.AND.Z(J).LE.ZLBHE) JBNS=J
-          IF(IABS(IHEPNP).EQ.11.AND.Z(J).LE.ZLBNP) JBNS=J
+          IF(Z(J).LE.ZLBHE) JBNS=J
         ENDDO
 
         !.. Set up boundary indices for the solution procedure
@@ -121,10 +88,7 @@ C- OUTER LOOP Return here on Non-Convergence with reduced time step
           !.. set boundary conditions on density
           DO J=JMIN,JMAX
             IF(J.LE.JBNN.OR.J.GE.JBNS) THEN
-              IF(IABS(IHEPNP).EQ.9) CALL 
-     >          MCHEMQ(J,DUM,N,TI,FLDIM)
-              IF(IABS(IHEPNP).EQ.11) 
-     >         CALL NCHEMQ(J,DUM,N,TI,FLDIM)
+              CALL MCHEMQ(J,DUM,N,TI,FLDIM)
               N(1,J)=DUM(1)
             ENDIF
           ENDDO
@@ -138,15 +102,10 @@ C- OUTER LOOP Return here on Non-Convergence with reduced time step
               RHS(KR+IRHS)=F(IRHS)
             ENDDO
           ENDDO
-          !.. Now set up the Jacobian Matrix dFij/dn
-!nm20130111: distinguished he+ v.s. n+ according to phil's suggestion
-          IF(IABS(IHEPNP).EQ.9) !he+  
-     >     CALL HMATRX(FLDIM,S,RHS,IEQ,DT,N,TI,JBNN,JBNS,MIT,IHEPNP,
-     >      XMAS,NION,NMSAVE)
-          IF(IABS(IHEPNP).EQ.11)  !n+ 
-     >     CALL NMATRX(FLDIM,S,RHS,IEQ,DT,N,TI,JBNN,JBNS,MIT,IHEPNP,
-     >      XMAS,NION,NMSAVE)
 
+          !.. Now set up the Jacobian Matrix dFij/dn
+           CALL HMATRX(FLDIM,S,RHS,IEQ,DT,N,TI,JBNN,JBNS,MIT,IHEPNP,
+     >      XMAS,NION,NMSAVE)
 
           !.. invert the jacobian matriX *s* in the inversion routine *bdslv*.
           !.. the increments are stored in array delta in this order
@@ -162,8 +121,7 @@ C- OUTER LOOP Return here on Non-Convergence with reduced time step
             IF(EFLAG(11,11).EQ.1) WRITE(6,*) ' '
             IF(EFLAG(11,11).EQ.1) WRITE(6,*) 
      >        ' *** Problem in band solver ****'
-            IF(IABS(IHEPNP).EQ.9) EFLAG(3,2)=-1    !.. Report problem to calling routine
-            IF(IABS(IHEPNP).EQ.11) EFLAG(4,2)=-1   !.. Report problem to calling routine
+            EFLAG(3,2)=-1    !.. Report problem to calling routine
             RETURN
           ENDIF
 
@@ -213,8 +171,7 @@ C- OUTER LOOP Return here on Non-Convergence with reduced time step
      >       ' He+ N+ ',ITER,DTINC,DTIN,DT
           IF(DTINC.GE.DTIN-1) THEN
             DO J=JMIN,JMAX
-              IF(IABS(IHEPNP).EQ. 9) XIONN(3,J)=N(1,J)  ! He+
-              IF(IABS(IHEPNP).EQ.11) XIONN(4,J)=N(1,J)  ! N+
+              XIONN(3,J)=N(1,J)  ! He+
             ENDDO
             RETURN
           ENDIF
@@ -231,8 +188,7 @@ C- OUTER LOOP Return here on Non-Convergence with reduced time step
         !-- Non-Convergence: Reduce time step and restore densities. 
           DT=DT/2  !.. reduce time step for non-convergence
           !.. Raise lower boundary to maximum of 300 km
-          IF(IHEPNP.EQ.9.AND.DT.LT.DTIN/3.0)  ZLBHE=(ZLBHE+350)/2   
-          IF(IHEPNP.EQ.11.AND.DT.LT.DTIN/3.0)  ZLBNP=(ZLBNP+350)/2   
+          IF(DT.LT.DTIN/3.0)  ZLBHE=(ZLBHE+350)/2   
           IF(EFLAG(11,11).EQ.1) WRITE(6,'(A,2I5,9F14.2)')  
      >       ' He+ N+ 2nd ',-IHEPNP,ITER,DTINC,DTIN,DT,ZLBHE,ZLBNP
           DO J=JMIN,JMAX
@@ -241,14 +197,12 @@ C- OUTER LOOP Return here on Non-Convergence with reduced time step
 
           !.. Check that DT is not too small
           IF(DT.LT.DTMIN) THEN
-            IF(IABS(IHEPNP).EQ.9) EFLAG(3,1)=-1    !.. Report problem to calling routine
-            IF(IABS(IHEPNP).EQ.11) EFLAG(4,1)=-1   !.. Report problem to calling routine
+            EFLAG(3,1)=-1    !.. Report problem to calling routine
             IF(EFLAG(11,11).EQ.1) WRITE(6,'(A,9I5)') 
      >        '  ERR FLAGS MINA',IHEPNP
             !.. Restore density to original input value
             DO J=JMIN,JMAX
-              IF(IABS(IHEPNP).EQ.9) XIONN(3,J)=NMORIG(1,J)
-              IF(IABS(IHEPNP).EQ.11) XIONN(4,J)=NMORIG(1,J)
+              XIONN(3,J)=NMORIG(1,J)
             ENDDO
             RETURN
           ENDIF 
@@ -258,6 +212,222 @@ C- OUTER LOOP Return here on Non-Convergence with reduced time step
 C- END OF OUTER LOOP ----------------------------
       RETURN
       END
+
+
+
+      SUBROUTINE dloops_nplus(TI,    !.. O+,H+ & Ti,Te
+     >              DTIN,    !.. Time step in
+     >             DTMIN,    !.. Minimum time step
+     >            IHEPNP,    !.. He+ - N+ switch
+     >             EFLAG,mp,lp,i_which_call)    !.. OUTPUT: Error flag array
+      USE FIELD_LINE_GRID    !.. FLDIM JMIN JMAX FLDIM Z BM GR SL GL SZA
+      USE SOLVARR        !... DELTA RHS WORK S, Variables for solver
+      USE ION_DEN_VEL    !.. O+ H+ He+ N+ NO+ O2+ N2+ O+(2D) O+(2P)
+      !..EUVION PEXCIT PEPION OTHPR1 OTHPR2 SUMION SUMEXC PAUION PAUEXC NPLSPRD
+      USE PRODUCTION !.. EUV, photoelectron, and auroral production
+      IMPLICIT NONE
+      integer mp,lp,i_which_call
+      INTEGER NION,IHEPNP,J,ITER,IRHS,IBW,I
+      INTEGER EFLAG(11,11),NFLAG                  !.. solution procedure error flags
+      INTEGER JBNN,JBNS,JEQ,JC                    !.. boundary indices
+      INTEGER IDIV,KR,ION,IEQ,MIT                 !.. solution variables
+      DOUBLE PRECISION N(4,FLDIM),NMSAVE(2,FLDIM) !.. Solution and saved densities 
+      DOUBLE PRECISION TI(3,FLDIM)                !.. Ti,Te
+      !.. solution variables
+      DOUBLE PRECISION DCR,DCRP,DCRQ(2,FLDIM),ADCR,DINC,F(20),DUM(9)
+      DOUBLE PRECISION DT,DTIN,DTMIN,DTINC !.. Time step variables
+      DOUBLE PRECISION ZLBHE,ZLBNP         !.. He+ & N+ lower boundary
+      DOUBLE PRECISION XMAS,XMASS(9)       !.. Ion mass
+      DOUBLE PRECISION NMORIG(2,FLDIM)     !.. Original density at previous time step
+      integer ret
+      DATA XMASS/23.4164D-24,26.7616D-24,6.6904D-24,6*0.0/
+      DATA NION/1/      ! # species: do not change
+
+      XMAS=XMASS(1)  !.. FOR N+
+
+      ZLBHE=200         !.. set He+ lower boundary
+      ZLBNP=115         !.. set N+ lower boundary
+      DT=DTIN           !.. Set time step for dN/dt
+      DTINC=0.0         !.. Used for reduced timestep
+      JBNN=JMIN         !.. lower boundary point for O+ and H+
+      JBNS=JMAX         !.. lower boundary point for O+ and H+
+      JEQ=(JMIN+JMAX)/2 !.. Equatorial point
+
+      !..transferring minor ion densities from storage in XION to the 
+      !.. solution variable N
+      DO J=JMIN,JMAX
+           N(1,J)=XIONN(4,J)
+           N(3,J)=XIONN(5,J)+XIONN(6,J)+XIONN(7,J)+XIONN(8,J)
+         !..store minor ion density to calculate dn/dt
+         NMSAVE(1,J)=N(1,J)    !.. density at previous intermediate time step
+         NMORIG(1,J)=N(1,J)    !.. Original density at previous time step
+         DCRQ(1,J)=1.0
+         DCRQ(2,J)=1.0
+      ENDDO
+
+      !.. Use local equilibrium for N+ densities if apex height < ZLBNP
+      IF(Z(JEQ).LE.ZLBNP) THEN
+        DO J=JMIN,JMAX
+          CALL NCHEMQ(J,DUM,N,TI,FLDIM)
+          XIONN(4,J)=DUM(1)      !.. N+
+        ENDDO
+        RETURN
+      ENDIF 
+
+
+      !... calculate average values for quantities that don't
+      !... change in Newton iteration
+      CALL DENAVE(JMAX-1,TI)
+      CALL AVDEN2(JMAX-1,TI,IHEPNP)
+
+C- OUTER LOOP Return here on Non-Convergence with reduced time step
+  10  CONTINUE
+
+        !.. Update indices for the lower boundaries North. 
+        DO J=JMIN,JEQ-1
+          IF(Z(J).LE.ZLBNP) JBNN=J
+        ENDDO
+        !.. Update indices for the lower boundaries South. 
+        DO J=JMAX,JEQ,-1
+          IF(Z(J).LE.ZLBNP) JBNS=J
+        ENDDO
+
+        !.. Set up boundary indices for the solution procedure
+        MIT=JBNS-JBNN+1       !.. Number of points on field line
+        IEQ=MIT-2             !.. Number of equations to set up      
+
+        !************* Main Newton Solver Iteration Loop begins *****************
+        DO 220 ITER=1,20
+          !.. set boundary conditions on density
+          DO J=JMIN,JMAX
+            IF(J.LE.JBNN.OR.J.GE.JBNS) THEN
+              CALL NCHEMQ(J,DUM,N,TI,FLDIM)
+              N(1,J)=DUM(1)
+            ENDIF
+          ENDDO
+
+          !.. call MDFIJ to get unperturbed value to calculate dFij/dn
+          DO J=2,MIT-1
+            KR=NION*(J-2)
+            JC=J+JBNN-1
+            CALL MDFIJ(JC,0,NION,DT,N,TI,F,JBNN,JBNS,IHEPNP,XMAS,NMSAVE)
+            DO IRHS=1,NION
+              RHS(KR+IRHS)=F(IRHS)
+            ENDDO
+          ENDDO
+          !.. Now set up the Jacobian Matrix dFij/dn
+          CALL NMATRX(FLDIM,S,RHS,IEQ,DT,N,TI,JBNN,JBNS,MIT,IHEPNP,
+     >      XMAS,NION,NMSAVE)
+
+
+          !.. invert the jacobian matriX *s* in the inversion routine *bdslv*.
+          !.. the increments are stored in array delta in this order
+          !.. X(1...n,j),X(1...n,j+1),X(1...n,j+2),....X(1...n,jmaX-1)
+          IBW=2*NION-1
+          CALL BDSLV(IEQ,IBW,S,0,RHS,DELTA,WORK,NFLAG,
+     >                mp,lp,i_which_call)
+
+          !.. Check for problems in band solver
+          EFLAG(3,2)=0     
+          EFLAG(4,2)=0     
+          IF(NFLAG.NE.0) THEN
+            IF(EFLAG(11,11).EQ.1) WRITE(6,*) ' '
+            IF(EFLAG(11,11).EQ.1) WRITE(6,*) 
+     >        ' *** Problem in band solver ****'
+            EFLAG(4,2)=-1   !.. Report problem to calling routine
+            RETURN
+          ENDIF
+
+          IDIV=0             !... convergence indicator
+          DCR=1.0            !... convergence indicator
+
+          !.. test density increments 'dinc' to ensure density > 0 
+          !.. (mod steepest descent)
+          DO  142 I=1,NION
+            ION=2*NION-I
+            DO 142 J=2,MIT-1
+              DCRP=1.0
+              JC=JBNN+J-1
+              DCRQ(I,JC)=1.0
+              DINC=DELTA(NION*J-ION)
+              IF(DINC.LE.0) GO TO 142
+              IF(ABS(DINC/N(I,JC)).GT.0.9999) DCRP=0.5*ABS(N(I,JC)/DINC)
+              IF((DCRP.LT.DCR).AND.(Z(JC).GT.0.0)) DCR=DCRP
+              IF(ITER.GT.0) DCRQ(I,JC)=DCRP
+ 142      CONTINUE
+ 
+          ADCR=DCR
+          !.. add iterative increment to the density. 
+          !.. convergence when IDIV=0. 
+          DO 42 I=1,NION
+            ION=2*NION-I
+            DO 42 J=2,MIT-1
+              JC=JBNN+J-1
+              DINC=DELTA(NION*J-ION)
+              N(I,JC)=N(I,JC)-DINC*ADCR
+              IF(ABS(DINC/N(I,JC)).GT.1E-3)  IDIV=IDIV+1
+ 42       CONTINUE
+
+          !.. test to see if convergence has occured.
+          IF(IDIV.EQ.0)  GO TO 230
+ 220    CONTINUE
+
+ 230    CONTINUE    !*************** end main loop ***************
+
+        !.. Testing for convergence to see if need to reduce time step
+        IF(IDIV.EQ.0) THEN
+          !============== Convergence success ========
+          EFLAG(3,1)=0     
+          EFLAG(4,1)=0     
+          DTINC=DTINC+DT   !.. Used for reduced timestep
+          IF(EFLAG(11,11).EQ.1) WRITE(6,'(A,I5,9F14.2)')  
+     >       ' He+ N+ ',ITER,DTINC,DTIN,DT
+          IF(DTINC.GE.DTIN-1) THEN
+            DO J=JMIN,JMAX
+              XIONN(4,J)=N(1,J)  ! N+
+            ENDDO
+            RETURN
+          ENDIF
+          !.. increase time step if convergence is easy
+          IF(ITER.LT.5.AND.DTINC+2*DT.LE.DTIN) DT=2*DT
+          IF(ITER.LT.5.AND.DTINC+2*DT.GT.DTIN) DT=DTIN-DTINC
+
+          !-- Save current densities for dN/dt. 
+          DO J=JMIN,JMAX
+            NMSAVE(1,J)=N(1,J)
+          ENDDO
+        ELSE
+        !============== Convergence failure ========
+        !-- Non-Convergence: Reduce time step and restore densities. 
+          DT=DT/2  !.. reduce time step for non-convergence
+          !.. Raise lower boundary to maximum of 300 km
+          IF(DT.LT.DTIN/3.0)  ZLBNP=(ZLBNP+350)/2   
+          IF(EFLAG(11,11).EQ.1) WRITE(6,'(A,2I5,9F14.2)')  
+     >       ' He+ N+ 2nd ',-IHEPNP,ITER,DTINC,DTIN,DT,ZLBHE,ZLBNP
+          DO J=JMIN,JMAX
+            N(1,J)=NMSAVE(1,J)
+          ENDDO
+
+          !.. Check that DT is not too small
+          IF(DT.LT.DTMIN) THEN
+            EFLAG(4,1)=-1   !.. Report problem to calling routine
+            IF(EFLAG(11,11).EQ.1) WRITE(6,'(A,9I5)') 
+     >        '  ERR FLAGS MINA',IHEPNP
+            !.. Restore density to original input value
+            DO J=JMIN,JMAX
+              XIONN(4,J)=NMORIG(1,J)
+            ENDDO
+            RETURN
+          ENDIF 
+        ENDIF
+
+      GOTO 10
+C- END OF OUTER LOOP ----------------------------
+      RETURN
+      END
+
+
+
 C::::::::::::::::::::::::::::: MDFIJ ::::::::::::::::::::::::::::::::::::
 C.... This routine sets up the He+ and H+ continuity equations to be 
 C.... minimized by the Newton solver. See program DFIJ on RSDENA.FOR 

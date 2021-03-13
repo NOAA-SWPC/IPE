@@ -684,13 +684,13 @@ C.... Written by P. Richards June-September 2010.
       !.. He+ solution
       IF(EFLAG(2,1).EQ.0.AND.IHEPLS.GT.0) THEN
         i_which_call = 1
-        CALL dloops_heplus_nplus(temp_ti_te,DT,DTMIN,9,EFLAG,mp,lp,
+        CALL dloops_heplus(temp_ti_te,DT,DTMIN,9,EFLAG,mp,lp,
      >                           i_which_call)
       ENDIF
       !.. N+ solution
       IF(EFLAG(2,1).EQ.0.AND.INPLS.GT.0) THEN
         i_which_call = 2
-        CALL dloops_heplus_nplus(temp_ti_te,DT,DTMIN,11,EFLAG,mp,lp,
+        CALL dloops_nplus(temp_ti_te,DT,DTMIN,11,EFLAG,mp,lp,
      >                           i_which_call)
       ENDIF
 
