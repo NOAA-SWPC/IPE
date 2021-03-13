@@ -104,7 +104,8 @@ C- OUTER LOOP Return here on Non-Convergence with reduced time step
           ENDDO
 
           !.. Now set up the Jacobian Matrix dFij/dn
-           CALL HMATRX(FLDIM,S,RHS,IEQ,DT,N,TI,JBNN,JBNS,MIT,IHEPNP,
+           CALL heplus_matrix(FLDIM,S,RHS,IEQ,DT,N,TI,JBNN,JBNS,MIT,
+     >      IHEPNP,
      >      XMAS,NION,NMSAVE)
 
           !.. invert the jacobian matriX *s* in the inversion routine *bdslv*.
@@ -316,7 +317,8 @@ C- OUTER LOOP Return here on Non-Convergence with reduced time step
             ENDDO
           ENDDO
           !.. Now set up the Jacobian Matrix dFij/dn
-          CALL NMATRX(FLDIM,S,RHS,IEQ,DT,N,TI,JBNN,JBNS,MIT,IHEPNP,
+          CALL nplus_matrix(FLDIM,S,RHS,IEQ,DT,N,TI,JBNN,JBNS,MIT,
+     >      IHEPNP,
      >      XMAS,NION,NMSAVE)
 
 
@@ -891,14 +893,14 @@ C........For N+
 
       RETURN
       END
-C::::::::::::::::::::::: HMATRX ::::::::::::::::::::::::::::::::::::
-C.... HMATRX evaluates df/dn using Stephansons method for He+ and N+.
+C::::::::::::::::::::::: heplus_matrix ::::::::::::::::::::::::::::::::::::
+C.... heplus_matrix evaluates df/dn using Stephansons method for He+ and N+.
 C.... S(L,M) = DEL(FIJ) / DEL(N)
 C.... where N is the density of ion IV at grid point JV. L and M
 C.... are computed from JF...IV. the array RHS contains values of
 C.... FIJ saved from previous computation
 C.... Consult file RSLPSD-Algorithm.doc for detailed explanation
-      SUBROUTINE HMATRX(FLDIM,   !.. field line grid dimension
+      SUBROUTINE heplus_matrix(FLDIM,   !.. field line grid dimension
      >                      S,   !.. Array to store the Jacobian
      >                    RHS,   !.. Stored values of function at time t
      >                   INEQ,   !.. # of equations
@@ -963,15 +965,14 @@ C.... Consult file RSLPSD-Algorithm.doc for detailed explanation
 
       RETURN
       END
-Cnm20130111: copied from HMATRX to distinguish between he+ v.s. n+
-C::::::::::::::::::::::: NMATRX ::::::::::::::::::::::::::::::::::::
-C.... NMATRX evaluates df/dn using Stephansons method for He+ and N+.
+C::::::::::::::::::::::: nplus_matrix ::::::::::::::::::::::::::::::::::::
+C.... nplus_matrix evaluates df/dn using Stephansons method for He+ and N+.
 C.... S(L,M) = DEL(FIJ) / DEL(N)
 C.... where N is the density of ion IV at grid point JV. L and M
 C.... are computed from JF...IV. the array RHS contains values of
 C.... FIJ saved from previous computation
 C.... Consult file RSLPSD-Algorithm.doc for detailed explanation
-      SUBROUTINE NMATRX(FLDIM,   !.. field line grid dimension
+      SUBROUTINE nplus_matrix(FLDIM,   !.. field line grid dimension
      >                      S,   !.. Array to store the Jacobian
      >                    RHS,   !.. Stored values of function at time t
      >                   INEQ,   !.. # of equations
