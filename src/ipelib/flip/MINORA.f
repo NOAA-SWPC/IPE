@@ -65,7 +65,7 @@ C.... Cleaned up and commented by P. Richards in April 2000
       !... calculate average values for quantities that don't
       !... change in Newton iteration
       CALL DENAVE(JMAX-1,TI)
-      CALL AVDEN2(JMAX-1,TI,IHEPNP)
+      CALL AVDEN_heplus(JMAX-1,TI)
 
 C- OUTER LOOP Return here on Non-Convergence with reduced time step
   10  CONTINUE
@@ -278,7 +278,7 @@ C- END OF OUTER LOOP ----------------------------
       !... calculate average values for quantities that don't
       !... change in Newton iteration
       CALL DENAVE(JMAX-1,TI)
-      CALL AVDEN2(JMAX-1,TI,IHEPNP)
+      CALL AVDEN_nplus(JMAX-1,TI)
 
 C- OUTER LOOP Return here on Non-Convergence with reduced time step
   10  CONTINUE
@@ -795,13 +795,13 @@ C.... to do the interpolation.
  400  CONTINUE
       RETURN
       END
-C::::::::::::::::::::::::::::: AVDEN2 ::::::::::::::::::::::::::::::::::::
+C::::::::::::::::::::::::::::: AVDEN_heplus ::::::::::::::::::::::::::::::::::::
 C.....................................................................
 C   this program evaluates the interpolated densities at the midpoints
 C   it also evaluates the ion-neutral collision frequencies nuX(i,j)
 C   and o+ and h+ production and loss rates
 C........................................................................
-      SUBROUTINE AVDEN2(JMAX1,TI,IHEPNP)
+      SUBROUTINE AVDEN_heplus(JMAX1,TI)
       USE FIELD_LINE_GRID    !.. FLDIM JMIN JMAX FLDIM Z BM GR SL GL SZA
       !.. TEJ TIJ NUX UNJ DS GRADTE GRADTI GRAV OLOSS HLOSS HPROD
       USE THERMOSPHERE  !.. ON HN N2N O2N HE TN UN EHT COLFAC
@@ -821,16 +821,43 @@ C........................................................................
         HEA=SQRT(HE(J)*HE(J+1))
         TNJ=0.5*(TN(J)+TN(J+1))
         TR=(TIJ(J)+TNJ)*0.5
-        IF(IABS(IHEPNP).EQ.9) CALL ADEN9(J,OA,HA,N2A,O2A,HEA,TIJJ
-     >  ,TR,TNJ,NUX)
-        IF(IABS(IHEPNP).EQ.11) CALL ADEN11(J,OA,HA,N2A,O2A,HEA
-     >  ,TIJJ,TR,TNJ,NUX)
+        CALL ADEN_heplus(J,OA,HA,N2A,O2A,HEA,TIJJ,TR,TNJ,NUX)
 10    CONTINUE
       RETURN
       END
-C:::::::::::::::::: ADEN9::::::::::::::::::::::::::::::
+C::::::::::::::::::::::::::::: AVDEN_nplus ::::::::::::::::::::::::::::::::::::
+C.....................................................................
+C   this program evaluates the interpolated densities at the midpoints
+C   it also evaluates the ion-neutral collision frequencies nuX(i,j)
+C   and o+ and h+ production and loss rates
+C........................................................................
+      SUBROUTINE AVDEN_nplus(JMAX1,TI)
+      USE FIELD_LINE_GRID    !.. FLDIM JMIN JMAX FLDIM Z BM GR SL GL SZA
+      !.. TEJ TIJ NUX UNJ DS GRADTE GRADTI GRAV OLOSS HLOSS HPROD
+      USE THERMOSPHERE  !.. ON HN N2N O2N HE TN UN EHT COLFAC
+      USE AVE_PARAMS    !.. midpoint values - TEJ TIJ NUX UNJ etc. 
+      USE ION_DEN_VEL   !.. O+ H+ He+ N+ NO+ O2+ N2+ O+(2D) O+(2P)
+      IMPLICIT DOUBLE PRECISION(A-H,L,N-Z)
+      REAL OA,HA,N2A,O2A,TNJ,TR,HEA
+      DIMENSION TI(3,FLDIM)
+
+      !.. ion-neutral coll freqs taken from schunk and nagy rev. geophys. v18
+      !.. p813, 1980. first,  resonant charge eXchange from table 5 p823
+      DO 10 J=JMIN,JMAX-1
+        OA=SQRT(ON(J)*ON(J+1))
+        HA=SQRT(HN(J)*HN(J+1))
+        N2A=SQRT(N2N(J)*N2N(J+1))
+        O2A=SQRT(O2N(J)*O2N(J+1))
+        HEA=SQRT(HE(J)*HE(J+1))
+        TNJ=0.5*(TN(J)+TN(J+1))
+        TR=(TIJ(J)+TNJ)*0.5
+        CALL ADEN_nplus(J,OA,HA,N2A,O2A,HEA,TIJJ,TR,TNJ,NUX)
+10    CONTINUE
+      RETURN
+      END
+C:::::::::::::::::: ADEN_heplus::::::::::::::::::::::::::::::
 C.........For HE+
-      SUBROUTINE ADEN9(J,OA,HA,N2A,O2A,HEA,TIJJ,TR,TNJ,NUX)
+      SUBROUTINE ADEN_heplus(J,OA,HA,N2A,O2A,HEA,TIJJ,TR,TNJ,NUX)
       USE FIELD_LINE_GRID    !.. FLDIM JMIN JMAX FLDIM Z BM GR SL GL SZA
       IMPLICIT DOUBLE PRECISION(A-H,L,N-Z)
       REAL OA,HA,N2A,O2A,TNJ,TR,SQT,HEA
@@ -843,17 +870,11 @@ C.........For HE+
       NUX(1,J)=RHEPHE+CHEPN
       NUX(2,J)=0.0
 
-      !... print diagnostics
-      !  ID=3
-      !  IF(J.GT.JMAX/2) ID=9
-      !  WRITE(ID,99) J,Z(J),OA,HA,N2A,O2A,HEA,TIJJ,TNJ,TR,RHEPHE
-      !  WRITE(ID,99) J,Z(J),CHEPN,NUX(1,J),NUX(2,J)
- 99   FORMAT(1X,'AVDEN9',I4,F7.0,1P,22E10.3)
       RETURN
       END
-C:::::::::::::::::: ADEN11::::::::::::::::::::::::::::::
+C:::::::::::::::::: ADEN_nplus::::::::::::::::::::::::::::::
 C........For N+
-      SUBROUTINE ADEN11(J,OA,HA,N2A,O2A,HEA,TIJJ,TR,TNJ,NUX)
+      SUBROUTINE ADEN_nplus(J,OA,HA,N2A,O2A,HEA,TIJJ,TR,TNJ,NUX)
       USE FIELD_LINE_GRID    !.. FLDIM JMIN JMAX FLDIM Z BM GR SL GL SZA
       IMPLICIT DOUBLE PRECISION(A-H,L,N-Z)
       REAL OA,HA,N2A,O2A,TNJ,TR,SQT,HEA
@@ -868,12 +889,6 @@ C........For N+
       NUX(1,J)=CRIN+CNRIN
       NUX(2,J)=0.0
 
-      !... print diagnostics
-      !  ID=3
-      !  IF(J.GT.JMAX/2) ID=9
-      !  WRITE(ID,99) J,Z(J),OA,HA,N2A,O2A,HEA,TIJJ,TNJ,TR,CRIN
-      !  WRITE(ID,99) J,Z(J),CNRIN,NUX(1,J),NUX(2,J)
- 99   FORMAT(1X,'AVDEN11',I4,F7.0,1P,22E10.3)
       RETURN
       END
 C::::::::::::::::::::::: HMATRX ::::::::::::::::::::::::::::::::::::
