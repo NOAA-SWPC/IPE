@@ -260,6 +260,7 @@ C*** OUTER LOOP: Return here on Non-Convergence with reduced time step
 
           !.. Check that DT is not too small
           IF(DT.LT.DTMIN) THEN
+            write(6,*) 'ghgm dloops tmin ', mp,lp,dt
             EFLAG(2,1)=-1   !.. Report problem to calling routine
             IF(EFLAG(11,11).EQ.1) WRITE(6,'(A,9I5)') 
      >        '  ERR FLAGS LPSD',DCLON,DCLOS,DCUPP,NINT(ZLBDY)

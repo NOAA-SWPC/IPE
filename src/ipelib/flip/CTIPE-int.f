@@ -684,12 +684,14 @@ C.... Written by P. Richards June-September 2010.
       !.. He+ solution
       IF(EFLAG(2,1).EQ.0.AND.IHEPLS.GT.0) THEN
         i_which_call = 1
-        CALL XION(temp_ti_te,DT,DTMIN,9,EFLAG,mp,lp,i_which_call)
+        CALL dloops_heplus_nplus(temp_ti_te,DT,DTMIN,9,EFLAG,mp,lp,
+     >                           i_which_call)
       ENDIF
       !.. N+ solution
       IF(EFLAG(2,1).EQ.0.AND.INPLS.GT.0) THEN
         i_which_call = 2
-        CALL XION(temp_ti_te,DT,DTMIN,11,EFLAG,mp,lp,i_which_call)
+        CALL dloops_heplus_nplus(temp_ti_te,DT,DTMIN,11,EFLAG,mp,lp,
+     >                           i_which_call)
       ENDIF
 
         !.. transfer densities from FLIP to CTIP variable
@@ -781,26 +783,16 @@ C... Written by R. Montuoro June 2020
       INTEGER,          INTENT(IN)  :: EFLAG(11,11)    !.. error flags
 
       CHARACTER(LEN=*), PARAMETER :: ERRMSG(10) = (/
-     >  'Convergence failure in Temperature solution (TLOOPS).'
-     >  //' Time step less than minimum.             ',
-     >  'Convergence failure in Temperature solution (TLOOPS).'
-     >  //' Incorrect input to the band solver BDSLV.',
-     >  'Convergence failure in O+ - H+ solution (DLOOPS).'
-     >  //' Time step less than minimum.                 ',
-     >  'Convergence failure in O+ - H+ solution (DLOOPS).'
-     >  //' Incorrect input to the band solver BDSLV.    ',
-     >  'Convergence failure in He+ solution (XION).'
-     >  //' Time step less than minimum.                       ',
-     >  'Convergence failure in He+ solution (XION).'
-     >  //' Incorrect input to the band solver BDSLV.          ',
-     >  'Convergence failure in He+ solution (XION).'
-     >  //' Time step less than minimum.                       ',
-     >  'Convergence failure in N+ solution (XION).'
-     >  //' Incorrect input to the band solver BDSLV.           ',
-     >  'Convergence failure in CMINOR.            '
-     >  //'                                                     ',
-     >  'CTIP dimension not equal to FLIP dimensions.'
-     >  //' Check dimensions in all FLIP modules              ' /)
+     >  'Convergence failure in TLOOPS. Time step less than min.',
+     >  'Convergence failure in TLOOPS. Incorrect input to BDSLV',
+     >  'Convergence failure in DLOOPS. Time step less than min.',
+     >  'Convergence failure in DLOOPS. Incorrect input to BDSLV',
+     >  'Convergence failure in He+ XION. Time step less than min.',
+     >  'Convergence failure in He+ XION. Incorrect input to BDSLV',
+     >  'Convergence failure in N+ XION. Time step less than min.',
+     >  'Convergence failure in N+ XION. Incorrect input to BDSLV',
+     >  'Convergence failure in CMINOR.            ',
+     >  'CTIP dimension not equal to FLIP dimensions.' /)
 
       INTEGER, PARAMETER :: ERRI(6) = (/ 1, 2, 3, 4, 5, 11 /)
       INTEGER, PARAMETER :: ERRJ(6) = (/ 2, 2, 2, 2, 1,  1 /)

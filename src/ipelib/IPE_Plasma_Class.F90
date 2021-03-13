@@ -108,6 +108,7 @@ MODULE IPE_Plasma_Class
   !
   ! ------------------------------------------------------------------------ !
   REAL(dp), PARAMETER, PRIVATE :: DTMIN    = 1.0D0
+! REAL(dp), PARAMETER, PRIVATE :: DTMIN    = 0.1D0
   REAL(dp), PARAMETER, PRIVATE :: FPAS     = 0.0D0
   REAL(dp), PARAMETER, PRIVATE :: HEPRAT   = 9.0D-2
 !  REAL(dp), PARAMETER, PRIVATE :: HPEQ     = 0.0D0
@@ -1059,6 +1060,7 @@ CONTAINS
                 ksi_fac = 1.0_prec
               ELSE
                 ksi_fac = grid % magnetic_field_strength(i,lp,mp)/B_int
+!               ksi_fac = 1.0_prec
               ENDIF
 
               z = grid % altitude(i,lp)/1000.0_prec
