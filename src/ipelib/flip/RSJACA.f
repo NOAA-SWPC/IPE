@@ -1,5 +1,5 @@
 C.................... RSJACA.FOR;3 ..........12-MAR-1993 09:02:35.48 
-      SUBROUTINE BDSLV(N,M,S,KS,B,X,WORK,NFLAG,
+      SUBROUTINE band_solver(N,M,S,KS,B,X,WORK,NFLAG,
      >                mp,lp,i_which_call)          
       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
       DOUBLE PRECISION MUL(50000)

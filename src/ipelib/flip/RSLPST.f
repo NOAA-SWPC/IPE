@@ -123,7 +123,8 @@ C*** OUTER LOOP: Return here on Non-Convergence with reduced time step
           !.. the increments are stored in array delta in this order
           !.. x(1...n,j),x(1...n,j+1),x(1...n,j+2),....x(1...n,jmax-1)
           i_which_call = 4
-          CALL BDSLV(IEQ,3,S,0,RHS,DELTA,WORK,NFLAG,mp,lp,i_which_call)
+          CALL band_solver(IEQ,3,S,0,RHS,DELTA,WORK,NFLAG,mp,lp,
+     >                     i_which_call)
  
 
           IF(NFLAG.NE.0) THEN

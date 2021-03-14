@@ -6,7 +6,6 @@ C.... Cleaned up and commented by P. Richards in April 2000
       SUBROUTINE dloops_heplus(TI,    !.. O+,H+ & Ti,Te
      >              DTIN,    !.. Time step in
      >             DTMIN,    !.. Minimum time step
-     >            IHEPNP,    !.. He+ - N+ switch
      >             EFLAG,mp,lp,i_which_call)    !.. OUTPUT: Error flag array
       USE FIELD_LINE_GRID    !.. FLDIM JMIN JMAX FLDIM Z BM GR SL GL SZA
       USE SOLVARR        !... DELTA RHS WORK S, Variables for solver
@@ -15,7 +14,7 @@ C.... Cleaned up and commented by P. Richards in April 2000
       USE PRODUCTION !.. EUV, photoelectron, and auroral production
       IMPLICIT NONE
       integer mp,lp,i_which_call
-      INTEGER NION,IHEPNP,J,ITER,IRHS,IBW,I
+      INTEGER NION,J,ITER,IRHS,IBW,I
       INTEGER EFLAG(11,11),NFLAG                  !.. solution procedure error flags
       INTEGER JBNN,JBNS,JEQ,JC                    !.. boundary indices
       INTEGER IDIV,KR,ION,IEQ,MIT                 !.. solution variables
@@ -104,15 +103,14 @@ C- OUTER LOOP Return here on Non-Convergence with reduced time step
           ENDDO
 
           !.. Now set up the Jacobian Matrix dFij/dn
-           CALL heplus_matrix(FLDIM,S,RHS,IEQ,DT,N,TI,JBNN,JBNS,MIT,
-     >      IHEPNP,
+          CALL heplus_matrix(FLDIM,S,RHS,IEQ,DT,N,TI,JBNN,JBNS,MIT,
      >      XMAS,NION,NMSAVE)
 
           !.. invert the jacobian matriX *s* in the inversion routine *bdslv*.
           !.. the increments are stored in array delta in this order
           !.. X(1...n,j),X(1...n,j+1),X(1...n,j+2),....X(1...n,jmaX-1)
           IBW=2*NION-1
-          CALL BDSLV(IEQ,IBW,S,0,RHS,DELTA,WORK,NFLAG,
+          CALL band_solver(IEQ,IBW,S,0,RHS,DELTA,WORK,NFLAG,
      >                mp,lp,i_which_call)
 
           !.. Check for problems in band solver
@@ -190,8 +188,6 @@ C- OUTER LOOP Return here on Non-Convergence with reduced time step
           DT=DT/2  !.. reduce time step for non-convergence
           !.. Raise lower boundary to maximum of 300 km
           IF(DT.LT.DTIN/3.0)  ZLBHE=(ZLBHE+350)/2   
-          IF(EFLAG(11,11).EQ.1) WRITE(6,'(A,2I5,9F14.2)')  
-     >       ' He+ N+ 2nd ',-IHEPNP,ITER,DTINC,DTIN,DT,ZLBHE,ZLBNP
           DO J=JMIN,JMAX
             N(1,J)=NMSAVE(1,J)
           ENDDO
@@ -199,8 +195,6 @@ C- OUTER LOOP Return here on Non-Convergence with reduced time step
           !.. Check that DT is not too small
           IF(DT.LT.DTMIN) THEN
             EFLAG(3,1)=-1    !.. Report problem to calling routine
-            IF(EFLAG(11,11).EQ.1) WRITE(6,'(A,9I5)') 
-     >        '  ERR FLAGS MINA',IHEPNP
             !.. Restore density to original input value
             DO J=JMIN,JMAX
               XIONN(3,J)=NMORIG(1,J)
@@ -219,7 +213,6 @@ C- END OF OUTER LOOP ----------------------------
       SUBROUTINE dloops_nplus(TI,    !.. O+,H+ & Ti,Te
      >              DTIN,    !.. Time step in
      >             DTMIN,    !.. Minimum time step
-     >            IHEPNP,    !.. He+ - N+ switch
      >             EFLAG,mp,lp,i_which_call)    !.. OUTPUT: Error flag array
       USE FIELD_LINE_GRID    !.. FLDIM JMIN JMAX FLDIM Z BM GR SL GL SZA
       USE SOLVARR        !... DELTA RHS WORK S, Variables for solver
@@ -228,7 +221,7 @@ C- END OF OUTER LOOP ----------------------------
       USE PRODUCTION !.. EUV, photoelectron, and auroral production
       IMPLICIT NONE
       integer mp,lp,i_which_call
-      INTEGER NION,IHEPNP,J,ITER,IRHS,IBW,I
+      INTEGER NION,J,ITER,IRHS,IBW,I
       INTEGER EFLAG(11,11),NFLAG                  !.. solution procedure error flags
       INTEGER JBNN,JBNS,JEQ,JC                    !.. boundary indices
       INTEGER IDIV,KR,ION,IEQ,MIT                 !.. solution variables
@@ -318,15 +311,13 @@ C- OUTER LOOP Return here on Non-Convergence with reduced time step
           ENDDO
           !.. Now set up the Jacobian Matrix dFij/dn
           CALL nplus_matrix(FLDIM,S,RHS,IEQ,DT,N,TI,JBNN,JBNS,MIT,
-     >      IHEPNP,
      >      XMAS,NION,NMSAVE)
-
 
           !.. invert the jacobian matriX *s* in the inversion routine *bdslv*.
           !.. the increments are stored in array delta in this order
           !.. X(1...n,j),X(1...n,j+1),X(1...n,j+2),....X(1...n,jmaX-1)
           IBW=2*NION-1
-          CALL BDSLV(IEQ,IBW,S,0,RHS,DELTA,WORK,NFLAG,
+          CALL band_solver(IEQ,IBW,S,0,RHS,DELTA,WORK,NFLAG,
      >                mp,lp,i_which_call)
 
           !.. Check for problems in band solver
@@ -404,8 +395,6 @@ C- OUTER LOOP Return here on Non-Convergence with reduced time step
           DT=DT/2  !.. reduce time step for non-convergence
           !.. Raise lower boundary to maximum of 300 km
           IF(DT.LT.DTIN/3.0)  ZLBNP=(ZLBNP+350)/2   
-          IF(EFLAG(11,11).EQ.1) WRITE(6,'(A,2I5,9F14.2)')  
-     >       ' He+ N+ 2nd ',-IHEPNP,ITER,DTINC,DTIN,DT,ZLBHE,ZLBNP
           DO J=JMIN,JMAX
             N(1,J)=NMSAVE(1,J)
           ENDDO
@@ -413,8 +402,6 @@ C- OUTER LOOP Return here on Non-Convergence with reduced time step
           !.. Check that DT is not too small
           IF(DT.LT.DTMIN) THEN
             EFLAG(4,1)=-1   !.. Report problem to calling routine
-            IF(EFLAG(11,11).EQ.1) WRITE(6,'(A,9I5)') 
-     >        '  ERR FLAGS MINA',IHEPNP
             !.. Restore density to original input value
             DO J=JMIN,JMAX
               XIONN(4,J)=NMORIG(1,J)
@@ -987,12 +974,11 @@ C.... Consult file RSLPSD-Algorithm.doc for detailed explanation
      >                   JBNN,   !.. Lower boundary index in north
      >                   JBNS,   !.. Lower boundary index in south
      >                    MIT,   !.. # of points on field line
-     >                 IHEPNP,   !.. Switch for He+ or N+
      >                    XMA,   !.. mass of ion
      >                   NSPC,   !.. # of species
      >                 NMSAVE)   !.. saved density N at time t (for dn/dt)
       IMPLICIT NONE
-      INTEGER FLDIM,INEQ,JBNN,JBNS,MIT,IHEPNP,NSPC   !.. see I/O comments above
+      INTEGER FLDIM,INEQ,JBNN,JBNS,MIT,NSPC   !.. see I/O comments above
       INTEGER KZS,JZS,JF,J1,J2,IV,JV,L,M,KRV,JVC,JFC,IS !.. Loop control variables
       DOUBLE PRECISION F(20)   !.. Function values at time t + delt
       DOUBLE PRECISION RHS(INEQ),S(INEQ,8),N(4,FLDIM),TI(3,FLDIM),XMA
@@ -1059,12 +1045,11 @@ C.... Consult file RSLPSD-Algorithm.doc for detailed explanation
      >                   JBNN,   !.. Lower boundary index in north
      >                   JBNS,   !.. Lower boundary index in south
      >                    MIT,   !.. # of points on field line
-     >                 IHEPNP,   !.. Switch for He+ or N+
      >                    XMA,   !.. mass of ion
      >                   NSPC,   !.. # of species
      >                 NMSAVE)   !.. saved density N at time t (for dn/dt)
       IMPLICIT NONE
-      INTEGER FLDIM,INEQ,JBNN,JBNS,MIT,IHEPNP,NSPC   !.. see I/O comments above
+      INTEGER FLDIM,INEQ,JBNN,JBNS,MIT,NSPC   !.. see I/O comments above
       INTEGER KZS,JZS,JF,J1,J2,IV,JV,L,M,KRV,JVC,JFC,IS !.. Loop control variables
       DOUBLE PRECISION F(20)   !.. Function values at time t + delt
       DOUBLE PRECISION RHS(INEQ),S(INEQ,8),N(4,FLDIM),TI(3,FLDIM),XMA

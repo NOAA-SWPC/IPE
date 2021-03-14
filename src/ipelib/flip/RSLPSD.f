@@ -18,7 +18,6 @@ C--- Consult file RSLPSD-Algorithm.doc for detailed explanation
       USE SOLVARR       !... DELTA RHS WORK S, Variables for solver
       USE THERMOSPHERE  !.. ON HN N2N O2N HE TN UN EHT COLFAC
       USE ION_DEN_VEL   !.. O+ H+ He+ N+ NO+ O2+ N2+ O+(2D) O+(2P)
-!dbg20120301: N+ problem: "IN BDSLV &&&&&&& BANDWIDTH IS TOO LARGE "
       IMPLICIT NONE
       integer mp,lp,i_which_call
       INTEGER FLDIM                      !.. Field line grid array dimension
@@ -48,25 +47,8 @@ C--- Consult file RSLPSD-Algorithm.doc for detailed explanation
       JEQ=(JMIN+JMAX)/2 !.. Equatorial point
       EFLAG(2,1)=0      !.. Initialize error flag
       EFLAG(2,1)=0      !.. Initialize error flag
-!dbg20121130:debug note 
-!i vaguely remembered ZLBDY_flip=115 caused crash (or at least very bad results!)
-!i can't remember introducing ZLBDY_flip was the cause of the problem? 
-! or the bad value, 115???
-!therefore, the use of ZLBDY_flip is pending.
-!dbg20121130      ZLBDY=115.!ZLBDY_flip        !.. Lower boundary altitude
       ZLBDY=120.        !.. Lower boundary altitude
 
-!dbg20120301: this part was commented out on 20110815, but un-comment again to solve for N+ problem: "IN BDSLV &&&&&&& BANDWIDTH IS TOO LARGE " i don't remember why we decided to comment out here and i cannot find a program to setup the local chem equil anywhere else???
-!dbg20110815      !.. Use local equilibrium for densities if flux tube apex height < 200 km
-!	IF(sw_LCE.AND.Z(JEQ).LT.ht_LCE) THEN !ht_LCE=200.
-!         DO J=JMIN,JMAX
-!           CALL HOEQ(FLDIM,J,N,TI)
-!           XIONV(1,J)=0.0
-!           XIONV(2,J)=0.0
-!         ENDDO
-!         RETURN
-!	ENDIF 
-!dbg20110815:
       !.. Use local equilibrium for densities if flux tube
       !.. apex height < ZLBDY + some increment (1.0 km?)
       IF(Z(JEQ).LE.ZLBDY+1.0) THEN
@@ -141,7 +123,7 @@ C*** OUTER LOOP: Return here on Non-Convergence with reduced time step
           !.. the increments are stored in array delta in this order
           !.. x(1...n,j),x(1...n,j+1),x(1...n,j+2),....x(1...n,jmax-1)
           i_which_call = 3
-          CALL BDSLV(IEQ,3,S,0,RHS,DELTA,WORK,NFLAG,
+          CALL band_solver(IEQ,3,S,0,RHS,DELTA,WORK,NFLAG,
      >               mp,lp,i_which_call)
 
           IF(NFLAG.NE.0) THEN
