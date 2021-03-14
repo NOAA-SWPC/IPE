@@ -97,7 +97,7 @@ C- OUTER LOOP Return here on Non-Convergence with reduced time step
           DO J=2,MIT-1
             KR=NION*(J-2)
             JC=J+JBNN-1
-            CALL MDFIJ(JC,0,NION,DT,N,TI,F,JBNN,JBNS,IHEPNP,XMAS,NMSAVE)
+            CALL MDFIJ_heplus(JC,0,NION,DT,N,TI,F,JBNN,JBNS,XMAS,NMSAVE)
             DO IRHS=1,NION
               RHS(KR+IRHS)=F(IRHS)
             ENDDO
@@ -311,7 +311,7 @@ C- OUTER LOOP Return here on Non-Convergence with reduced time step
           DO J=2,MIT-1
             KR=NION*(J-2)
             JC=J+JBNN-1
-            CALL MDFIJ(JC,0,NION,DT,N,TI,F,JBNN,JBNS,IHEPNP,XMAS,NMSAVE)
+            CALL MDFIJ_nplus(JC,0,NION,DT,N,TI,F,JBNN,JBNS,XMAS,NMSAVE)
             DO IRHS=1,NION
               RHS(KR+IRHS)=F(IRHS)
             ENDDO
@@ -435,12 +435,12 @@ C.... This routine sets up the He+ and H+ continuity equations to be
 C.... minimized by the Newton solver. See program DFIJ on RSDENA.FOR 
 C.... for more details
 
-      SUBROUTINE MDFIJ(J,JSJ,NION,DT,N,TI,F,JBNN,JBNS,IHEPNP,XMAS,
+      SUBROUTINE MDFIJ_heplus(J,JSJ,NION,DT,N,TI,F,JBNN,JBNS,XMAS,
      >  NMSAVE)
       USE FIELD_LINE_GRID    !.. FLDIM JMIN JMAX FLDIM Z BM GR SL GL SZA
       USE ION_DEN_VEL    !.. O+ H+ He+ N+ NO+ O2+ N2+ O+(2D) O+(2P)
       IMPLICIT NONE
-      INTEGER I,J,JSJ,NION,IHEPNP,ID
+      INTEGER I,J,JSJ,NION,ID
       INTEGER JBNN,JBNS,JEQ                !.. boundary indices
       DOUBLE PRECISION VL(2),VU(2),FLU(2),FLL(2),ANM(2),PM(2),Q(2)
       DOUBLE PRECISION TINCR(2),N(4,FLDIM),TI(3,FLDIM),F(20)
@@ -458,18 +458,16 @@ C.... for more details
       !.. MINVEL to get the velocities(fluxes) at the lower 1/2 pt
       FLL(1)=FLU(1)
       FLL(2)=FLU(2)
-      CALL MINVEL(J-1,VL,FLL,N,JSJ,0,XMAS,IHEPNP)
+      CALL MINVEL_heplus(J-1,VL,FLL,N,JSJ,0,XMAS)
 
       !..  CALL CHEMO to evaluate the source (Q) and sink(L) terms 
-      IF(IABS(IHEPNP).EQ.9) 
-     >   CALL CHEMO9(NION,J,Q,N,NMSAVE,TI,L)
-      IF(IABS(IHEPNP).EQ.11) CALL CHEM11(NION,J,Q,N,NMSAVE,TI,1,L)
+      CALL CHEMO9(NION,J,Q,N,NMSAVE,TI,L)
 
       !..  Call DAVE for dn/dt. PM(AM)=future(present) cpt of dn/dt
       CALL DAVE(NION,J,ANM,PM,N,NMSAVE)
 
       !.. MINVEL to get the velocities(fluxes) at the upper 1/2 pt
-360   CALL MINVEL(J,VU,FLU,N,JSJ,ID,XMAS,IHEPNP)
+360   CALL MINVEL_heplus(J,VU,FLU,N,JSJ,ID,XMAS)
 
       !.. magnetic field strength at midpoints
       BU=(BM(J)+BM(J+1))*0.5
@@ -483,19 +481,66 @@ C.... for more details
       F(I)=Q(I)-L(I)-TINCR(I)-FGR
 
       !.... average velocity for He+ and N+ ........
-      IF(JSJ.EQ.0.AND.IABS(IHEPNP).EQ.9)  XIONV(3,J)=.5*(VL(I)+VU(I))
-      IF(JSJ.EQ.0.AND.IABS(IHEPNP).EQ.11) XIONV(4,J)=.5*(VL(I)+VU(I))
+      IF(JSJ.EQ.0)  XIONV(3,J)=.5*(VL(I)+VU(I))
       VL(I)=VU(I)
 
-      !.. printing of factors in the continuity equations ...........
-      !.. since all quantities have been divided by bm and integrated,
-      !.. multiply by bd to get actual magnitudes
-      IF(ID.EQ.0) GO TO 380
-        BD=2.0*BM(J)/(SL(J+1)-SL(J-1))
-        WRITE(ID,666) J,BD,FLU(I),FLL(I),FGR,Q(I),L(I),F(I),XIONV(3,J)
-     >   ,TINCR(I),XIONV(4,J)
-  666    FORMAT(2X,'FIJ2',I4,1P,22E11.3)
-         IF(I.EQ.2) WRITE(ID,*) '   '
+  380 CONTINUE
+      RETURN
+      END
+C::::::::::::::::::::::::::::: MDFIJ ::::::::::::::::::::::::::::::::::::
+C.... This routine sets up the He+ and H+ continuity equations to be 
+C.... minimized by the Newton solver. See program DFIJ on RSDENA.FOR 
+C.... for more details
+
+      SUBROUTINE MDFIJ_nplus(J,JSJ,NION,DT,N,TI,F,JBNN,JBNS,XMAS,
+     >  NMSAVE)
+      USE FIELD_LINE_GRID    !.. FLDIM JMIN JMAX FLDIM Z BM GR SL GL SZA
+      USE ION_DEN_VEL    !.. O+ H+ He+ N+ NO+ O2+ N2+ O+(2D) O+(2P)
+      IMPLICIT NONE
+      INTEGER I,J,JSJ,NION,ID
+      INTEGER JBNN,JBNS,JEQ                !.. boundary indices
+      DOUBLE PRECISION VL(2),VU(2),FLU(2),FLL(2),ANM(2),PM(2),Q(2)
+      DOUBLE PRECISION TINCR(2),N(4,FLDIM),TI(3,FLDIM),F(20)
+      DOUBLE PRECISION NMSAVE(2,FLDIM),L(2),XMAS
+      DOUBLE PRECISION BU,BL,BD,DT,FGR
+      DATA FLU/0.0,0.0/
+
+      !... ID is the unit number for writing diagnostics in
+      !... both hemispheres
+      ID=3  
+      IF(J.GT.JMAX/2) ID=9
+      JEQ=(JMAX+1)/2
+      IF(JSJ.NE.9) ID=0
+
+      !.. MINVEL to get the velocities(fluxes) at the lower 1/2 pt
+      FLL(1)=FLU(1)
+      FLL(2)=FLU(2)
+      CALL MINVEL_nplus(J-1,VL,FLL,N,JSJ,0,XMAS)
+
+      !..  CALL CHEMO to evaluate the source (Q) and sink(L) terms 
+      CALL CHEM11(NION,J,Q,N,NMSAVE,TI,1,L)
+
+      !..  Call DAVE for dn/dt. PM(AM)=future(present) cpt of dn/dt
+      CALL DAVE(NION,J,ANM,PM,N,NMSAVE)
+
+      !.. MINVEL to get the velocities(fluxes) at the upper 1/2 pt
+360   CALL MINVEL_nplus(J,VU,FLU,N,JSJ,ID,XMAS)
+
+      !.. magnetic field strength at midpoints
+      BU=(BM(J)+BM(J+1))*0.5
+      BL=(BM(J)+BM(J-1))*0.5
+
+      !.. Set up F=prod-loss-dn/dt-div(flux)
+      DO 380 I=1,NION
+      TINCR(I)=(PM(I)-ANM(I))/DT     !.. dn/dt
+      FGR=(FLU(I)/BU-FLL(I)/BL)      !.. div(flux)
+
+      F(I)=Q(I)-L(I)-TINCR(I)-FGR
+
+      !.... average velocity for He+ and N+ ........
+      IF(JSJ.EQ.0) XIONV(4,J)=.5*(VL(I)+VU(I))
+      VL(I)=VU(I)
+
   380 CONTINUE
       RETURN
       END
@@ -541,13 +586,13 @@ C... Gets the chemical equilibrium density for N+
       END
 C::::::::::::::::::::::::::::: MINVEL ::::::::::::::::::::::::::::::::::
 C... This subroutine returns the ion fluxes for the continuity equation.
-      SUBROUTINE MINVEL(J,V,FLUX,N,JSJ,ID,XMAS,IHEPNP)
+      SUBROUTINE MINVEL_heplus(J,V,FLUX,N,JSJ,ID,XMAS)
       USE FIELD_LINE_GRID    !.. FLDIM JMIN JMAX FLDIM Z BM GR SL GL SZA
       !.. TEJ TIJ NUX UNJ DS GRADTE GRADTI GRAV OLOSS HLOSS HPROD
       USE AVE_PARAMS    !.. midpoint values - TEJ TIJ NUX UNJ etc. 
       USE ION_DEN_VEL   !.. O+ H+ He+ N+ NO+ O2+ N2+ O+(2D) O+(2P)
       IMPLICIT NONE
-      INTEGER J,IHEPNP,JSJ,ID
+      INTEGER J,JSJ,ID
       DOUBLE PRECISION PP(4),QSIGN(2),V(2),FLUX(2),GAMMA(2),B(3)
       DOUBLE PRECISION N(4,FLDIM),HX(2),GRA
       DOUBLE PRECISION NE,NEU,NEL,D,SUMN,XMAS,GRADNE,DLNI,QION,Q2,Q3,Q4
@@ -557,21 +602,13 @@ C... This subroutine returns the ion fluxes for the continuity equation.
       NEU=XIONN(1,J+1)+XIONN(2,J+1)
       NEL=XIONN(1,J)+XIONN(2,J)
       NE=DSQRT(XIONN(1,J+1)*XIONN(1,J))+DSQRT(XIONN(2,J)*XIONN(2,J+1))
-      IF(IABS(IHEPNP).GT.9) THEN
-         NEU=NEU+XIONN(3,J+1)+N(1,J+1)+N(3,J+1)
-         NEL=NEL+XIONN(3,J)+N(1,J)+N(3,J)
-         NE=NE+DSQRT(XIONN(3,J)*XIONN(3,J+1))+DSQRT(N(1,J+1)*N(1,J))
-         NE=NE+DSQRT(N(3,J)*N(3,J+1))
-      ENDIF
       !.. interpolate minor ion to midpoint
       PP(1)=DSQRT(N(1,J+1)*N(1,J))
       PP(2)=0.0
       !.. CALCULATE ELECTRON DENSITY AT UPPER, LOWER AND MID POINT
-      IF (IABS(IHEPNP).LE.9) THEN
-        NEU=NEU+N(1,J+1)+N(3,J+1)
-        NEL=NEL+N(1,J)+N(3,J)
-        NE=NE+PP(1)+DSQRT(N(3,J)*N(3,J+1))
-      ENDIF
+      NEU=NEU+N(1,J+1)+N(3,J+1)
+      NEL=NEL+N(1,J)+N(3,J)
+      NE=NE+PP(1)+DSQRT(N(3,J)*N(3,J+1))
 
       !.. CALL DCOEFF to obtain d(i),hX,beta1,beta2,betaX, @ b(i) used
       !.. to calc v(i)  all from st. maurice and schunk
@@ -594,17 +631,57 @@ C... This subroutine returns the ion fluxes for the continuity equation.
 
       !.. Velocity from the momentum equation.
        V(1)=Q3-D*(DLNI-GRA+Q4+GRADNE+QION)
-
-      !.......  print routine for momtm eqn terms ..........
-      IF(ID.NE.0) WRITE(ID,605) J,Z(J),DLNI,GRADTI(J),GRADNE
-     > ,GRADTE(J),GRA,QION,Q4,Q2,Q3
- 605   FORMAT(1X,'MINVEL',I4,F9.0,1P,22E11.3)
-
-       !.. ion flux
        FLUX(1)=V(1)*PP(1)
-       !... print velocities ...........
-      IF(JSJ.EQ.-4) WRITE(3,606) J,Z(J),V(1),V(2)
- 606  FORMAT(1X,'J=',I4,3X,'ALT=',F9.0,2X,'V1=',1P,E13.6,2X,'V2=',E13.6)
+      RETURN
+      END
+C::::::::::::::::::::::::::::: MINVEL ::::::::::::::::::::::::::::::::::
+C... This subroutine returns the ion fluxes for the continuity equation.
+      SUBROUTINE MINVEL_nplus(J,V,FLUX,N,JSJ,ID,XMAS)
+      USE FIELD_LINE_GRID    !.. FLDIM JMIN JMAX FLDIM Z BM GR SL GL SZA
+      !.. TEJ TIJ NUX UNJ DS GRADTE GRADTI GRAV OLOSS HLOSS HPROD
+      USE AVE_PARAMS    !.. midpoint values - TEJ TIJ NUX UNJ etc. 
+      USE ION_DEN_VEL   !.. O+ H+ He+ N+ NO+ O2+ N2+ O+(2D) O+(2P)
+      IMPLICIT NONE
+      INTEGER J,JSJ,ID
+      DOUBLE PRECISION PP(4),QSIGN(2),V(2),FLUX(2),GAMMA(2),B(3)
+      DOUBLE PRECISION N(4,FLDIM),HX(2),GRA
+      DOUBLE PRECISION NE,NEU,NEL,D,SUMN,XMAS,GRADNE,DLNI,QION,Q2,Q3,Q4
+      DATA QSIGN/-1.,1./
+
+      !... evaluate total ion density
+      NEU=XIONN(1,J+1)+XIONN(2,J+1)
+      NEL=XIONN(1,J)+XIONN(2,J)
+      NE=DSQRT(XIONN(1,J+1)*XIONN(1,J))+DSQRT(XIONN(2,J)*XIONN(2,J+1))
+      NEU=NEU+XIONN(3,J+1)+N(1,J+1)+N(3,J+1)
+      NEL=NEL+XIONN(3,J)+N(1,J)+N(3,J)
+      NE=NE+DSQRT(XIONN(3,J)*XIONN(3,J+1))+DSQRT(N(1,J+1)*N(1,J))
+      NE=NE+DSQRT(N(3,J)*N(3,J+1))
+      !.. interpolate minor ion to midpoint
+      PP(1)=DSQRT(N(1,J+1)*N(1,J))
+      PP(2)=0.0
+
+      !.. CALL DCOEFF to obtain d(i),hX,beta1,beta2,betaX, @ b(i) used
+      !.. to calc v(i)  all from st. maurice and schunk
+      CALL DCOEFF(J,PP,D,B,HX,GAMMA,JSJ,ID,SUMN,XMAS)    ! f90 added
+
+      !-----calculate altitude derivatives----------
+      !.. note that TEJ(J)=0.5(TI(3,J+1)+TI(3,J))/DS(J)/TIJ(J) see AVDEN
+      GRADNE=TEJ(J)*(NEU-NEL)/NE
+
+      DLNI=(N(1,J+1)-N(1,J))/DS(J)/PP(1)              !.. dn/ds
+      GRA=XMAS*GRAV(J)                                !.. gravity
+      QION=QSIGN(2)*GRADTE(J)
+
+      !.... neutral wind term SUMN=sum of collision terms for ions on neutrals
+      Q2=UNJ(J)*SUMN
+      !.. Q3 is the sum of FRICTION terms.  HX(1)=X - H+, HX(2)=X - O+
+      Q3=0.5*(XIONV(1,J+1)+XIONV(1,J))*HX(2)
+      Q3=Q2+Q3+0.5*(XIONV(2,J+1)+XIONV(2,J))*HX(1)
+      Q4=GRADTI(J)*(1.0D00-(B(1)+B(2)+B(3)))
+
+      !.. Velocity from the momentum equation.
+       V(1)=Q3-D*(DLNI-GRA+Q4+GRADNE+QION)
+       FLUX(1)=V(1)*PP(1)
       RETURN
       END
 C::::::::::::::::::::::::::::: DCOEFF ::::::::::::::::::::::::::::::::::::
@@ -951,7 +1028,7 @@ C.... Consult file RSLPSD-Algorithm.doc for detailed explanation
             N(IV,JVC)=N(IV,JVC)+H !.. increment density
 
             !.. Obtain the function at the new density
-            CALL MDFIJ(JFC,1,NSPC,DT,N,TI,F,JBNN,JBNS,IHEPNP,XMA,NMSAVE)
+            CALL MDFIJ_heplus(JFC,1,NSPC,DT,N,TI,F,JBNN,JBNS,XMA,NMSAVE)
             N(IV,JVC)=N(IV,JVC)-H   !.. restore density
 
             !.. Store derivatives in the band matrix
@@ -1021,7 +1098,7 @@ C.... Consult file RSLPSD-Algorithm.doc for detailed explanation
             N(IV,JVC)=N(IV,JVC)+H !.. increment density
 
             !.. Obtain the function at the new density
-            CALL MDFIJ(JFC,1,NSPC,DT,N,TI,F,JBNN,JBNS,IHEPNP,XMA,NMSAVE)
+            CALL MDFIJ_nplus(JFC,1,NSPC,DT,N,TI,F,JBNN,JBNS,XMA,NMSAVE)
             N(IV,JVC)=N(IV,JVC)-H   !.. restore density
 
             !.. Store derivatives in the band matrix
@@ -1034,7 +1111,6 @@ C.... Consult file RSLPSD-Algorithm.doc for detailed explanation
       ENDDO
       RETURN
       END
-Cnm20130111
 C::::::::::::::::::::::::::: DENAVE :::::::::::::::::::::::::::::::::::::
 C   this program evaluates the interpolated densities at the midpoints
 C   it also evaluates the ion-neutral collision frequencies nux(i,j)
