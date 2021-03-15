@@ -222,7 +222,7 @@ CONTAINS
     potential_model      = 2
     hpeq                 = 0.0_prec
     transport_highlat_lp = 30
-    perp_transport_max_lp = 151
+    perp_transport_max_lp   = 151
 
     ! Initialize buffers
     sbuf = ""
