@@ -16,6 +16,7 @@ IMPLICIT NONE
 
     REAL(prec)              :: dt
     REAL(prec)              :: current_time
+    REAL(prec)              :: start_time
     INTEGER                 :: current_index
     INTEGER                 :: max_read_index
     INTEGER                 :: ifp_interval
@@ -88,6 +89,7 @@ CONTAINS
     dt            = parameters % solar_forcing_time_step
 
     forcing % dt            = parameters % solar_forcing_time_step
+    forcing % start_time    = 0.0_prec
     forcing % current_time  = 0.0_prec
     forcing % current_index = 1
 
