@@ -213,7 +213,7 @@ CONTAINS
       call ipe % forcing % Update_Current_Index( ipe % parameters, &
                                                  ipe % mpi_layer, &
                                                  ipe % forcing_io, &
-                                                 ipe % time_tracker % elapsed_sec - ipe % forcing % start_time, &
+                                                 ipe % time_tracker % elapsed_sec, &
                                                  rc = localrc )
       IF ( ipe_error_check( localrc, msg="Failed to update neutrals", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
