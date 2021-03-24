@@ -260,7 +260,7 @@ CONTAINS
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     end if
 
-    forcing % current_index = INT( (deltime - forcing % start_time / real(forcing % ifp_interval) ) &
+    forcing % current_index = INT( (deltime - forcing % start_time) / real(forcing % ifp_interval) ) &
                                   + forcing % ifp_skip + 1
 
   END SUBROUTINE Update_Current_Index
