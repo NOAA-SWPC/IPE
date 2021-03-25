@@ -16,6 +16,7 @@ IMPLICIT NONE
 
     REAL(prec)              :: dt
     REAL(prec)              :: current_time
+    REAL(prec)              :: start_time
     INTEGER                 :: current_index
     INTEGER                 :: max_read_index
     INTEGER                 :: ifp_interval
@@ -88,6 +89,7 @@ CONTAINS
     dt            = parameters % solar_forcing_time_step
 
     forcing % dt            = parameters % solar_forcing_time_step
+    forcing % start_time    = 0.0_prec
     forcing % current_time  = 0.0_prec
     forcing % current_index = 1
 
@@ -258,7 +260,8 @@ CONTAINS
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     end if
 
-    forcing % current_index = INT( deltime / real(forcing % ifp_interval) ) + forcing % ifp_skip + 1
+    forcing % current_index = INT( (deltime - forcing % start_time) / real(forcing % ifp_interval) ) &
+                                  + forcing % ifp_skip + 1
 
   END SUBROUTINE Update_Current_Index
 
