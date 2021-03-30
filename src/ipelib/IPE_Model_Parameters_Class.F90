@@ -73,6 +73,15 @@ MODULE IPE_Model_Parameters_Class
 
     INTEGER :: n_model_updates
 
+    ! >> Operations
+    REAL(prec) :: colfac
+    REAL(prec) :: offset1_deg
+    REAL(prec) :: offset2_deg
+    INTEGER    :: potential_model
+    REAL(prec) :: hpeq
+    INTEGER    :: transport_highlat_lp
+    INTEGER    :: perp_transport_max_lp
+
     CONTAINS
 
       PROCEDURE :: Build => Build_IPE_Model_Parameters
@@ -136,11 +145,19 @@ CONTAINS
     REAL(prec) :: solarwind_velocity
     REAL(prec) :: solarwind_Bz
     REAL(prec) :: solarwind_density
+    ! >> Ops
+    REAL(prec) :: colfac
+    REAL(prec) :: offset1_deg
+    REAL(prec) :: offset2_deg
+    INTEGER    :: potential_model
+    REAL(prec) :: hpeq
+    INTEGER    :: transport_highlat_lp
+    INTEGER    :: perp_transport_max_lp
 
     ! Communication buffers
     CHARACTER(LEN=200), DIMENSION( 4) :: sbuf
-    INTEGER,            DIMENSION(21) :: ibuf
-    REAL(prec),         DIMENSION(21) :: rbuf
+    INTEGER,            DIMENSION(24) :: ibuf
+    REAL(prec),         DIMENSION(25) :: rbuf
 
 
     NAMELIST / SpaceManagement / grid_file
@@ -154,6 +171,8 @@ CONTAINS
                                  write_geographic_eldyn, write_apex_eldyn, file_output_frequency
     NAMELIST / IPECAP          / mesh_height_min, mesh_height_max, mesh_fill, mesh_write, mesh_write_file
     NAMELIST / ElDyn           / dynamo_efield
+    NAMELIST / OPERATIONAL     / colfac, offset1_deg, offset2_deg, potential_model, hpeq, &
+                                 transport_highlat_lp, perp_transport_max_lp
 
     ! Begin
     IF (PRESENT(rc)) rc = IPE_SUCCESS
@@ -217,7 +236,16 @@ CONTAINS
     mesh_write_file = 'ipemesh'
 
     ! ElDyn !
-    dynamo_efield          = .TRUE.
+    dynamo_efield       = .TRUE.
+
+    ! Operational
+    colfac               = 1.3_prec
+    offset1_deg          = 5.0_prec
+    offset2_deg          = 20.0_prec
+    potential_model      = 2
+    hpeq                 = 0.0_prec
+    transport_highlat_lp = 30
+    perp_transport_max_lp   = 151
 
     ! Initialize buffers
     sbuf = ""
@@ -283,12 +311,17 @@ CONTAINS
       IF ( write_apex_eldyn          ) ibuf(19) = 1
       IF ( params % use_f107_kp_file ) ibuf(20) = 1
       IF ( dynamo_efield             ) ibuf(21) = 1
+      ! -- integers for operations
+      ibuf(22) = potential_model
+      ibuf(23) = transport_highlat_lp
+      ibuf(24) = perp_transport_max_lp
 
       ! -- reals
       rbuf = (/ time_step, start_time, end_time, msis_time_step, solar_forcing_time_step, &
                 mesh_height_min, mesh_height_max, f107, f107_81day_avg, kp, kp_1day_avg, ap,   &
                 ap_1day_avg, nhemi_power, shemi_power, solarwind_By, solarwind_angle,          &
-                solarwind_velocity, solarwind_Bz, solarwind_density, file_output_frequency /)
+                solarwind_velocity, solarwind_Bz, solarwind_density, file_output_frequency, &
+                colfac, offset1_deg, offset2_deg, hpeq /)
 
     ENDIF
 
@@ -328,6 +361,9 @@ CONTAINS
     params % write_apex_eldyn          = ( ibuf(19) == 1 )
     params % use_f107_kp_file          = ( ibuf(20) == 1 )
     params % dynamo_efield             = ( ibuf(21) == 1 )
+    params % potential_model           = ibuf(22)
+    params % transport_highlat_lp      = ibuf(23)
+    params % perp_transport_max_lp     = ibuf(24)
 
 #ifdef HAVE_MPI
     CALL MPI_BCAST( rbuf, size(rbuf), mpi_layer % mpi_prec, 0, mpi_layer % mpi_communicator, ierr )
@@ -355,6 +391,10 @@ CONTAINS
     params % solarwind_Bz            = rbuf(19)
     params % solarwind_density       = rbuf(20)
     params % file_output_frequency   = rbuf(21)
+    params % colfac                  = rbuf(22)
+    params % offset1_deg             = rbuf(23)
+    params % offset2_deg             = rbuf(24)
+    params % hpeq                    = rbuf(25)
 
     params % n_model_updates = INT( ( params % end_time - params % start_time ) / params % file_output_frequency )
 
