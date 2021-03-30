@@ -5,7 +5,7 @@
       PUBLIC :: colath
       contains 
 !-----------------------------------------------------------------------
-      subroutine colath
+      subroutine colath(offset1_deg,offset2_deg)
 !
 ! Calculate pfrac fractional presence of dynamo equation using critical
 !  convection colatitudes crit(2).  (crit is in cons module)
@@ -19,9 +19,7 @@
       use params_module,only: kmlonp1
       implicit none
 !
-! Args:
-!     integer,intent(in) :: kmlat0,kmlonp1
-!     real,intent(out) :: pfrac(kmlonp1,kmlat0)
+      real,intent(in) :: offset1_deg,offset2_deg
 
       real,dimension(kmlonp1,kmlat0) :: colatc
 !
@@ -34,10 +32,6 @@
       cosofc = cos(ofdc)
       sinofc = sin(ofdc)
       aslonc = asin(dskofc(2)/ofdc)
-! TEMP
-!       write (6,"(1x,'COLATH: crit1,2 dskofc offc deg=',6e12.4)")
-!    |   crit(1)*rtd,crit(2)*rtd,dskofc(1)*rtd,offc(1)*rtd,
-!    |   dskofc(2)*rtd,offc(2)*rtd
 !
 ! Define colatc with northern convection circle coordinates
 ! sunlons(nlat): sun's longitude in dipole coordinates (see sub sunloc)
@@ -50,15 +44,12 @@
           colatc(i,j) = acos(cosofc*sinlat-sinofc*coslat*colatc(i,j))
         enddo ! i=1,kmlonp1
 
-!       write(6,"('colath: j=',i3,' colatc(:,j)=',/,(6e12.4))")
-!     &    j,colatc(:,j)*rtd
-
 !
 ! Calculate fractional presence of dynamo equation at each northern
 ! hemisphere geomagnetic grid point. Output in pfrac(kmlonp1,kmlat0)
 !
-         crit(1)=theta0(1)+5.*pi_dyn/180.
-         crit(2)=theta0(1)+20.*pi_dyn/180.
+         crit(1)=theta0(1)+(offset1_deg*pi_dyn/180.)
+         crit(2)=theta0(1)+(offset2_deg*pi_dyn/180.)
 	do i=1,kmlonp1
           pfrac(i,j) = (colatc(i,j)-crit(1))/(crit(2)-crit(1))
           if (pfrac(i,j) < 0.) pfrac(i,j) = 0.
