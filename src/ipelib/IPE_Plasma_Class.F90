@@ -1069,24 +1069,24 @@ CONTAINS
               plasma % electron_temperature(i,lp,mp) = electron_temperature_int*( ksi_fac**(4.0_prec/3.0_prec) )
 
 
-              z = grid % altitude(i,lp)/1000.0_prec
-              if ((z.lt.200.0).and.(z.gt.100.0)) then
-              z_factor = (z - 100.0) / 100.0
-              plasma % ion_densities(1:n_conv_spec,i,lp,mp) = (z_factor * (plasma % ion_densities(1:n_conv_spec,i,lp,mp) - plasma % ion_densities_old(1:n_conv_spec,i,lp,mp))) &
-                                               + plasma % ion_densities_old(1:n_conv_spec,i,lp,mp)
-              plasma % ion_velocities(1:n_conv_spec,i,lp,mp) = (z_factor * (plasma % ion_velocities(1:n_conv_spec,i,lp,mp) - plasma % ion_velocities_old(1:n_conv_spec,i,lp,mp))) &
-                                               + plasma % ion_velocities_old(1:n_conv_spec,i,lp,mp)
-              plasma % ion_temperature(i,lp,mp) = (z_factor * (plasma % ion_temperature(i,lp,mp) - plasma % ion_temperature_old(i,lp,mp))) &
-                                               + plasma % ion_temperature_old(i,lp,mp)
-              plasma % electron_temperature(i,lp,mp) = (z_factor * (plasma % electron_temperature(i,lp,mp) - plasma % electron_temperature_old(i,lp,mp))) &
-                                               + plasma % electron_temperature_old(i,lp,mp)
-              endif
-              if (z.lt.100.0) then
-                 plasma % ion_densities(1:n_conv_spec,i,lp,mp) = plasma % ion_densities_old(1:n_conv_spec,i,lp,mp)
-                 plasma % ion_velocities(1:n_conv_spec,i,lp,mp) = plasma % ion_velocities_old(1:n_conv_spec,i,lp,mp)
-                 plasma % ion_temperature(i,lp,mp) = plasma % ion_temperature_old(i,lp,mp)
-                 plasma % electron_temperature(i,lp,mp) = plasma % electron_temperature_old(i,lp,mp)
-              endif
+!             z = grid % altitude(i,lp)/1000.0_prec
+!             if ((z.lt.200.0).and.(z.gt.100.0)) then
+!             z_factor = (z - 100.0) / 100.0
+!             plasma % ion_densities(1:n_conv_spec,i,lp,mp) = (z_factor * (plasma % ion_densities(1:n_conv_spec,i,lp,mp) - plasma % ion_densities_old(1:n_conv_spec,i,lp,mp))) &
+!                                              + plasma % ion_densities_old(1:n_conv_spec,i,lp,mp)
+!             plasma % ion_velocities(1:n_conv_spec,i,lp,mp) = (z_factor * (plasma % ion_velocities(1:n_conv_spec,i,lp,mp) - plasma % ion_velocities_old(1:n_conv_spec,i,lp,mp))) &
+!                                              + plasma % ion_velocities_old(1:n_conv_spec,i,lp,mp)
+!             plasma % ion_temperature(i,lp,mp) = (z_factor * (plasma % ion_temperature(i,lp,mp) - plasma % ion_temperature_old(i,lp,mp))) &
+!                                              + plasma % ion_temperature_old(i,lp,mp)
+!             plasma % electron_temperature(i,lp,mp) = (z_factor * (plasma % electron_temperature(i,lp,mp) - plasma % electron_temperature_old(i,lp,mp))) &
+!                                              + plasma % electron_temperature_old(i,lp,mp)
+!             endif
+!             if (z.lt.100.0) then
+!                plasma % ion_densities(1:n_conv_spec,i,lp,mp) = plasma % ion_densities_old(1:n_conv_spec,i,lp,mp)
+!                plasma % ion_velocities(1:n_conv_spec,i,lp,mp) = plasma % ion_velocities_old(1:n_conv_spec,i,lp,mp)
+!                plasma % ion_temperature(i,lp,mp) = plasma % ion_temperature_old(i,lp,mp)
+!                plasma % electron_temperature(i,lp,mp) = plasma % electron_temperature_old(i,lp,mp)
+!             endif
 
 !              plasma % ion_densities(1:n_conv_spec,i,lp,mp) = ion_densities_int(1:n_conv_spec)*( ksi_fac**2 )
 !              plasma % ion_velocities(1:n_conv_spec,i,lp,mp) = ion_velocities_int(1:n_conv_spec)
