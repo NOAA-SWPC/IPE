@@ -58,8 +58,6 @@ IMPLICIT NONE
       PROCEDURE :: GetKP
 
       PROCEDURE, PRIVATE :: Allocate_IFP_IPE_Forcing
-      PROCEDURE, PRIVATE :: Check_Write_Lock
-      PROCEDURE, PRIVATE :: Manage_Write_Lock
 
       PROCEDURE :: Read_IFP_IPE_Forcing
       PROCEDURE :: Read_Tiros_IPE_Forcing
@@ -265,59 +263,6 @@ CONTAINS
 
   END SUBROUTINE Update_Current_Index
 
-  SUBROUTINE Check_Write_Lock( forcing, rc )
-
-    IMPLICIT NONE
-
-    CLASS( IPE_Forcing ), INTENT(in)  :: forcing
-    INTEGER,              INTENT(out) :: rc
-
-    character(len=22), parameter :: filename = "input_parameters.wlock"
-    logical :: not_ready
-    integer :: iostat
-
-    rc = IPE_SUCCESS
-
-    not_ready = .true.
-    do while (not_ready)
-      inquire(file=filename, exist=not_ready, iostat=iostat)
-      if (not_ready) call sleep(1)
-    end do
-
-  END SUBROUTINE Check_Write_Lock
-
-  SUBROUTINE Manage_Write_Lock( forcing, me, create, rc )
-
-    IMPLICIT NONE
-
-    CLASS( IPE_Forcing ), INTENT(in)  :: forcing
-    INTEGER,              INTENT(in)  :: me
-    LOGICAL,              INTENT(in)  :: create
-    INTEGER,              INTENT(out) :: rc
-
-    character(len=26), parameter :: filename = "input_parameters.rlock.ipe"
-    character(len=29)            :: lockfile
-    integer, parameter           :: unit = 79
-    integer                      :: localrc
-
-    rc = IPE_SUCCESS
-
-    write (lockfile, "(A22,I0.3)") filename, me
-    open(unit, file=lockfile, status="replace", action="write", iostat=localrc)
-      IF( ipe_error_check( localrc, msg="writing lockfile "//trim(lockfile)//" failed", &
-        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-    if (create) then
-      close(unit, iostat=localrc)
-      IF( ipe_error_check( localrc, msg="closing lockfile "//trim(lockfile)//" failed", &
-        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-    else
-      close(unit, status="delete", iostat=localrc)
-      IF( ipe_error_check( localrc, msg="destroying lockfile "//trim(lockfile)//" failed", &
-        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-    end if
-
-  END SUBROUTINE Manage_Write_Lock
-
   SUBROUTINE Read_IFP_IPE_Forcing( forcing, parameters, mpi_layer, io, rc )
 
     IMPLICIT NONE
@@ -336,13 +281,6 @@ CONTAINS
     rc = IPE_SUCCESS
 
     if ( parameters % use_ifp_file ) then
-      call forcing % check_write_lock(localrc)
-      IF( ipe_error_check( localrc, msg="call to Check_Write_Lock failed", &
-        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-      call forcing % manage_write_lock(mpi_layer % rank_id, .true., localrc)
-      IF( ipe_error_check( localrc, msg="call to Manage_Write_Lock(create) failed", &
-        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-
       call io % open(parameters % ifp_file, "r")
       if (io % err % check(msg="Unable to open" // parameters % ifp_file, file=__FILE__,line=__LINE__)) return
 
@@ -374,9 +312,6 @@ CONTAINS
       call io % read("swbt",  forcing % solarwind_Bt)
       call io % close()
 
-      call forcing % manage_write_lock(mpi_layer % rank_id, .false., localrc)
-      IF( ipe_error_check( localrc, msg="call to Manage_Write_Lock(destroy) failed", &
-        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     else ! fixed parameters
       call forcing % allocate_ifp_ipe_forcing(int( (parameters % end_time - parameters % start_time)/parameters % time_step ), localrc)
       IF( ipe_error_check( localrc, msg="call to Allocate_IFP_IPE_Forcing failed", &
