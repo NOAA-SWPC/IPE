@@ -335,6 +335,7 @@ C.... Written by P. Richards June-September 2010.
 
       IMPLICIT NONE
       integer mp,lp,i_which_call,nflag_t,nflag_d,test_te, ifail_pe2s
+      integer ifail_pe2s_mplp(80,170)
       INTEGER IHEPLS, INPLS, INNO
       INTEGER CTIPDIM         !.. CTIPe array dimension, must equal to FLDIM
       INTEGER JTI             !.. Dummy variable to count the number of calls to this routine
@@ -586,16 +587,20 @@ C.... Written by P. Richards June-September 2010.
       IF(lp.LE.158) THEN
 
       ifail_pe2s = 0 
+      ifail_pe2s_mplp(mp,lp) = ifail_pe2s
       CALL PE2S(F107,F107A,N,temp_ti_te,FPAS,electron_density,UVFAC,
      >          COLUM,IHEPLS,INPLS,INNO,mp,lp,ifail_pe2s)
-      if(ifail_pe2s.eq.1) write(8100+mp,*) 'PE2S ', mp,lp
+      if(ifail_pe2s.eq.1) then
+         write(6,*) 'PE2S fail ', mp,lp
+         ifail_pe2s_mplp(mp,lp) = ifail_pe2s
+      endif
 
       ENDIF
 
       ENDIF
 
       !-- Sum the EUV, photoelectron, and auroral production rate
-      CALL SUMPRD(JMIN,JMAX,AUR_PROD,mp,lp,ifail_pe2s)
+      CALL SUMPRD(JMIN,JMAX,AUR_PROD,mp,lp,ifail_pe2s_mplp)
 
       !.. Loop to calculate O+(4S) total ionization rate
       !.. PHION=total O+(4S) prod, including EUV, e*, dissoc of O2 and

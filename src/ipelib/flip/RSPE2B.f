@@ -340,7 +340,7 @@ C////////////main calculations  begin here ////////////
      >         JMAX,PRED,IPAS,FPAS,PHIDWN,
      >         PHIUP,T1,T2,DS,PRODUP,PRODWN,mp,lp,ifail)
       if(ifail.eq.1) then
-        write(2700+mp,*) 'fail1 ', mp,lp
+        write(6,*) 'ghgm tris1 fail1 ', mp,lp
         return
       endif
 
@@ -349,7 +349,7 @@ C////////////main calculations  begin here ////////////
      >         PHIDWN,PHIUP,T1,T2,DS,PRODUP,PRODWN,mp,lp,iteration,
      >         ifail)
       if(ifail.eq.1) then
-        write(2700+mp,*) 'fail2 ', mp,lp
+        write(6,*) 'ghgm tris1 fail2 ', mp,lp
         return
       endif
 
@@ -912,8 +912,11 @@ C......  And Wilkes, Applied Numerical Methods, Wiley, 1969, page 446
       DO K=1,NUM
         J=LAST-K
         DELTA(J)=GAMMA1(J)-C(J)*DELTA(J+1)/ALPHA(J)
+! ghgm - create a NaN....
+!       if(mp.eq.10.and.lp.eq.20) delta(j) = 0.0/0.0
         if(isnan(delta(j))) then 
-          write(8100+mp,7777) mp,lp,k,j,num,
+!         write(8100+mp,7777) mp,lp,k,j,num,
+          write(6,7777) mp,lp,k,j,num,
      >    first,last,i_which_call,ie
 c    >    GAMMA1(J),C(J),DELTA(J+1),ALPHA(J),ie
  7777     format('tridiagonal solver ',9i8)

@@ -232,8 +232,10 @@ C      qiont !units number/m3/s
       !..EUVION PEXCIT PEPION OTHPR1 OTHPR2 SUMION SUMEXC PAUION PAUEXC NPLSPRD
       USE PRODUCTION !.. EUV, photoelectron, and auroral production
       INTEGER,INTENT(IN) :: JMIN,JMAX
+      INTEGER,INTENT(IN) :: mp,lp
+      INTEGER,INTENT(IN),dimension(80,170) :: ifail_pe2s
       REAL*8,dimension(3,JMIN:JMAX),INTENT(IN) :: qiont !1:O,2:O2,3:N2 !units number/m3/s
-      INTEGER :: J,IS,IK,mp,lp,ifail_pe2s
+      INTEGER :: J,IS,IK
       !--- Branching ratios for ion states were updated Sep 91 by P. Richards
       !--- N2+ from Doering and Goembel, JGR 1991, page 16025. fraction of
       !--- N+ from Richards and Torr JGR 1985, page 9917. fraction of O+ from
@@ -263,7 +265,7 @@ C      qiont !units number/m3/s
          EUVION(1,8,J) = EUVION(1,2,J) + EUVION(1,5,J)/1.3
          EUVION(1,9,J) = EUVION(1,3,J) + EUVION(1,5,J)/4.3
 
-         if(ifail_pe2s.eq.0) then
+         if(ifail_pe2s(mp,lp).eq.0) then
          PEPION(1,7,J) = PEPION(1,1,J) + PEPION(1,4,J)
          PEPION(1,8,J) = PEPION(1,2,J) + PEPION(1,5,J)/1.3
          PEPION(1,9,J) = PEPION(1,3,J) + PEPION(1,5,J)/4.3
@@ -275,29 +277,36 @@ C      qiont !units number/m3/s
  
       !..- SUM non-diss. states to get total O2+ and N2+ production
          EUVION(2,7,J)= EUVION(2,1,J)+EUVION(2,2,J)+EUVION(2,3,J)
-         if(ifail_pe2s.eq.0) then
+         if(ifail_pe2s(mp,lp).eq.0) then
          PEPION(2,7,J)= PEPION(2,1,J)+PEPION(2,2,J)+PEPION(2,3,J)
          endif
          PAUION(2,7,J)= PAUION(2,1,J)+PAUION(2,2,J)+PAUION(2,3,J)
 
          EUVION(3,7,J)= EUVION(3,1,J)+EUVION(3,2,J)+EUVION(3,3,J)
-         if(ifail_pe2s.eq.0) then
+         if(ifail_pe2s(mp,lp).eq.0) then
          PEPION(3,7,J)= PEPION(3,1,J)+PEPION(3,2,J)+PEPION(3,3,J)
          endif
          PAUION(3,7,J)= PAUION(3,1,J)+PAUION(3,2,J)+PAUION(3,3,J)
  30   CONTINUE
 
+      if(ifail_pe2s(mp,lp).eq.0) then
       DO 50 I=1,3
       DO 50 K=1,12
       DO 50 J=JMIN,JMAX
-        if(ifail_pe2s.eq.0) then
         SUMION(I,K,J)=EUVION(I,K,J)+PEPION(I,K,J)+PAUION(I,K,J)
         SUMEXC(I,K,J)=PEXCIT(I,K,J)+PAUEXC(I,K,J)
-        else
+ 50   CONTINUE
+      endif
+
+      if(ifail_pe2s(mp,lp).eq.1) then
+      write(6,*) 'No Photoelectrons ', mp , lp
+      DO 60 I=1,3
+      DO 60 K=1,12
+      DO 60 J=JMIN,JMAX
         SUMION(I,K,J)=EUVION(I,K,J)+PAUION(I,K,J)
         SUMEXC(I,K,J)=PAUEXC(I,K,J)
-        endif
- 50   CONTINUE
+ 60   CONTINUE
+      endif
 
       !.. total N+ production for MINORA routine
       DO J=JMIN,JMAX
