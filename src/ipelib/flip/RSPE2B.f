@@ -339,11 +339,19 @@ C////////////main calculations  begin here ////////////
         CALL TRIS1(FLDIM,1,j120N,j1000N,I_energy,BM,Z,
      >         JMAX,PRED,IPAS,FPAS,PHIDWN,
      >         PHIUP,T1,T2,DS,PRODUP,PRODWN,mp,lp,ifail)
+      if(ifail.eq.1) then
+        write(2700+mp,*) 'fail1 ', mp,lp
+        return
+      endif
 
         CALL TRISM1(FLDIM,-1,j1000S,j120S,I_energy,j1000N,BM,Z,
      >         JMAX,PRED,IPASC,FPAS,
      >         PHIDWN,PHIUP,T1,T2,DS,PRODUP,PRODWN,mp,lp,iteration,
      >         ifail)
+      if(ifail.eq.1) then
+        write(2700+mp,*) 'fail2 ', mp,lp
+        return
+      endif
 
       ENDDO
 
@@ -782,6 +790,7 @@ C..... of Nagy and Banks. This is for the Northern Hemisphere
 
       CALL tridiagonal_solver(FLDIM,PHIDWN,j120N,j1000N,A,B,C,D,
      >                        mp,lp,1,ie,ifail)
+      if(ifail.eq.1) return
 
       !:::::: PHIUP IS EVALUATED  ANALYTICALLY   ::::
       DO J=j120N,JMAX - 1
@@ -852,6 +861,7 @@ C..... of Nagy and Banks. This is for the Southern Hemisphere
       D(j120S)=D(j120S)-C(j120S)*PHIUP(j120S+1)
       CALL tridiagonal_solver(FLDIM,PHIUP,j1000S,j120S,A,B,C,D,
      >                        mp,lp,2,ie,ifail)
+      if(ifail.eq.1) return
 
       !.. PHIDWN IS EVALUATED ANALYTICALLY   ::::
 ! GHGM this is wrong ?? out by 1 ....
@@ -908,7 +918,8 @@ C......  And Wilkes, Applied Numerical Methods, Wiley, 1969, page 446
 c    >    GAMMA1(J),C(J),DELTA(J+1),ALPHA(J),ie
  7777     format('tridiagonal solver ',9i8)
           ifail = 1
-          exit
+!         exit
+          return
         endif
       ENDDO
 c GHGM don't leave this in......
