@@ -1082,9 +1082,6 @@ CONTAINS
                 ksi_fac = 1.0_prec
               ELSE
                 ksi_fac = grid % magnetic_field_strength(i,lp,mp)/B_int
-                if(mp.eq.10) then
-                write(970,*) i,ksi_fac
-                endif
               ENDIF
 
               plasma % ion_densities(1:n_conv_spec,i,lp,mp) = ion_densities_int(1:n_conv_spec)*( ksi_fac**2 )
@@ -1111,13 +1108,6 @@ CONTAINS
                  plasma % ion_temperature(i,lp,mp) = plasma % ion_temperature_old(i,lp,mp)
                  plasma % electron_temperature(i,lp,mp) = plasma % electron_temperature_old(i,lp,mp)
               endif
-
-!              plasma % ion_densities(1:n_conv_spec,i,lp,mp) = ion_densities_int(1:n_conv_spec)*( ksi_fac**2 )
-!              plasma % ion_velocities(1:n_conv_spec,i,lp,mp) = ion_velocities_int(1:n_conv_spec)
-!!             plasma % ion_temperature(i,lp,mp) = ion_temperature_int
-!!             plasma % electron_temperature(i,lp,mp) = electron_temperature_int
-!              plasma % ion_temperature(i,lp,mp) = ion_temperature_int*( ksi_fac**(4.0_prec/3.0_prec) )
-!              plasma % electron_temperature(i,lp,mp) = electron_temperature_int*( ksi_fac**(4.0_prec/3.0_prec) )
 
  300        CONTINUE  !  i = 1, grid % flux_tube_max(lp)
 
