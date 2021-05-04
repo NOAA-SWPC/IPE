@@ -8,14 +8,14 @@ C... N= density of H+, O+, minor ions(O2+ + NO+), and He+.
 C... TI= temperature of H+, O+, electrons
 C... FRPAS= fraction of flux lost in plasmasphere
       SUBROUTINE PE2S(F107,F107A,N,temp_ti_te,FRPAS,electron_density,
-     >                UVFAC,COLUM,IHEPLS,INPLS,INNO,mp,lp)
+     >                UVFAC,COLUM,IHEPLS,INPLS,INNO,mp,lp,ifail)
       USE FIELD_LINE_GRID    !.. FLDIM JMIN JMAX FLDIM Z BM GR SL GL SZA
       !..EUVION PEXCIT PEPION OTHPR1 OTHPR2 SUMION SUMEXC PAUION PAUEXC NPLSPRD
       USE THERMOSPHERE  !.. ON HN N2N O2N HE TN UN EHT COLFAC
       USE PRODUCTION !.. EUV, photoelectron, and auroral production
       USE MINORNEUT !.. N4S N2D NNO N2P N2A O1D O1S EQN2D
       IMPLICIT NONE
-      INTEGER mp,lp
+      INTEGER mp,lp,ifail
       INTEGER J,j2,I_energy,IK,IS  !.. altitude, energy, species loop control variables
       INTEGER IDGE(201),JOE(201),JN2E(201) !.. indices for degraded electrons
       INTEGER IPAS,IPASC    !.. grid indices for pitch angle trapping
@@ -337,12 +337,13 @@ C////////////main calculations  begin here ////////////
       DO iteration=1,2
 
         CALL TRIS1(FLDIM,1,j120N,j1000N,I_energy,BM,Z,
-     >             JMAX,PRED,IPAS,FPAS,PHIDWN,
-     >             PHIUP,T1,T2,DS,PRODUP,PRODWN,mp,lp)
+     >         JMAX,PRED,IPAS,FPAS,PHIDWN,
+     >         PHIUP,T1,T2,DS,PRODUP,PRODWN,mp,lp,ifail)
 
         CALL TRISM1(FLDIM,-1,j1000S,j120S,I_energy,j1000N,BM,Z,
-     >              JMAX,PRED,IPASC,FPAS,
-     >              PHIDWN,PHIUP,T1,T2,DS,PRODUP,PRODWN,mp,lp,iteration)
+     >         JMAX,PRED,IPASC,FPAS,
+     >         PHIDWN,PHIUP,T1,T2,DS,PRODUP,PRODWN,mp,lp,iteration,
+     >         ifail)
 
       ENDDO
 
@@ -732,9 +733,10 @@ C..... of Nagy and Banks. This is for the Northern Hemisphere
       !.. where PRED = q, PRODUP = q+ and PRODWN = q-
       SUBROUTINE TRIS1(FLDIM,IDIR,j120N,j1000N,IE,BM,Z,JMAX,
      >  PRED,IPAS,FPAS,
-     >  PHIDWN,PHIUP,T1,T2,DS,PRODUP,PRODWN,mp,lp)
+     >  PHIDWN,PHIUP,T1,T2,DS,PRODUP,PRODWN,mp,lp,ifail)
       IMPLICIT NONE
       INTEGER J,FLDIM,IDIR,j120N,j1000N,IE,IPAS,JMAX,mp,lp
+      INTEGER ifail
       REAL FPAS,T2DS,PHI,R1
       REAL DELZ,DLB,DSLB,DLT1,DTS2,DPR1,DPR2,ALPHA,BETA
       REAL A(FLDIM),B(FLDIM),C(FLDIM),D(FLDIM),PRED(FLDIM)
@@ -779,7 +781,7 @@ C..... of Nagy and Banks. This is for the Northern Hemisphere
       D(J1000N)=D(J1000N)-C(J1000N)*PHIDWN(J1000N+1)
 
       CALL tridiagonal_solver(FLDIM,PHIDWN,j120N,j1000N,A,B,C,D,
-     >                        mp,lp,1,ie)
+     >                        mp,lp,1,ie,ifail)
 
       !:::::: PHIUP IS EVALUATED  ANALYTICALLY   ::::
       DO J=j120N,JMAX - 1
@@ -803,10 +805,11 @@ C..... of Nagy and Banks. This is for the Southern Hemisphere
       !.. where PRED = q, PRODUP = q+ and PRODWN = q-
       SUBROUTINE TRISM1(FLDIM,IDIR,j1000S,j120S,IE,j1000N,BM,Z,JMAX,
      >  PRED,IPASC,FPAS,
-     >  PHIDWN,PHIUP,T1,T2,DS,PRODUP,PRODWN,mp,lp,iteration)
+     >  PHIDWN,PHIUP,T1,T2,DS,PRODUP,PRODWN,mp,lp,iteration,ifail)
       IMPLICIT NONE
       INTEGER J,K,FLDIM,IDIR,j1000S,j120S,j1000N,IE,IPASC,JMAX,
      >        mp,lp,ii,iteration
+      INTEGER ifail
       REAL DELZ,DLB,DSLB,DLT1,DTS2,DPR1,DPR2,ALPHA,BETA
       REAL FPAS,T2DS,PHI,R1
       DOUBLE PRECISION Z(FLDIM),BM(FLDIM)
@@ -848,7 +851,7 @@ C..... of Nagy and Banks. This is for the Southern Hemisphere
       D(j1000S)=D(j1000S)-A(j1000S)*PHIUP(j1000S-1)
       D(j120S)=D(j120S)-C(j120S)*PHIUP(j120S+1)
       CALL tridiagonal_solver(FLDIM,PHIUP,j1000S,j120S,A,B,C,D,
-     >                        mp,lp,2,ie)
+     >                        mp,lp,2,ie,ifail)
 
       !.. PHIDWN IS EVALUATED ANALYTICALLY   ::::
 ! GHGM this is wrong ?? out by 1 ....
@@ -876,7 +879,7 @@ C...... Stored in D. The computed solution vector is stored
 C......  In the array DELTA. This routine comes from Carnahan, Luther,
 C......  And Wilkes, Applied Numerical Methods, Wiley, 1969, page 446
       SUBROUTINE tridiagonal_solver(FLDIM,DELTA,FIRST,LAST,A,B,C,D,
-     >           mp,lp,i_which_call,ie)
+     >           mp,lp,i_which_call,ie,ifail)
       IMPLICIT NONE
       INTEGER J,FLDIM,K,NUM,LAST,FIRST,FIRSTP1,mp,lp,
      >        i_which_call,ie,ifail
@@ -900,21 +903,23 @@ C......  And Wilkes, Applied Numerical Methods, Wiley, 1969, page 446
         J=LAST-K
         DELTA(J)=GAMMA1(J)-C(J)*DELTA(J+1)/ALPHA(J)
         if(isnan(delta(j))) then 
-          write(6,7777) mp,lp,k,j,num,
-     >    first,last,i_which_call,
-     >    GAMMA1(J),C(J),DELTA(J+1),ALPHA(J),ie
- 7777     format('GHGM tridiagonal solver ',8i6,4e12.4,i6)
+          write(8100+mp,7777) mp,lp,k,j,num,
+     >    first,last,i_which_call,ie
+c    >    GAMMA1(J),C(J),DELTA(J+1),ALPHA(J),ie
+ 7777     format('tridiagonal solver ',9i8)
           ifail = 1
           exit
         endif
       ENDDO
+c GHGM don't leave this in......
+c     ifail = 1
 
-      if(ifail.eq.1) then
-        DO K=1,NUM
-        J=LAST-K
-        delta(j) = 0.0
-        ENDDO
-      endif
+!     if(ifail.eq.1) then
+!       DO K=1,NUM
+!       J=LAST-K
+!       delta(j) = 0.0
+!       ENDDO
+!     endif
 
         RETURN
         END

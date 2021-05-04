@@ -165,7 +165,7 @@ CONTAINS
     grid % apex_e_vectors          = 0.0_prec
     grid % apex_d_vectors          = 0.0_prec
     grid % d1xd2_magnitude         = 0.0_prec
-    grid % apex_be3                = 0.0_prec
+    grid % apex_be3         = 0.0_prec
 
     grid % flux_tube_midpoint = 0
     grid % flux_tube_max      = 0

@@ -51,8 +51,8 @@ MODULE IPE_Plasma_Class
       PROCEDURE, PRIVATE :: Clean_Data
       PROCEDURE, PRIVATE :: Buffer_Old_State
       PROCEDURE, PRIVATE :: Calculate_Pole_Values
-!      PROCEDURE, PRIVATE :: Cross_Flux_Tube_Transport
-      PROCEDURE, PRIVATE :: Cross_Flux_Tube_Transport_houjun_ksi
+      PROCEDURE, PRIVATE :: Cross_Flux_Tube_Transport
+!     PROCEDURE, PRIVATE :: Cross_Flux_Tube_Transport_houjun_ksi
       PROCEDURE, PRIVATE :: Test_Transport_Time_step
       PROCEDURE, PRIVATE :: Auroral_Precipitation
       PROCEDURE, PRIVATE :: FLIP_Wrapper
@@ -315,9 +315,17 @@ CONTAINS
 
 #endif
 
-        CALL plasma % Cross_Flux_Tube_Transport_houjun_ksi( grid, v_ExB, transport_time_step2, &
+!      if (i.eq.1) then
+!      do mp = 1 ,  plasma % NMP
+!      write(400 + mp,889) time_tracker % year, time_tracker % month, time_tracker % day, &       
+!                   time_tracker % hour, time_tracker % minute, n_transport_timesteps, i       
+!889   format('Time ', i4,x,i2.2,x,i2.2,2x,i2.2,':'i2.2,' ',2i4)
+!      enddo
+!      endif
+!       CALL plasma % Cross_Flux_Tube_Transport_houjun_ksi( grid, v_ExB, transport_time_step2, &
+        CALL plasma % Cross_Flux_Tube_Transport( grid, v_ExB, transport_time_step2, &
                                                  transport_highlat_lp,perp_transport_max_lp, &
-                                                 mpi_layer, localrc )
+                                                 mpi_layer, i, localrc )
         IF ( ipe_error_check( localrc, msg="call to Cross_Flux_Tube_Transport failed", &
           line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
@@ -761,7 +769,8 @@ CONTAINS
 
 
   SUBROUTINE Cross_Flux_Tube_Transport( plasma, grid, v_ExB, time_step, &
-                                        transport_highlat_lp,perp_transport_max_lp, mpi_layer, rc )  
+                                        transport_highlat_lp,perp_transport_max_lp, mpi_layer, & 
+                                        i_transport_time , rc )  
     IMPLICIT NONE
     CLASS( IPE_Plasma ),   INTENT(inout) :: plasma
     TYPE( IPE_Grid ),      INTENT(in)    :: grid
@@ -799,6 +808,7 @@ CONTAINS
     INTEGER    :: lp_min, mp_min, isouth, inorth, ii, ispecial
     INTEGER    :: mp, lp, i, lpx, mpx, jth
     INTEGER    :: i_min(1:2)
+    INTEGER    :: i_transport_time
     LOGICAL    :: i_convection_too_far_in_lp
     REAL(prec), PARAMETER :: rad_to_deg = 57.295779513
     CHARACTER(len=128) :: errmsg
@@ -825,6 +835,14 @@ CONTAINS
 
           coslam = cos( half_pi - grid % magnetic_colatitude(1,lp) )
           sinim  = 2.0_prec*sqrt( 1.0_prec - coslam*coslam )/sqrt( 4.0_prec - 3.0_prec*coslam*coslam )
+
+          if(i_transport_time.eq.1) then
+          if(lp.lt.101) then
+            write(1100+mp,9870) mp,lp,v_ExB(1,lp,mp),v_ExB(2,lp,mp)           
+ 9870       format(2i7, 2e12.4)
+          endif
+          endif
+
           theta_t0 = colat_90km(lp) - v_ExB(2,lp,mp)*time_step/(r*sinim)
 
           ! If a Lagrangian trajectory crosses the equator, we clip the colatitude
@@ -904,7 +922,7 @@ CONTAINS
           IF( lp_min == 0 )THEN
             i_convection_too_far_in_lp = .TRUE.
             write(errmsg,*) 'GHGM convection too far ', mp , lp
-            CALL ipe_warning_log( msg=errmsg, line=__LINE__, file=__FILE__ )
+            CALL ipe_warning_log( msg=errmsg , line=__LINE__, file=__FILE__ )
           ENDIF
 
 ! GHGM - check that lp_min is not greater than NLP
@@ -1077,24 +1095,24 @@ CONTAINS
               plasma % electron_temperature(i,lp,mp) = electron_temperature_int*( ksi_fac**(4.0_prec/3.0_prec) )
 
 
-!             z = grid % altitude(i,lp)/1000.0_prec
-!             if ((z.lt.200.0).and.(z.gt.100.0)) then
-!             z_factor = (z - 100.0) / 100.0
-!             plasma % ion_densities(1:n_conv_spec,i,lp,mp) = (z_factor * (plasma % ion_densities(1:n_conv_spec,i,lp,mp) - plasma % ion_densities_old(1:n_conv_spec,i,lp,mp))) &
-!                                              + plasma % ion_densities_old(1:n_conv_spec,i,lp,mp)
-!             plasma % ion_velocities(1:n_conv_spec,i,lp,mp) = (z_factor * (plasma % ion_velocities(1:n_conv_spec,i,lp,mp) - plasma % ion_velocities_old(1:n_conv_spec,i,lp,mp))) &
-!                                              + plasma % ion_velocities_old(1:n_conv_spec,i,lp,mp)
-!             plasma % ion_temperature(i,lp,mp) = (z_factor * (plasma % ion_temperature(i,lp,mp) - plasma % ion_temperature_old(i,lp,mp))) &
-!                                              + plasma % ion_temperature_old(i,lp,mp)
-!             plasma % electron_temperature(i,lp,mp) = (z_factor * (plasma % electron_temperature(i,lp,mp) - plasma % electron_temperature_old(i,lp,mp))) &
-!                                              + plasma % electron_temperature_old(i,lp,mp)
-!             endif
-!             if (z.lt.100.0) then
-!                plasma % ion_densities(1:n_conv_spec,i,lp,mp) = plasma % ion_densities_old(1:n_conv_spec,i,lp,mp)
-!                plasma % ion_velocities(1:n_conv_spec,i,lp,mp) = plasma % ion_velocities_old(1:n_conv_spec,i,lp,mp)
-!                plasma % ion_temperature(i,lp,mp) = plasma % ion_temperature_old(i,lp,mp)
-!                plasma % electron_temperature(i,lp,mp) = plasma % electron_temperature_old(i,lp,mp)
-!             endif
+              z = grid % altitude(i,lp)/1000.0_prec
+              if ((z.lt.200.0).and.(z.gt.100.0)) then
+              z_factor = (z - 100.0) / 100.0
+              plasma % ion_densities(1:n_conv_spec,i,lp,mp) = (z_factor * (plasma % ion_densities(1:n_conv_spec,i,lp,mp) - plasma % ion_densities_old(1:n_conv_spec,i,lp,mp))) &
+                                               + plasma % ion_densities_old(1:n_conv_spec,i,lp,mp)
+              plasma % ion_velocities(1:n_conv_spec,i,lp,mp) = (z_factor * (plasma % ion_velocities(1:n_conv_spec,i,lp,mp) - plasma % ion_velocities_old(1:n_conv_spec,i,lp,mp))) &
+                                               + plasma % ion_velocities_old(1:n_conv_spec,i,lp,mp)
+              plasma % ion_temperature(i,lp,mp) = (z_factor * (plasma % ion_temperature(i,lp,mp) - plasma % ion_temperature_old(i,lp,mp))) &
+                                               + plasma % ion_temperature_old(i,lp,mp)
+              plasma % electron_temperature(i,lp,mp) = (z_factor * (plasma % electron_temperature(i,lp,mp) - plasma % electron_temperature_old(i,lp,mp))) &
+                                               + plasma % electron_temperature_old(i,lp,mp)
+              endif
+              if (z.lt.100.0) then
+                 plasma % ion_densities(1:n_conv_spec,i,lp,mp) = plasma % ion_densities_old(1:n_conv_spec,i,lp,mp)
+                 plasma % ion_velocities(1:n_conv_spec,i,lp,mp) = plasma % ion_velocities_old(1:n_conv_spec,i,lp,mp)
+                 plasma % ion_temperature(i,lp,mp) = plasma % ion_temperature_old(i,lp,mp)
+                 plasma % electron_temperature(i,lp,mp) = plasma % electron_temperature_old(i,lp,mp)
+              endif
 
 !              plasma % ion_densities(1:n_conv_spec,i,lp,mp) = ion_densities_int(1:n_conv_spec)*( ksi_fac**2 )
 !              plasma % ion_velocities(1:n_conv_spec,i,lp,mp) = ion_velocities_int(1:n_conv_spec)
@@ -1151,6 +1169,7 @@ CONTAINS
     INTEGER    :: lp_min, mp_min, isouth, inorth, ii, ispecial
     INTEGER    :: mp, lp, i, lpx, mpx, jth
     INTEGER    :: i_min(1:2)
+    INTEGER    :: ismooths
     LOGICAL    :: i_convection_too_far_in_lp
     REAL(prec), PARAMETER :: rad_to_deg = 57.295779513
     CHARACTER(len=128) :: errmsg
@@ -1339,6 +1358,7 @@ CONTAINS
 
             if(mp.eq.10) then
               write(970,*) 'GHGM KSI ', lp , grid % flux_tube_max(lp)
+              write(980,*) 'GHGM KSI ', lp , grid % flux_tube_max(lp)
             endif
             DO 300 i = 1, grid % flux_tube_max(lp)
 
@@ -1502,16 +1522,22 @@ CONTAINS
 
             ! smooth the ksi profile
 
-            ksi_fac3(1) = ksi_fac2(1)
-            ksi_fac3(grid % flux_tube_max(lp)) = ksi_fac2(grid % flux_tube_max(lp))
-            do i = 2, grid % flux_tube_max(lp) - 1
-            ksi_fac3(i) = 0.25 * (ksi_fac2(i-1) + 2.0* ksi_fac2(i) + ksi_fac2(i+1))
+            do ismooths = 1, 100
+              ksi_fac3(1) = ksi_fac2(1)
+              ksi_fac3(grid % flux_tube_max(lp)) = ksi_fac2(grid % flux_tube_max(lp))
+              do i = 2, grid % flux_tube_max(lp) - 1
+                ksi_fac3(i) = 0.25 * (ksi_fac2(i-1) + 2.0* ksi_fac2(i) + ksi_fac2(i+1))
+              enddo
+                ksi_fac2 = ksi_fac3
             enddo
 
 
             ! apply the ksi factor
 
             do i = 1, grid % flux_tube_max(lp)
+                if(mp.eq.10) then
+                write(980,*) lp,i,ksi_fac3(i)
+                endif
             plasma % ion_temperature(i,lp,mp) = ion_temperature_int2(i)*( ksi_fac3(i)**(4.0_prec/3.0_prec) )
             plasma % electron_temperature(i,lp,mp) = electron_temperature_int2(i)*( ksi_fac3(i)**(4.0_prec/3.0_prec) )
             plasma % ion_densities(1:n_conv_spec,i,lp,mp) = ion_densities_int2(1:n_conv_spec,i)*( ksi_fac3(i)**2 )
@@ -1879,6 +1905,7 @@ CONTAINS
     REAL(dp) :: dotprod, sini
     REAL(sp) :: F107D, F107A
     CHARACTER(len=95) :: ERRMSG
+    CHARACTER(len=10) :: mp_lp_string
     LOGICAL, EXTERNAL :: CTIP_CHECK_EFLAG
 
       F107D = forcing % f107( forcing % current_index )
@@ -2006,7 +2033,8 @@ CONTAINS
                         NHEAT(1:JMAXX), & !.. OUT: array, Neutral heating rate (eV/cm^3/s)
                         EFLAG,mp,lp,nflag_t(lp,mp),nflag_d(lp,mp) ) !.. OUT: 2D array, Error Flags
 
-          IF ( CTIP_CHECK_EFLAG( ERRMSG, EFLAG ) ) CALL ipe_warning_log( msg=ERRMSG, line=__LINE__, file=__FILE__ )
+          write(mp_lp_string,"(2i4)") mp,lp
+          IF ( CTIP_CHECK_EFLAG( ERRMSG, EFLAG ) ) CALL ipe_warning_log( msg=trim(ERRMSG)//trim(mp_lp_string) , line=__LINE__, file=__FILE__ )
 
           DO i=1, grid % flux_tube_max(lp)
 

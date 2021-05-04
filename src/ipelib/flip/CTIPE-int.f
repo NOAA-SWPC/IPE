@@ -334,7 +334,7 @@ C.... Written by P. Richards June-September 2010.
       USE PRODUCTION
 
       IMPLICIT NONE
-      integer mp,lp,i_which_call,nflag_t,nflag_d,test_te
+      integer mp,lp,i_which_call,nflag_t,nflag_d,test_te, ifail_pe2s
       INTEGER IHEPLS, INPLS, INNO
       INTEGER CTIPDIM         !.. CTIPe array dimension, must equal to FLDIM
       INTEGER JTI             !.. Dummy variable to count the number of calls to this routine
@@ -515,7 +515,19 @@ C.... Written by P. Richards June-September 2010.
         TINF(J)=TINFX(J)
         N4S(J)=N4SX(J)*M3_to_CM3
         NNO(J)=NNOX(J)*M3_to_CM3
+! ghgm - times 10 test
+!       UN(J)=UNX(J)*M_to_CM*100.0
         UN(J)=UNX(J)*M_to_CM
+!       if(un(j).gt.10000.0) then
+!         un(j) = 10000.0
+!         write(7100+mp,2108) mp , lp , j , unx(j)
+!       endif
+!       if(un(j).lt.-10000.0) then
+!         un(j) = -10000.0
+!         write(7100+mp,2108) mp , lp , j , unx(j)
+!       endif
+!2108   format(3i6,f10.3)
+! ghgm
         !.. transfer densities from storage to FLIP solution variable N
         N(1,J)=XIONN(1,J)
         N(2,J)=XIONN(2,J)
@@ -573,15 +585,17 @@ C.... Written by P. Richards June-September 2010.
 !
       IF(lp.LE.158) THEN
 
+      ifail_pe2s = 0 
       CALL PE2S(F107,F107A,N,temp_ti_te,FPAS,electron_density,UVFAC,
-     >          COLUM,IHEPLS,INPLS,INNO,mp,lp)
+     >          COLUM,IHEPLS,INPLS,INNO,mp,lp,ifail_pe2s)
+      if(ifail_pe2s.eq.1) write(8100+mp,*) 'PE2S ', mp,lp
 
       ENDIF
 
       ENDIF
 
       !-- Sum the EUV, photoelectron, and auroral production rate
-      CALL SUMPRD(JMIN,JMAX,AUR_PROD,mp,lp)
+      CALL SUMPRD(JMIN,JMAX,AUR_PROD,mp,lp,ifail_pe2s)
 
       !.. Loop to calculate O+(4S) total ionization rate
       !.. PHION=total O+(4S) prod, including EUV, e*, dissoc of O2 and
@@ -729,49 +743,7 @@ C.... Written by P. Richards June-September 2010.
 
       RETURN
       END
-C:::::::::::::::::: WRITE_EFLAG ::::::::::::::::::::::::
-C... This routine prints the information about error flags
-C... Written by P. Richards September 2010
-      SUBROUTINE WRITE_EFLAG(PRUNIT,   !.. Unit number to print results
-     >                        EFLAG)   !.. Error flag array
-      IMPLICIT NONE
-      INTEGER PRUNIT,EFLAG(11,11)         !.. error flags
-      IF(EFLAG(1,1).NE.0) WRITE(PRUNIT,11)
- 11   FORMAT(/'  Convergence failure in Temperature solution (TLOOPS).'
-     >  ,2X,'Time step less than minimum.')
-      IF(EFLAG(1,2).NE.0) WRITE(PRUNIT,12)
- 12   FORMAT(/'  Convergence failure in Temperature solution (TLOOPS).'
-     >  ,2X,'Incorrect input to the band solver BDSLV.')
 
-      IF(EFLAG(2,1).NE.0) WRITE(PRUNIT,21)
- 21   FORMAT(/'  Convergence failure in O+ - H+ solution (DLOOPS).'
-     >  ,2X,'Time step less than minimum.')
-      IF(EFLAG(2,2).NE.0) WRITE(PRUNIT,22)
- 22   FORMAT(/'  Convergence failure in O+ - H+ solution (DLOOPS).'
-     >  ,2X,'Incorrect input to the band solver BDSLV.')
-
-      IF(EFLAG(3,1).NE.0) WRITE(PRUNIT,31)
- 31   FORMAT(/'  Convergence failure in He+ solution (XION).'
-     >  ,2X,'Time step less than minimum.')
-      IF(EFLAG(3,2).NE.0) WRITE(PRUNIT,32)
- 32   FORMAT(/'  Convergence failure in He+ solution (XION).'
-     >  ,2X,'Incorrect input to the band solver BDSLV.')
-
-      IF(EFLAG(4,1).NE.0) WRITE(PRUNIT,41)
- 41   FORMAT(/'  Convergence failure in He+ solution (XION).'
-     >  ,2X,'Time step less than minimum.')
-      IF(EFLAG(4,2).NE.0) WRITE(PRUNIT,42)
- 42   FORMAT(/'  Convergence failure in N+ solution (XION).'
-     >  ,2X,'Incorrect input to the band solver BDSLV.')
-
-      IF(EFLAG(5,1).NE.0) WRITE(PRUNIT,51)
- 51   FORMAT(/'  Convergence failure in CMINOR.')
-
-      IF(EFLAG(11,1).NE.0) WRITE(PRUNIT,111)
- 111  FORMAT(/3X,'** CTIP dimension not equal to FLIP dimensions'
-     >  /3X,'** Check dimensions in all FLIP modules')
-      RETURN
-      END
 C:::::::::::::::::: CTIP_CHECK_EFLAG ::::::::::::::::::::::::
 C... This routine checks the error flags and returns a string
 C... containing information about the error, if any.
@@ -783,26 +755,16 @@ C... Written by R. Montuoro June 2020
       INTEGER,          INTENT(IN)  :: EFLAG(11,11)    !.. error flags
 
       CHARACTER(LEN=*), PARAMETER :: ERRMSG(10) = (/
-     >  'Convergence failure in Temperature solution (TLOOPS).'
-     >  //' Time step less than minimum.             ',
-     >  'Convergence failure in Temperature solution (TLOOPS).'
-     >  //' Incorrect input to the band solver BDSLV.',
-     >  'Convergence failure in O+ - H+ solution (DLOOPS).'
-     >  //' Time step less than minimum.                 ',
-     >  'Convergence failure in O+ - H+ solution (DLOOPS).'
-     >  //' Incorrect input to the band solver BDSLV.    ',
-     >  'Convergence failure in He+ solution (XION).'
-     >  //' Time step less than minimum.                       ',
-     >  'Convergence failure in He+ solution (XION).'
-     >  //' Incorrect input to the band solver BDSLV.          ',
-     >  'Convergence failure in He+ solution (XION).'
-     >  //' Time step less than minimum.                       ',
-     >  'Convergence failure in N+ solution (XION).'
-     >  //' Incorrect input to the band solver BDSLV.           ',
-     >  'Convergence failure in CMINOR.            '
-     >  //'                                                     ',
-     >  'CTIP dimension not equal to FLIP dimensions.'
-     >  //' Check dimensions in all FLIP modules              ' /)
+     >  'Conv issue in Temp TLOOPS : Time step < min ',
+     >  'Conv issue in Temp TLOOPS : input to BDSLV ',
+     >  'Conv issue in O+ H+ DLOOPS : Time step < min ',
+     >  'Conv issue in O+ H+ DLOOPS : input to BDSLV ',
+     >  'Conv issue in He+ XION : Time step < min ',
+     >  'Conv issue in He+ XION : input to BDSLV ',
+     >  'Conv issue in He+ XION : Time step < min ',
+     >  'Conv issue in N+ XION : input to BDSLV ',
+     >  'Conv issue in CMINOR ',
+     >  'CTIP dims =/= FLIP dims '/)
 
       INTEGER, PARAMETER :: ERRI(6) = (/ 1, 2, 3, 4, 5, 11 /)
       INTEGER, PARAMETER :: ERRJ(6) = (/ 2, 2, 2, 2, 1,  1 /)

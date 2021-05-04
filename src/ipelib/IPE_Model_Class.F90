@@ -223,6 +223,7 @@ CONTAINS
                                     ipe % time_tracker, &
                                     ipe % forcing, &
                                     ipe % mpi_layer, &
+                                    ipe % parameters % vertical_wind_limit, &
                                     rc = localrc )
       IF ( ipe_error_check( localrc, msg="Failed to update neutrals", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
