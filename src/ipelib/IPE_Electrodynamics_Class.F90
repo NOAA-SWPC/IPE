@@ -314,8 +314,8 @@ CONTAINS
     DO mp = grid % mp_low, grid % mp_high
       DO lp = 1, grid % NLP
 
-        write(2100 + mp,4611) mp,lp,eldyn % electric_field(2,lp,mp),eldyn % electric_field(1,lp,mp),grid % apex_be3(lp,mp)                                           
- 4611   format(2i6,3e12.4)
+!       write(2100 + mp,4611) mp,lp,eldyn % electric_field(2,lp,mp),eldyn % electric_field(1,lp,mp),grid % apex_be3(lp,mp)                                           
+!4611   format(2i6,3e12.4)
 
         eldyn % v_ExB_apex(1,lp,mp) = eldyn % electric_field(2,lp,mp)/grid % apex_be3(lp,mp)
         eldyn % v_ExB_apex(2,lp,mp) = -eldyn % electric_field(1,lp,mp)/grid % apex_be3(lp,mp)
@@ -907,26 +907,26 @@ CONTAINS
     ed2dy_map(1,:)=ed2dy(40,:)
     ed2dy_map(82,:)=ed2dy(41,:)
 
-    do ilon = 1 , 81
-     write(2500+mpi_layer % rank_id,7933) ilon , xlonm_deg(ilon)
- 7933 format('GHGM xlonm ', i5, f12.4)
-    enddo
-    do ilon = 1 , 82
-     write(2500+mpi_layer % rank_id,7934) ilon , xlonm_deg_map(ilon)
- 7934 format('GHGM xlonm_map ', i5, f12.4)
-    enddo
-    do ilon = 1 , 82
-    do ilat = 1 , kmlat
-     write(2400+mpi_layer % rank_id,7935) ilon , ilat, ed1dy_map(ilon,ilat),ed2dy_map(ilon,ilat)                       
- 7935 format('GHGM ED1  ', 2i5, 2e12.4)
-    enddo
-    enddo
-    do ilon = 1 , 81
-    do ilat = 1 , kmlat
-      write(3400+mpi_layer % rank_id,7777) ilon , ilat, ed1dy(ilon,ilat), ed2dy(ilon,ilat)      
-    enddo
-    enddo
- 7777 format('GHGM ED1  ', 2i5, 2e12.4)
+!   do ilon = 1 , 81
+!    write(2500+mpi_layer % rank_id,7933) ilon , xlonm_deg(ilon)
+!7933 format('GHGM xlonm ', i5, f12.4)
+!   enddo
+!   do ilon = 1 , 82
+!    write(2500+mpi_layer % rank_id,7934) ilon , xlonm_deg_map(ilon)
+!7934 format('GHGM xlonm_map ', i5, f12.4)
+!   enddo
+!   do ilon = 1 , 82
+!   do ilat = 1 , kmlat
+!    write(2400+mpi_layer % rank_id,7935) ilon , ilat, ed1dy_map(ilon,ilat),ed2dy_map(ilon,ilat)                       
+!7935 format('GHGM ED1  ', 2i5, 2e12.4)
+!   enddo
+!   enddo
+!   do ilon = 1 , 81
+!   do ilat = 1 , kmlat
+!     write(3400+mpi_layer % rank_id,7777) ilon , ilat, ed1dy(ilon,ilat), ed2dy(ilon,ilat)      
+!   enddo
+!   enddo
+!7777 format('GHGM ED1  ', 2i5, 2e12.4)
 
     CALL eldyn % Regrid_Potential( grid,mpi_layer, time_tracker,ed1dy_map,xlonm_deg_map,ylatm_deg_map, 1, 82,kmlat, rc=localrc )
     IF ( ipe_error_check( localrc, msg="call to Regrid_Potential (ed1dy_map) failed", line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
