@@ -721,7 +721,6 @@ CONTAINS
     use heelis_module, only:ctpoten
     use module_magfield
     use ipe_error_module
-!!     use module_update_fli,ONLY:update_fli
 
     CLASS( IPE_Electrodynamics ), INTENT(inout) :: eldyn
     TYPE( IPE_Forcing ),          INTENT(in)    :: forcing
@@ -740,9 +739,8 @@ CONTAINS
     INTEGER    :: tube_need(dyn_midpoint),ihem,lp_dyn
     INTEGER    :: localrc
     REAL(prec) :: mlat_plas,mlat_dyn
-    REAL(prec) :: fkp
+    REAL(prec) :: fkp,fkpa
     REAL(prec) :: ed_dyn(170,80,2)
-    REAL(prec) :: theta0(kmlat)
     REAL(prec) :: xlonm_deg_map(82)
     REAL(prec) :: ylatm_deg_map(kmlat)
     REAL(prec) :: ed1dy_map(82,kmlat)
@@ -759,10 +757,8 @@ CONTAINS
     swvel= forcing % solarwind_velocity (forcing % current_index )
     swden= forcing % solarwind_density (forcing % current_index )
     stilt= get_tilt(time_tracker%year,time_tracker%month,time_tracker%day,time_tracker%utime)
-
     fkp= forcing % kp ( forcing % current_index )
     ctpoten= 15.+15.*fkp+0.8*fkp**2
-    CALL init_heelis
 
     year=2000
 
