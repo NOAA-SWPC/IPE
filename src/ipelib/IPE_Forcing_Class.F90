@@ -89,6 +89,7 @@ CONTAINS
     forcing % n_time_levels = params % f107_kp_size + params % f107_kp_read_in_start
     forcing % dt            = params % solar_forcing_time_step
     forcing % current_time  = 0.0_prec
+    forcing % start_time    = 0.0_prec
     forcing % current_index = 1
 
     ALLOCATE( forcing % time(params % f107_kp_read_in_start+1:forcing % n_time_levels), &
