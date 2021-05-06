@@ -265,7 +265,7 @@ CONTAINS
     IF ( ipe_error_check( localrc, msg="Failed to read file "//filename, &
       line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
-    CALL ipe % plasma % Calculate_Field_Line_Integrals( ipe % grid, ipe % neutrals, ipe % mpi_layer )
+    CALL ipe % plasma % Calculate_Field_Line_Integrals( ipe % grid, ipe % neutrals, ipe % parameters % colfac, ipe % mpi_layer )
 
   END SUBROUTINE Initialize_IPE_Model
 
