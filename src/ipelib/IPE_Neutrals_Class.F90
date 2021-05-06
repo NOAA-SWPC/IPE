@@ -453,9 +453,9 @@ CONTAINS
 
              IF ( dotprod > 0.0_prec ) THEN
 
-               if (neutral_vertical_velocity.gt.vertical_wind_limit) then
+               if (neutrals % velocity_geographic(3,kp,lp,mp).gt.vertical_wind_limit) then
                  neutral_vertical_velocity = vertical_wind_limit
-               else if (neutral_vertical_velocity.lt.0.0 - vertical_wind_limit) then
+               else if (neutrals % velocity_geographic(3,kp,lp,mp).lt.0.0 - vertical_wind_limit) then
                  neutral_vertical_velocity = 0.0 - vertical_wind_limit
                else
                  neutral_vertical_velocity = neutrals % velocity_geographic(3,kp,lp,mp)
