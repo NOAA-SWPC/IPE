@@ -17,6 +17,7 @@ IMPLICIT NONE
     REAL(prec)              :: dt
     REAL(prec), ALLOCATABLE :: time(:)
     REAL(prec)              :: current_time
+    REAL(prec)              :: start_time
     INTEGER                 :: current_index
     INTEGER                 :: max_read_index
     !
@@ -261,7 +262,7 @@ CONTAINS
     ! Local
     INTEGER :: localrc
 
-    forcing % current_index = INT( deltime / real(params % f107_kp_interval) ) + &
+    forcing % current_index = INT( (deltime - forcing % start_time) / real(params % f107_kp_interval) ) + &
                                       1 + params % f107_kp_skip_size
 
     if ( params % use_f107_kp_file .and. forcing % current_index > forcing % max_read_index &
