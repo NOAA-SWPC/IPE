@@ -62,7 +62,7 @@ MODULE IPE_Plasma_Class
   INTEGER, PARAMETER, PRIVATE    :: n_ion_species = 9
   REAL(prec), PARAMETER, PRIVATE :: safe_density_minimum = 1.0e+06_prec
   REAL(prec), PARAMETER, PRIVATE :: safe_temperature_minimum = 100.0_prec
-  REAL(prec), PARAMETER, PRIVATE :: colfac = 1.3_prec
+!  REAL(prec), PARAMETER, PRIVATE :: colfac = 1.3_prec
   REAL(prec), PARAMETER, PRIVATE :: qeoNao10 = 9.6489E7_prec        !  qe/m_e*1000 [C/g]
   REAL(prec), PARAMETER, PRIVATE :: qeomeo10 = 1.7588028E11_prec    ! qe/m_e*1000 [C/g]
   REAL(prec), PARAMETER, PRIVATE :: rmassinv_nop = 1.0_prec / NO_mass ! inverted rmass
@@ -340,7 +340,7 @@ CONTAINS
                                   time_step, colfac, hpeq, nflag_t,nflag_d )
 
       !TWFANG, calculate field line integrals for dynamo solver
-      CALL plasma % Calculate_Field_Line_Integrals(grid, neutrals, mpi_layer)
+      CALL plasma % Calculate_Field_Line_Integrals(grid, neutrals, colfac, mpi_layer)
 
   END SUBROUTINE Update_IPE_Plasma
 
@@ -1606,7 +1606,7 @@ CONTAINS
   END FUNCTION Solar_Zenith_Angle
 
 
-  SUBROUTINE Calculate_Field_Line_Integrals( plasma, grid, neutrals, mpi_layer )
+  SUBROUTINE Calculate_Field_Line_Integrals( plasma, grid, neutrals, colfac, mpi_layer )
 
 
     ! this routine takes in the plasma, grid, and neutral fields and returns the six conductivities on IPE
@@ -1616,6 +1616,7 @@ CONTAINS
     CLASS( IPE_Plasma ), INTENT(inout)  :: plasma
     TYPE( IPE_Grid ), INTENT(in)        :: grid
     TYPE( IPE_Neutrals ), INTENT(in)    :: neutrals
+    REAL(prec),            INTENT(in)   :: colfac
     TYPE( IPE_MPI_Layer ), INTENT(in)   :: mpi_layer
     ! Local
     INTEGER    :: i, ihem, istart, istop, istep, mp, lp
@@ -1718,7 +1719,7 @@ CONTAINS
                                  effective_temp,                          &
                                  neutrals % temperature(i,lp,mp),         &
                                  grid % magnetic_field_strength(i,lp,mp), &
-                                 rnu_o2p,rnu_op,rnu_nop,rnu_ne)
+                                 rnu_o2p,rnu_op,rnu_nop,rnu_ne,colfac)
 
 !! get pedersen & hall conductivities
 !! more ion spieces can be added for calculating electron density
@@ -1859,9 +1860,9 @@ CONTAINS
   END SUBROUTINE Calculate_Field_Line_Integrals
 
 
-  SUBROUTINE calc_collfreq(o1_cm3,o2_cm3,n2_cm3,tnti,tn,apex_Bmag,rnu_o2p,rnu_op,rnu_nop,rnu_ne)
+  SUBROUTINE calc_collfreq(o1_cm3,o2_cm3,n2_cm3,tnti,tn,apex_Bmag,rnu_o2p,rnu_op,rnu_nop,rnu_ne,colfac)
       IMPLICIT NONE
-      REAL(prec), INTENT(in)::o1_cm3,o2_cm3,n2_cm3,tnti,tn,apex_Bmag
+      REAL(prec), INTENT(in)::o1_cm3,o2_cm3,n2_cm3,tnti,tn,apex_Bmag,colfac
       REAL(prec), INTENT(out):: rnu_o2p,rnu_op,rnu_nop,rnu_ne
 
 ! local

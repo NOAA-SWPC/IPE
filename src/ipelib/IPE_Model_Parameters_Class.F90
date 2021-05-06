@@ -81,6 +81,7 @@ MODULE IPE_Model_Parameters_Class
     REAL(prec) :: hpeq
     INTEGER    :: transport_highlat_lp
     INTEGER    :: perp_transport_max_lp
+    REAL(prec) :: vertical_wind_limit
 
     CONTAINS
 
@@ -153,11 +154,12 @@ CONTAINS
     REAL(prec) :: hpeq
     INTEGER    :: transport_highlat_lp
     INTEGER    :: perp_transport_max_lp
+    REAL(prec) :: vertical_wind_limit
 
     ! Communication buffers
     CHARACTER(LEN=200), DIMENSION( 4) :: sbuf
     INTEGER,            DIMENSION(24) :: ibuf
-    REAL(prec),         DIMENSION(25) :: rbuf
+    REAL(prec),         DIMENSION(26) :: rbuf
 
 
     NAMELIST / SpaceManagement / grid_file
@@ -172,7 +174,7 @@ CONTAINS
     NAMELIST / IPECAP          / mesh_height_min, mesh_height_max, mesh_fill, mesh_write, mesh_write_file
     NAMELIST / ElDyn           / dynamo_efield
     NAMELIST / OPERATIONAL     / colfac, offset1_deg, offset2_deg, potential_model, hpeq, &
-                                 transport_highlat_lp, perp_transport_max_lp
+                                 transport_highlat_lp, perp_transport_max_lp, vertical_wind_limit
 
     ! Begin
     IF (PRESENT(rc)) rc = IPE_SUCCESS
@@ -239,13 +241,14 @@ CONTAINS
     dynamo_efield       = .TRUE.
 
     ! Operational
-    colfac               = 1.3_prec
-    offset1_deg          = 5.0_prec
-    offset2_deg          = 20.0_prec
-    potential_model      = 2
-    hpeq                 = 0.0_prec
-    transport_highlat_lp = 30
-    perp_transport_max_lp   = 151
+    colfac                = 1.3_prec
+    offset1_deg           = 5.0_prec
+    offset2_deg           = 20.0_prec
+    potential_model       = 2
+    hpeq                  = 0.0_prec
+    transport_highlat_lp  = 30
+    perp_transport_max_lp = 151
+    vertical_wind_limit   = 100.0_prec
 
     ! Initialize buffers
     sbuf = ""
@@ -321,7 +324,7 @@ CONTAINS
                 mesh_height_min, mesh_height_max, f107, f107_81day_avg, kp, kp_1day_avg, ap,   &
                 ap_1day_avg, nhemi_power, shemi_power, solarwind_By, solarwind_angle,          &
                 solarwind_velocity, solarwind_Bz, solarwind_density, file_output_frequency, &
-                colfac, offset1_deg, offset2_deg, hpeq /)
+                colfac, offset1_deg, offset2_deg, hpeq, vertical_wind_limit /)
 
     ENDIF
 
@@ -395,6 +398,7 @@ CONTAINS
     params % offset1_deg             = rbuf(23)
     params % offset2_deg             = rbuf(24)
     params % hpeq                    = rbuf(25)
+    params % vertical_wind_limit     = rbuf(26)
 
     params % n_model_updates = INT( ( params % end_time - params % start_time ) / params % file_output_frequency )
 
