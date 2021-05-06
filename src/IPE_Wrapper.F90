@@ -77,9 +77,6 @@ CONTAINS
     ! Set IPE run mode to coupled
     ipe % forcing % coupled = .true.
 
-    ! Set IPE start time
-    ipe % forcing % start_time = ipe % time_tracker % elapsed_sec
-
     init_file = "IPE_State.apex."//ipe % time_tracker % DateStamp( )//".h5"
     INQUIRE( FILE = TRIM(init_file), EXIST = file_exists, IOSTAT = localrc )
     IF( localrc /= 0 ) THEN
