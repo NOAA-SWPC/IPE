@@ -311,12 +311,13 @@ CONTAINS
 
 !   write(1000 + mpi_layer % rank_id, *) 'TIME'
 
+
     DO mp = grid % mp_low, grid % mp_high
       DO lp = 1, grid % NLP
+         eldyn % v_ExB_apex(1,lp,mp) = eldyn % electric_field(2,lp,mp)/grid % apex_be3(lp,mp)
+         eldyn % v_ExB_apex(2,lp,mp) = -eldyn % electric_field(1,lp,mp)/grid % apex_be3(lp,mp)
          DO i_90km = 1, grid % flux_tube_max(lp)
 
-        eldyn % v_ExB_apex(1,lp,mp) = eldyn % electric_field(2,lp,mp)/grid % apex_be3(lp,mp)
-        eldyn % v_ExB_apex(2,lp,mp) = -eldyn % electric_field(1,lp,mp)/grid % apex_be3(lp,mp)
 !         eldyn % v_ExB_apex(1,lp,mp) = v_boost_factor * (eldyn % electric_field(2,lp,mp)/grid % apex_be3(lp,mp))
 !         eldyn % v_ExB_apex(2,lp,mp) = v_boost_factor * (-eldyn % electric_field(1,lp,mp)/grid % apex_be3(lp,mp))
 
