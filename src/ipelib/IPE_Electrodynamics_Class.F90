@@ -217,11 +217,13 @@ CONTAINS
       IF ( ipe_error_check(localrc, msg="call to Dynamo_Wrapper failed", &
         line=__LINE__, file=__FILE__, rc=rc) ) RETURN
       IF( mpi_layer % rank_id == 0 )THEN
+       write(6,*) '' 
        write(6,*) '*********************************'
        write(6,899) time_tracker % year, time_tracker % month, time_tracker % day, &
                     time_tracker % hour, time_tracker % minute
  899   format('Calling Dynamo E field ', i4,x,i2.2,x,i2.2,2x,i2.2,':'i2.2)
        write(6,*) '*********************************'
+       write(6,*) '' 
       ENDIF
 
     ELSE

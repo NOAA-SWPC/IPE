@@ -48,25 +48,8 @@ C--- Consult file RSLPSD-Algorithm.doc for detailed explanation
       JEQ=(JMIN+JMAX)/2 !.. Equatorial point
       EFLAG(2,1)=0      !.. Initialize error flag
       EFLAG(2,1)=0      !.. Initialize error flag
-!dbg20121130:debug note 
-!i vaguely remembered ZLBDY_flip=115 caused crash (or at least very bad results!)
-!i can't remember introducing ZLBDY_flip was the cause of the problem? 
-! or the bad value, 115???
-!therefore, the use of ZLBDY_flip is pending.
-!dbg20121130      ZLBDY=115.!ZLBDY_flip        !.. Lower boundary altitude
       ZLBDY=120.        !.. Lower boundary altitude
 
-!dbg20120301: this part was commented out on 20110815, but un-comment again to solve for N+ problem: "IN BDSLV &&&&&&& BANDWIDTH IS TOO LARGE " i don't remember why we decided to comment out here and i cannot find a program to setup the local chem equil anywhere else???
-!dbg20110815      !.. Use local equilibrium for densities if flux tube apex height < 200 km
-!	IF(sw_LCE.AND.Z(JEQ).LT.ht_LCE) THEN !ht_LCE=200.
-!         DO J=JMIN,JMAX
-!           CALL HOEQ(FLDIM,J,N,TI)
-!           XIONV(1,J)=0.0
-!           XIONV(2,J)=0.0
-!         ENDDO
-!         RETURN
-!	ENDIF 
-!dbg20110815:
       !.. Use local equilibrium for densities if flux tube
       !.. apex height < ZLBDY + some increment (1.0 km?)
       IF(Z(JEQ).LE.ZLBDY+1.0) THEN

@@ -112,8 +112,8 @@ MODULE IPE_Plasma_Class
   REAL(dp), PARAMETER, PRIVATE :: HEPRAT   = 9.0D-2
 !  REAL(dp), PARAMETER, PRIVATE :: HPEQ     = 0.0D0
   ! IHEPLS,INPLS turn on diffusive solutions if > 0. no solution if 0, chemical equilibrium if < 0
-  INTEGER, PARAMETER, PRIVATE  :: IHEPLS   = 1
-  INTEGER, PARAMETER, PRIVATE  :: INPLS    = 1
+! INTEGER, PARAMETER, PRIVATE  :: IHEPLS   = 1
+! INTEGER, PARAMETER, PRIVATE  :: INPLS    = 1
   INTEGER, PARAMETER, PRIVATE  :: INNO     = 0
   integer :: istop
   ! :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: !
@@ -221,7 +221,7 @@ CONTAINS
  
 
   SUBROUTINE Update_IPE_Plasma( plasma, grid, neutrals, forcing, time_tracker, mpi_layer, v_ExB, time_step, colfac, hpeq, &
-                                transport_highlat_lp, perp_transport_max_lp, rc )
+                                transport_highlat_lp, perp_transport_max_lp, ihepls, inpls, rc )
     IMPLICIT NONE
     CLASS( IPE_Plasma ),   INTENT(inout) :: plasma
     TYPE( IPE_Grid ),      INTENT(in)    :: grid
@@ -235,6 +235,8 @@ CONTAINS
     REAL(prec),            INTENT(in)    :: hpeq
     INTEGER,               INTENT(in)    :: transport_highlat_lp
     INTEGER,               INTENT(in)    :: perp_transport_max_lp
+    INTEGER,               INTENT(in)    :: ihepls
+    INTEGER,               INTENT(in)    :: inpls
     INTEGER, OPTIONAL,     INTENT(out)   :: rc
 
     ! Local
@@ -328,16 +330,20 @@ CONTAINS
                                            time_tracker )
 
        if (mpi_layer % rank_id.eq.0) then
+       write(6,*) ''
+       write(6,*) '***************************************'
        write(6,899) time_tracker % year, time_tracker % month, time_tracker % day, &       
                     time_tracker % hour, time_tracker % minute
- 899   format('Calling Plasma         ', i4,x,i2.2,x,i2.2,2x,i2.2,':'i2.2)
+ 899   format(' CALLING PLASMA         ', i4,x,i2.2,x,i2.2,2x,i2.2,':'i2.2)
+       write(6,*) '***************************************'
+       write(6,*) ''
        endif
 
       CALL plasma % FLIP_Wrapper( grid,         &
                                   neutrals,     &
                                   forcing,      &
                                   time_tracker, &
-                                  time_step, colfac, hpeq, nflag_t,nflag_d )
+                                  time_step, colfac, hpeq, ihepls, inpls, nflag_t,nflag_d )
 
       !TWFANG, calculate field line integrals for dynamo solver
       CALL plasma % Calculate_Field_Line_Integrals(grid, neutrals, colfac, mpi_layer)
@@ -1361,7 +1367,7 @@ CONTAINS
   END SUBROUTINE Auroral_Precipitation
 
 
-  SUBROUTINE FLIP_Wrapper( plasma, grid, neutrals, forcing, time_tracker, flip_time_step, colfac, hpeq, nflag_t, nflag_d )
+  SUBROUTINE FLIP_Wrapper( plasma, grid, neutrals, forcing, time_tracker, flip_time_step, colfac, hpeq, ihepls, inpls, nflag_t, nflag_d )
     IMPLICIT NONE
     CLASS( IPE_Plasma ), INTENT(inout) :: plasma
     TYPE( IPE_Grid ), INTENT(in)       :: grid
@@ -1371,6 +1377,8 @@ CONTAINS
     REAL(prec), INTENT(in)             :: flip_time_step
     REAL(prec), INTENT(in)             :: colfac
     REAL(prec), INTENT(in)             :: hpeq
+    INTEGER, INTENT(in)                :: IHEPLS
+    INTEGER, INTENT(in)                :: INPLS
     ! Local
     INTEGER  :: i, lp, mp, iprint, ii
     INTEGER  :: JMINX, JMAXX

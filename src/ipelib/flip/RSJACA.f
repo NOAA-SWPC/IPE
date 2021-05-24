@@ -39,8 +39,8 @@ C ...... modification here by PR Aug 91
            which_call_str = 'Temp'
            NFLAG=103
          END SELECT
-!        WRITE(*,918) 1,mp,lp,which_call_str
-918      FORMAT('    IN BDSLV &&&&&&& BANDWIDTH IS TOO LARGE',3i10,a8)
+         WRITE(*,918) mp,lp,which_call_str
+918      FORMAT('BDSLV BANDWIDTH TOO LARGE',2i10,a8)
 !        NFLAG=3
          RETURN
       ENDIF
@@ -87,8 +87,8 @@ C
         NFLAG=204
       END SELECT
 
-!     WRITE(*,919)I,1,mp,lp,which_call_str
-919   FORMAT('    IN BDSLV, ROW',I6,' IS ZERO IN INPUT MATRIX1=',
+      WRITE(*,919)I,1,mp,lp,which_call_str
+919   FORMAT('IN BDSLV, ROW',I6,' IS ZERO IN INPUT MATRIX1=',
      >       3i6,a8)
 !     NFLAG=2
       RETURN
@@ -147,8 +147,8 @@ C  ..... PR mod in Aug 91
         which_call_str = 'Temp'
         NFLAG=304
       END SELECT
-!     WRITE(*,917) 1 , mp,lp,which_call_str
-917   FORMAT('  IN BDSLV &&&&&&&&   ZERO PIVOT ELEMENT',3i10,a8)
+      WRITE(*,917) 1 , mp,lp,which_call_str
+917   FORMAT('BDSLV ZERO PIVOT ELEMENT',3i10,a8)
 !     NFLAG=1
       RETURN
 C
@@ -197,7 +197,7 @@ C
         which_call_str = 'Temp'
         NFLAG=404
       END SELECT
-!     WRITE(6,90) KDIM,which_call_str
+      WRITE(6,90) KDIM,which_call_str
  90   FORMAT(' WARNING!! DIMENSION OF MUL IN BDSLV TOO SMALL. KDIM=',
      >       I9,a8)
       ENDIF

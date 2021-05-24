@@ -236,6 +236,8 @@ CONTAINS
                                   ipe % parameters % hpeq, &
                                   ipe % parameters % transport_highlat_lp, &
                                   ipe % parameters % perp_transport_max_lp, &
+                                  ipe % parameters % ihepls, &
+                                  ipe % parameters % inpls, &
                                   rc = localrc )
       IF ( ipe_error_check( localrc, msg="Failed to update plasma", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN

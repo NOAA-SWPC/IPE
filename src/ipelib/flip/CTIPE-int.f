@@ -369,7 +369,8 @@ C.... Written by P. Richards June-September 2010.
       DOUBLE PRECISION HPEQ              !.. HPEQ is equatorial H+ density
       DOUBLE PRECISION DT,DTMIN,FD(9),BCKPRD,FPAS,HEPRAT,PCO,UTHRS !$$$
       DOUBLE PRECISION COLUM(3,CTIPDIM)  !.. Neutral column densities for PEPRIM
-      DOUBLE PRECISION N(4,CTIPDIM)      !.. FLIP variable for O+ H+ & total ions
+      DOUBLE PRECISION N_flip(4,CTIPDIM)      !.. FLIP variable for O+ H+ & total ions
+      DOUBLE PRECISION V_flip_save(2,CTIPDIM)      !.. FLIP variable for O+ H+ & total ions
       DOUBLE PRECISION temp_ti_te(3,CTIPDIM)     !.. FLIP variable for Te and Ti
       DOUBLE PRECISION N_SAVE(4,CTIPDIM)      !.. FLIP variable for O+ H+ & total ions
       DOUBLE PRECISION TI_SAVE(3,CTIPDIM)     !.. FLIP variable for Te and Ti
@@ -483,6 +484,9 @@ C.... Written by P. Richards June-September 2010.
         XIONN(I,J)=XIONNX(I,J)*M3_to_CM3
         XIONV(I,J)=XIONVX(I,J)*M_to_CM
       ENDDO
+      DO I=1,2
+        V_flip_save(i,j) = XIONV(I,J)
+      ENDDO
       ENDDO
 
       !.. Transfer Te and Ti to FLIP variable TI
@@ -496,17 +500,8 @@ C.... Written by P. Richards June-September 2010.
       !.. Upload thermosphere parameters to THERMOSPHERE module
       COLFAC=COLFACX  !.. O+ - O collision frequency Burnside factor 1-1.7
       DO J=JMIN,JMAX
-! GHGM - set N+ and He+ to zero
-!       if(uthrs.lt.2.0E-2) then
-!       XIONN(3,J)=0.0
-!       XIONV(3,J)=0.0
-!       XIONN(4,J)=0.0
-!       XIONV(4,J)=0.0
-!       endif
-! GHGM
         ON(J)=OX(J)*M3_to_CM3
         HN(J)=HX(J)*M3_to_CM3
-! GHGM
         if(hn(j).lt.1.e3) hn(j) = 1.e3
         N2N(J)=N2X(J)*M3_to_CM3
         O2N(J)=O2X(J)*M3_to_CM3
@@ -517,30 +512,24 @@ C.... Written by P. Richards June-September 2010.
         NNO(J)=NNOX(J)*M3_to_CM3
         UN(J)=UNX(J)*M_to_CM
         !.. transfer densities from storage to FLIP solution variable N
-        N(1,J)=XIONN(1,J)
-        N(2,J)=XIONN(2,J)
-        N(3,J)=(XIONN(4,J)+XIONN(5,J)+XIONN(6,J)+XIONN(7,J)+XIONN(8,J))
-        N(4,J)=XIONN(3,J)
+        N_flip(1,J)=XIONN(1,J)
+        N_flip(2,J)=XIONN(2,J)
+        N_flip(3,J)=(XIONN(4,J)+XIONN(5,J)+XIONN(6,J)+XIONN(7,J)
+     >               +XIONN(8,J))
+        N_flip(4,J)=XIONN(3,J)
         NHEAT(J)=0.0
         O2DISF(J)=0.0
-! GHGM - intialize ti and te ......
-!       if(uthrs.lt.2.0E-2) then
-!       temp_ti_te(3,J)=904.0*DLOG(z(j))-3329.0
-!       IF(temp_ti_te(3,J).GT.3000.) temp_ti_te(3,J)=3000.
-!       temp_ti_te(1,J)=0.5*(TN(J)+temp_ti_te(3,J))
-!       endif
-! GHGM
       ENDDO
 
       !.. Set up initial temperature and density profiles.
       !.. 0.1 < HPEQ < 1.0.
       IF(HPEQ.GT.0.001) THEN
-        CALL PROFIN(IHEPLS,INPLS,PCO,F107,N,temp_ti_te,HPEQ,HEPRAT)
+        CALL PROFIN(IHEPLS,INPLS,PCO,F107,N_flip,temp_ti_te,HPEQ,HEPRAT)
       ENDIF
 
       !.. This routine adjusts the H+ and He+ densities for depleted flux tubes
       !..  if HPEQ is negative. 0.1 < -HPEQ < 1.0
-      IF(HPEQ.LT.-0.001) CALL NEW_HP(JMIN,JMAX,PCO,HPEQ,N,EFLAG)
+      IF(HPEQ.LT.-0.001) CALL NEW_HP(JMIN,JMAX,PCO,HPEQ,N_flip,EFLAG)
 
       !.. Update solar EUV flux factors
       CALL FACEUV(F107,F107A,UVFAC,EUVFLUX)
@@ -573,8 +562,8 @@ C.... Written by P. Richards June-September 2010.
 !
       IF(lp.LE.158) THEN
 
-      CALL PE2S(F107,F107A,N,temp_ti_te,FPAS,electron_density,UVFAC,
-     >          COLUM,IHEPLS,INPLS,INNO,mp,lp)
+      CALL PE2S(F107,F107A,N_flip,temp_ti_te,FPAS,electron_density,
+     >          UVFAC,COLUM,IHEPLS,INPLS,INNO,mp,lp)
 
       ENDIF
 
@@ -593,14 +582,14 @@ C.... Written by P. Richards June-September 2010.
 !     endif
       DO J=JMIN,JMAX
          PHION(J)=1.0E-22
-         N(3,J)=1.0E-22
+         N_flip(3,J)=1.0E-22
          DO I=1,9
             FD(I)=0.0
          ENDDO
          N2D(J)=0.0
          IF(Z(J).GE.80.AND.Z(J).LE.700) THEN
            !.. CALL cminor to get NO+, O+(2D), O2+, N2+ & O+(2P) densities
-           CALL CMINOR(0,J,0,IHEPLS,INPLS,INNO,FD,7,N,temp_ti_te,
+           CALL CMINOR(0,J,0,IHEPLS,INPLS,INNO,FD,7,N_flip,temp_ti_te,
      >                 Z,EFLAG,mp,lp)
            BCKPRD=2.0E-10*N2N(J)*EXP(-5.0E-14*N2N(J)*TN(J))
            PHION(J)=SUMION(1,7,J)+SUMION(2,4,J)+SUMION(2,5,J)+FD(9)
@@ -618,80 +607,82 @@ C.... Written by P. Richards June-September 2010.
            NNO(J)=0.0
          ENDIF
          !.. Sum minor ions N+, NO+, O2+, N2+ for electron density at low altitudes
-         N(3,J)=XIONN(4,J)+XIONN(5,J)+XIONN(6,J)+XIONN(7,J)+XIONN(8,J)
+         N_flip(3,J)=XIONN(4,J)+XIONN(5,J)+XIONN(6,J)+XIONN(7,J)
+     >               +XIONN(8,J)
       ENDDO
 
       !..  electron and ion temperature solution
-      n_save = n
+      nflag_t = 0
+      n_save = n_flip
       ti_save = temp_ti_te
-      CALL TLOOPS(JMIN,JMAX,CTIPDIM,Z,N,temp_ti_te,DT,DTMIN,EFLAG,
+      DO J=JMIN,JMAX
+      DO I=1,2
+        V_flip_save(i,j) = XIONV(I,J)
+      ENDDO
+      ENDDO
+      CALL TLOOPS(JMIN,JMAX,CTIPDIM,Z,N_flip,temp_ti_te,DT,DTMIN,EFLAG,
      >            mp,lp,nflag_t)
-! GHGM - simple attempt to stop Te climbing above 5,000K
-!     test_te = 0
-!     DO J=JMIN,JMAX
-!       if(temp_ti_te(3,j).ge.5000.) then
-!         test_te = 1
-!         goto 2345
-!       endif
-!     ENDDO
-!2345 continue
-!     if(test_te.eq.1) then
-!      write(6,*) 'GHGM TE greater than 5000K, resetting ',mp,lp
-!     DO J=JMIN,JMAX
-!       temp_ti_te(3,J)=904.0*DLOG(z(j))-3329.0
-!       IF(temp_ti_te(3,J).GT.3000.) temp_ti_te(3,J)=3000.
-!       temp_ti_te(1,J)=0.5*(TN(J)+temp_ti_te(3,J))
-!     ENDDO
-!     endif
-! GHGM - simple attempt to stop Te climbing above 5,000K
-!     if((mp.eq.2).and.(lp.eq.27)) then
-!       do j = jmin,jmax
-!         write(6,11) j,z(j),n(1,j),n(2,j),n(3,j),n(4,j),
-!    >    temp_ti_te(1,j),temp_ti_te(2,j),temp_ti_te(3,j)
-!         write(6,11) j,z(j),XIONN(4,J),XIONN(5,J),XIONN(6,J),
-!    >                XIONN(7,J),XIONN(8,J)
-!         write(6,*) '*******************************'
-!11       format(i6,f10.0,7e12.4)
-!       enddo
-!     endif
-!     if(nflag_t.ne.0) then
-!       write(6,*) 'GHGM flagged Temperature ', mp,lp,nflag_t
-!       n = n_save
-!       ti = ti_save
-!       return
-!     endif
+      if(nflag_t.ne.0) then
+        write(6,*) 'GHGM flagged Temp ', mp,lp,nflag_t,uthrs
+        write(3700+mp,*) 'GHGM flagged Temp ', mp,lp,nflag_t,uthrs
+        n_flip = n_save
+        temp_ti_te = ti_save
+      DO J=JMIN,JMAX
+      DO I=1,2
+         XIONV(I,J) = V_flip_save(i,j)
+      ENDDO
+      ENDDO
+      endif
 
       !.. O+, H+ solution
-      n_save = n
+      nflag_d = 0
+      n_save = n_flip
       ti_save = temp_ti_te
-      CALL DLOOPS(JMIN,JMAX,CTIPDIM,Z,N,temp_ti_te,DT,DTMIN,EFLAG,
+      DO J=JMIN,JMAX
+      DO I=1,2
+        V_flip_save(i,j) = XIONV(I,J)
+      ENDDO
+      ENDDO
+      CALL DLOOPS(JMIN,JMAX,CTIPDIM,Z,N_flip,temp_ti_te,DT,DTMIN,EFLAG,
      >            mp,lp,nflag_d)
-!     if(nflag_d.ne.0) then
-!       write(6,*) 'GHGM flagged Density ', mp,lp,nflag_d
-!       n = n_save
-!       ti = ti_save
-!     endif
+      if(nflag_d.ne.0) then
+        write(6,*) 'GHGM flagged Den  ', mp,lp,nflag_d,uthrs
+        write(3700+mp,*) 'GHGM flagged Den  ', mp,lp,nflag_d,uthrs
+        n_flip = n_save
+        temp_ti_te = ti_save
+      DO J=JMIN,JMAX
+      DO I=1,2
+         XIONV(I,J) = V_flip_save(i,j)
+      ENDDO
+      ENDDO
+      endif
 
       !.. Recalculate the minor ion densities with the new O+ density
       !.. Added by PGR 2012-11-29
       DO J=JMIN,JMAX
        IF(Z(J).GE.80.AND.Z(J).LE.700) THEN
-          CALL CMINOR(0,J,0,IHEPLS,INPLS,INNO,FD,7,N,temp_ti_te,
+          CALL CMINOR(0,J,0,IHEPLS,INPLS,INNO,FD,7,N_flip,temp_ti_te,
      >                Z,EFLAG,mp,lp)
        ENDIF
       ENDDO
 
       !.. He+ solution
+      if(mp.eq.1.and.lp.eq.1) write(6,*) 'ihepls ', ihepls
       IF(EFLAG(2,1).EQ.0.AND.IHEPLS.GT.0) THEN
         i_which_call = 1
         CALL heplus_and_nplus(temp_ti_te,DT,DTMIN,9,EFLAG,
      >                        mp,lp,i_which_call)
+        if(eflag(3,1).ne.0) write(6,*) 'GHGM He+ 1 ' , mp,lp,eflag(3,1) 
+        if(eflag(3,2).ne.0) write(6,*) 'GHGM He+ 2 ' , mp,lp,eflag(3,2) 
       ENDIF
       !.. N+ solution
+      if(mp.eq.1.and.lp.eq.1) write(6,*) 'inpls ', inpls
       IF(EFLAG(2,1).EQ.0.AND.INPLS.GT.0) THEN
         i_which_call = 2
         CALL heplus_and_nplus(temp_ti_te,DT,DTMIN,11,EFLAG,
      >                        mp,lp,i_which_call)
+        if(eflag(4,1).ne.0) write(6,*) 'GHGM N+ 1 ' , mp,lp,eflag(4,1) 
+        if(eflag(4,2).ne.0) write(6,*) 'GHGM N+ 2 ' , mp,lp,eflag(4,2) 
       ENDIF
 
         !.. transfer densities from FLIP to CTIP variable
@@ -711,67 +702,9 @@ C.... Written by P. Richards June-September 2010.
         ENDDO
       ENDDO
 
-!        !.. Get neutral gas heating rate NHEAT
-!        DO J=JMIN,JMAX
-!          IF(Z(J).GE.80.AND.Z(J).LE.700) THEN
-!            !.. electron density for photoelectron routine
-!            electron_density(J)=XIONN(1,J)+XIONN(2,J)+XIONN(3,J)+XIONN(4,J)+
-!     >      XIONN(5,J)+XIONN(6,J)
-!            CALL RATS(J,temp_ti_te(3,J),temp_ti_te(1,J),TN(J),RTS)  !.. Reaction rates
-!            !.. Neutral heating rate
-!            CALL NEUT_HEATING(0,JMIN,J,Z(J),RTS,temp_ti_te(3,J),temp_ti_te(2,J),TN(J),
-!     >        ON(J),O2N(J),N2N(J),HE(J),N4S(J),electron_density(J),N(1,J),XIONN(6,J)
-!     >       ,XIONN(5,J),N(2,J),XIONN(7,J),XIONN(4,J),NNO(J),N2D(J)
-!     >       ,N2P(J),N2A(J),XIONN(8,J),XIONN(9,J),O1D(J),O1S(J)
-!     >       ,EHT(3,J),NHEAT(J),O2DISF(J))
-!          ENDIF
-!      ENDDO
-
       RETURN
       END
-C:::::::::::::::::: WRITE_EFLAG ::::::::::::::::::::::::
-C... This routine prints the information about error flags
-C... Written by P. Richards September 2010
-      SUBROUTINE WRITE_EFLAG(PRUNIT,   !.. Unit number to print results
-     >                        EFLAG)   !.. Error flag array
-      IMPLICIT NONE
-      INTEGER PRUNIT,EFLAG(11,11)         !.. error flags
-      IF(EFLAG(1,1).NE.0) WRITE(PRUNIT,11)
- 11   FORMAT(/'  Convergence failure in Temperature solution (TLOOPS).'
-     >  ,2X,'Time step less than minimum.')
-      IF(EFLAG(1,2).NE.0) WRITE(PRUNIT,12)
- 12   FORMAT(/'  Convergence failure in Temperature solution (TLOOPS).'
-     >  ,2X,'Incorrect input to the band solver BDSLV.')
 
-      IF(EFLAG(2,1).NE.0) WRITE(PRUNIT,21)
- 21   FORMAT(/'  Convergence failure in O+ - H+ solution (DLOOPS).'
-     >  ,2X,'Time step less than minimum.')
-      IF(EFLAG(2,2).NE.0) WRITE(PRUNIT,22)
- 22   FORMAT(/'  Convergence failure in O+ - H+ solution (DLOOPS).'
-     >  ,2X,'Incorrect input to the band solver BDSLV.')
-
-      IF(EFLAG(3,1).NE.0) WRITE(PRUNIT,31)
- 31   FORMAT(/'  Convergence failure in He+ solution (XION).'
-     >  ,2X,'Time step less than minimum.')
-      IF(EFLAG(3,2).NE.0) WRITE(PRUNIT,32)
- 32   FORMAT(/'  Convergence failure in He+ solution (XION).'
-     >  ,2X,'Incorrect input to the band solver BDSLV.')
-
-      IF(EFLAG(4,1).NE.0) WRITE(PRUNIT,41)
- 41   FORMAT(/'  Convergence failure in He+ solution (XION).'
-     >  ,2X,'Time step less than minimum.')
-      IF(EFLAG(4,2).NE.0) WRITE(PRUNIT,42)
- 42   FORMAT(/'  Convergence failure in N+ solution (XION).'
-     >  ,2X,'Incorrect input to the band solver BDSLV.')
-
-      IF(EFLAG(5,1).NE.0) WRITE(PRUNIT,51)
- 51   FORMAT(/'  Convergence failure in CMINOR.')
-
-      IF(EFLAG(11,1).NE.0) WRITE(PRUNIT,111)
- 111  FORMAT(/3X,'** CTIP dimension not equal to FLIP dimensions'
-     >  /3X,'** Check dimensions in all FLIP modules')
-      RETURN
-      END
 C:::::::::::::::::: CTIP_CHECK_EFLAG ::::::::::::::::::::::::
 C... This routine checks the error flags and returns a string
 C... containing information about the error, if any.

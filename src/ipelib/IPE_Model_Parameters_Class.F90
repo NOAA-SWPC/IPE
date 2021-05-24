@@ -81,6 +81,8 @@ MODULE IPE_Model_Parameters_Class
     REAL(prec) :: hpeq
     INTEGER    :: transport_highlat_lp
     INTEGER    :: perp_transport_max_lp
+    INTEGER    :: ihepls
+    INTEGER    :: inpls
     REAL(prec) :: vertical_wind_limit
 
     CONTAINS
@@ -155,10 +157,12 @@ CONTAINS
     INTEGER    :: transport_highlat_lp
     INTEGER    :: perp_transport_max_lp
     REAL(prec) :: vertical_wind_limit
+    INTEGER    :: ihepls
+    INTEGER    :: inpls
 
     ! Communication buffers
     CHARACTER(LEN=200), DIMENSION( 4) :: sbuf
-    INTEGER,            DIMENSION(24) :: ibuf
+    INTEGER,            DIMENSION(26) :: ibuf
     REAL(prec),         DIMENSION(26) :: rbuf
 
 
@@ -174,7 +178,8 @@ CONTAINS
     NAMELIST / IPECAP          / mesh_height_min, mesh_height_max, mesh_fill, mesh_write, mesh_write_file
     NAMELIST / ElDyn           / dynamo_efield
     NAMELIST / OPERATIONAL     / colfac, offset1_deg, offset2_deg, potential_model, hpeq, &
-                                 transport_highlat_lp, perp_transport_max_lp, vertical_wind_limit
+                                 transport_highlat_lp, perp_transport_max_lp, vertical_wind_limit, &
+                                 ihepls, inpls
 
     ! Begin
     IF (PRESENT(rc)) rc = IPE_SUCCESS
@@ -249,6 +254,8 @@ CONTAINS
     transport_highlat_lp  = 30
     perp_transport_max_lp = 151
     vertical_wind_limit   = 100.0_prec
+    ihepls                = 1
+    inpls                 = 1
 
     ! Initialize buffers
     sbuf = ""
@@ -318,6 +325,8 @@ CONTAINS
       ibuf(22) = potential_model
       ibuf(23) = transport_highlat_lp
       ibuf(24) = perp_transport_max_lp
+      ibuf(25) = ihepls
+      ibuf(26) = inpls
 
       ! -- reals
       rbuf = (/ time_step, start_time, end_time, msis_time_step, solar_forcing_time_step, &
@@ -367,6 +376,8 @@ CONTAINS
     params % potential_model           = ibuf(22)
     params % transport_highlat_lp      = ibuf(23)
     params % perp_transport_max_lp     = ibuf(24)
+    params % ihepls                    = ibuf(25)
+    params % inpls                     = ibuf(26)
 
 #ifdef HAVE_MPI
     CALL MPI_BCAST( rbuf, size(rbuf), mpi_layer % mpi_prec, 0, mpi_layer % mpi_communicator, ierr )

@@ -62,17 +62,6 @@ C.... Cleaned up and commented by P. Richards in April 2000
          DCRQ(2,J)=1.0
       ENDDO
 
-!dbg20120301: this part was commented out on 20110815, but un-comment again to solve for N+ problem: "IN BDSLV &&&&&&& BANDWIDTH IS TOO LARGE " i don't remember why we decided to comment out here and i cannot find a program to setup the local chem equil anywhere else???
-!dbg20110815      !.. Use local equilibrium for densities if flux tube apex height < 200 km
-!      IF(Z(JEQ).LT.200.0) THEN 
-!        DO J=JMIN,JMAX
-!          IF(IABS(IHEPNP).EQ.9) CALL MCHEMQ(J,DUM,N,TI,FLDIM)
-!          IF(IABS(IHEPNP).EQ.11) CALL NCHEMQ(J,DUM,N,TI,FLDIM)
-!          N(1,J)=DUM(1)
-!        ENDDO
-!        RETURN
-!      ENDIF
-!dbg20110815
       !.. Use local equilibrium for He+ densities if apex height < ZLBHE
       IF(IHEPNP.EQ.9.AND.Z(JEQ).LE.ZLBHE) THEN
         DO J=JMIN,JMAX

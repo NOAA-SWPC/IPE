@@ -900,10 +900,10 @@ C......  And Wilkes, Applied Numerical Methods, Wiley, 1969, page 446
         J=LAST-K
         DELTA(J)=GAMMA1(J)-C(J)*DELTA(J+1)/ALPHA(J)
         if(isnan(delta(j))) then 
-          write(6,7777) mp,lp,k,j,num,
-     >    first,last,i_which_call,
-     >    GAMMA1(J),C(J),DELTA(J+1),ALPHA(J),ie
- 7777     format('GHGM tridiagonal solver ',8i6,4e12.4,i6)
+!         write(6,7777) mp,lp,k,j,num,
+!    >    first,last,i_which_call,
+!    >    GAMMA1(J),C(J),DELTA(J+1),ALPHA(J),ie
+!7777     format('GHGM tridiagonal solver ',8i6,4e12.4,i6)
           ifail = 1
           exit
         endif
