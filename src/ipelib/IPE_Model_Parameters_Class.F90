@@ -296,6 +296,9 @@ CONTAINS
       READ( UNIT = fUnit, NML = ElDyn,           IOSTAT = iostatus )
       IF ( ipe_iostatus_check( iostatus, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
+      READ( UNIT = fUnit, NML = OPERATIONAL,     IOSTAT = iostatus )
+      IF ( ipe_iostatus_check( iostatus, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+
       CLOSE( fUnit, IOSTAT = iostatus )
       IF ( ipe_iostatus_check( iostatus, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
