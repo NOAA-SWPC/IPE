@@ -416,6 +416,28 @@ CONTAINS
 
     params % n_model_updates = INT( ( params % end_time - params % start_time ) / params % file_output_frequency )
 
+    if (mpi_layer % rank_id.eq.0) then
+       write(6,*) ''
+       write(6,*) '****************************************************'
+       write(6,*) '****** IPE OPERATIONAL PARAMETERS FOR THIS RUN *****'
+       write(6,*) '****************************************************'
+       write(6,*) ''
+       write(6,*) 'dynamo_efield ', params % dynamo_efield
+       write(6,*) 'potential_model ', params % potential_model
+       write(6,*) 'transport_highlat_lp ', params % transport_highlat_lp
+       write(6,*) 'perp_transport_max_lp ', params % perp_transport_max_lp
+       write(6,*) 'ihepls ', params % ihepls                 
+       write(6,*) 'inpls ', params % inpls                 
+       write(6,*) 'colfac ', params % colfac                
+       write(6,*) 'offset1_deg ', params % offset1_deg           
+       write(6,*) 'offset2_deg ', params % offset2_deg           
+       write(6,*) 'hpeq ', params % hpeq           
+       write(6,*) 'vertical_wind_limit ', params % vertical_wind_limit
+       write(6,*) ''
+       write(6,*) '****************************************************'
+       write(6,*) ''
+    endif
+
   END SUBROUTINE Build_IPE_Model_Parameters
 
 

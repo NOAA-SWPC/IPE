@@ -331,11 +331,11 @@ CONTAINS
 
        if (mpi_layer % rank_id.eq.0) then
        write(6,*) ''
-       write(6,*) '***************************************'
+       write(6,*) '****************************************'
        write(6,899) time_tracker % year, time_tracker % month, time_tracker % day, &       
                     time_tracker % hour, time_tracker % minute
  899   format(' CALLING PLASMA         ', i4,x,i2.2,x,i2.2,2x,i2.2,':'i2.2)
-       write(6,*) '***************************************'
+       write(6,*) '****************************************'
        write(6,*) ''
        endif
 
