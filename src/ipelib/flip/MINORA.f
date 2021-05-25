@@ -153,6 +153,11 @@ C- OUTER LOOP Return here on Non-Convergence with reduced time step
      >        ' *** Problem in band solver ****'
             IF(IABS(IHEPNP).EQ.9) EFLAG(3,2)=-1    !.. Report problem to calling routine
             IF(IABS(IHEPNP).EQ.11) EFLAG(4,2)=-1   !.. Report problem to calling routine
+            !.. Restore density to original input value
+            DO J=JMIN,JMAX
+              IF(IABS(IHEPNP).EQ.9) XIONN(3,J)=NMORIG(1,J)
+              IF(IABS(IHEPNP).EQ.11) XIONN(4,J)=NMORIG(1,J)
+            ENDDO
             RETURN
           ENDIF
 
