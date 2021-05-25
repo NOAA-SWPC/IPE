@@ -930,8 +930,8 @@ CONTAINS
 ! Very rare problem where convection in lp is greater than +-4 - for this case
 ! we set both lp indexes to just lp which means there will be no lp convection
 ! for this tube
-            lp_t0(1) = lp-1
-            lp_t0(2) = lp
+            lp_t0(1) = lp
+            lp_t0(2) = lp+1
           else
 ! The normal situation...
             lp_t0(1) = lp_min-1
@@ -972,14 +972,8 @@ CONTAINS
                 write(6,*) 'GHGM LP_T0 ',mp,lp,v_ExB(1,lp,mp), v_ExB(2,lp,mp)
               endif
 
-          if(i_convection_too_far_in_lp) then
-            write(6,*) 'ghgm comp weight has to be fixed ',mp,lp
-            lp_comp_weight(1) = 1.0
-            lp_comp_weight(2) = 0.0
-          else
             lp_comp_weight(1) =  ( theta_t0 - colat_90km(lp_t0(2)) )/( colat_90km(lp_t0(1))-colat_90km(lp_t0(2)) )
             lp_comp_weight(2) = -( theta_t0 - colat_90km(lp_t0(1)) )/( colat_90km(lp_t0(1))-colat_90km(lp_t0(2)) )
-          endif
 
             DO 300 i = 1, grid % flux_tube_max(lp)
 

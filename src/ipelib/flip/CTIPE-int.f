@@ -667,7 +667,7 @@ C.... Written by P. Richards June-September 2010.
       ENDDO
 
       !.. He+ solution
-      if(mp.eq.1.and.lp.eq.1) write(6,*) 'ihepls ', ihepls
+!     if(mp.eq.1.and.lp.eq.1) write(6,*) 'ihepls ', ihepls
       IF(EFLAG(2,1).EQ.0.AND.IHEPLS.GT.0) THEN
         i_which_call = 1
         CALL heplus_and_nplus(temp_ti_te,DT,DTMIN,9,EFLAG,
@@ -676,7 +676,7 @@ C.... Written by P. Richards June-September 2010.
         if(eflag(3,2).ne.0) write(6,*) 'GHGM He+ 2 ' , mp,lp,eflag(3,2) 
       ENDIF
       !.. N+ solution
-      if(mp.eq.1.and.lp.eq.1) write(6,*) 'inpls ', inpls
+!     if(mp.eq.1.and.lp.eq.1) write(6,*) 'inpls  ', inpls
       IF(EFLAG(2,1).EQ.0.AND.INPLS.GT.0) THEN
         i_which_call = 2
         CALL heplus_and_nplus(temp_ti_te,DT,DTMIN,11,EFLAG,
