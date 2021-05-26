@@ -27,6 +27,8 @@ C.... Cleaned up and commented by P. Richards in April 2000
       DOUBLE PRECISION ZLBHE,ZLBNP         !.. He+ & N+ lower boundary
       DOUBLE PRECISION XMAS,XMASS(9)       !.. Ion mass
       DOUBLE PRECISION NMORIG(2,FLDIM)     !.. Original density at previous time step
+      DOUBLE PRECISION VORIG_Heplus(FLDIM)      !.. Original velocity at previous time step
+      DOUBLE PRECISION VORIG_Nplus(FLDIM)      !.. Original velocity at previous time step
       integer ret
       DATA XMASS/23.4164D-24,26.7616D-24,6.6904D-24,6*0.0/
       DATA NION/1/      ! # species: do not change
@@ -49,11 +51,13 @@ C.... Cleaned up and commented by P. Richards in April 2000
          IF(IABS(IHEPNP).EQ.11) THEN
            N(1,J)=XIONN(4,J)
            N(3,J)=XIONN(5,J)+XIONN(6,J)+XIONN(7,J)+XIONN(8,J)
+           VORIG_Nplus(J) = XIONV(4,J)
          ENDIF
          !... for He+
          IF(IABS(IHEPNP).EQ.9) THEN
            N(1,J)=XIONN(3,J)
            N(3,J)=XIONN(4,J)+XIONN(5,J)+XIONN(6,J)+XIONN(7,J)+XIONN(8,J)
+           VORIG_Heplus(J) = XIONV(3,J)
          ENDIF
          !..store minor ion density to calculate dn/dt
          NMSAVE(1,J)=N(1,J)    !.. density at previous intermediate time step
@@ -155,8 +159,20 @@ C- OUTER LOOP Return here on Non-Convergence with reduced time step
             IF(IABS(IHEPNP).EQ.11) EFLAG(4,2)=-1   !.. Report problem to calling routine
             !.. Restore density to original input value
             DO J=JMIN,JMAX
-              IF(IABS(IHEPNP).EQ.9) XIONN(3,J)=NMORIG(1,J)
-              IF(IABS(IHEPNP).EQ.11) XIONN(4,J)=NMORIG(1,J)
+!             IF(IABS(IHEPNP).EQ.9) XIONN(3,J)=NMORIG(1,J)
+!             IF(IABS(IHEPNP).EQ.11) XIONN(4,J)=NMORIG(1,J)
+            IF(IABS(IHEPNP).EQ.9) then
+              XIONN(3,J)=NMORIG(1,J)
+              XIONV(3,J) = VORIG_Heplus(J) 
+!             XIONN(3,J) = 0.0
+!             XIONV(3,J) = 0.0 
+            endif
+            IF(IABS(IHEPNP).EQ.11) then
+              XIONN(4,J)=NMORIG(1,J)
+              XIONV(4,J) = VORIG_Nplus(J) 
+!             XIONN(4,J) = 0.0
+!             XIONV(4,J) = 0.0 
+            endif
             ENDDO
             RETURN
           ENDIF
@@ -241,8 +257,20 @@ C- OUTER LOOP Return here on Non-Convergence with reduced time step
      >        '  ERR FLAGS MINA',IHEPNP
             !.. Restore density to original input value
             DO J=JMIN,JMAX
-              IF(IABS(IHEPNP).EQ.9) XIONN(3,J)=NMORIG(1,J)
-              IF(IABS(IHEPNP).EQ.11) XIONN(4,J)=NMORIG(1,J)
+!             IF(IABS(IHEPNP).EQ.9) XIONN(3,J)=NMORIG(1,J)
+!             IF(IABS(IHEPNP).EQ.11) XIONN(4,J)=NMORIG(1,J)
+            IF(IABS(IHEPNP).EQ.9) then
+              XIONN(3,J)=NMORIG(1,J)
+              XIONV(3,J) = VORIG_Heplus(J) 
+!             XIONN(3,J) = 0.0
+!             XIONV(3,J) = 0.0 
+            endif
+            IF(IABS(IHEPNP).EQ.11) then
+              XIONN(4,J)=NMORIG(1,J)
+              XIONV(4,J) = VORIG_Nplus(J) 
+!             XIONN(4,J) = 0.0
+!             XIONV(4,J) = 0.0 
+            endif
             ENDDO
             RETURN
           ENDIF 
