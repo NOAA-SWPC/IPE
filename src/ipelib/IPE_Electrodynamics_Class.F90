@@ -52,6 +52,7 @@ IMPLICIT NONE
       PROCEDURE :: Update => Update_IPE_Electrodynamics
       PROCEDURE, PRIVATE :: Empirical_E_Field_Wrapper
       PROCEDURE, PRIVATE :: Dynamo_Wrapper
+      PROCEDURE, PRIVATE :: Dynamo_Wrapper2
       PROCEDURE, PRIVATE :: Regrid_Potential
       PROCEDURE, PRIVATE :: Calculate_Potential_Gradient
       PROCEDURE, PRIVATE :: Calculate_ExB_Velocity
@@ -212,7 +213,9 @@ CONTAINS
 
     IF( dynamo_efield ) THEN
 
-      CALL eldyn % Dynamo_Wrapper(grid, forcing, time_tracker, plasma, &
+!     CALL eldyn % Dynamo_Wrapper(grid, forcing, time_tracker, plasma, &
+!                                 offset1_deg,offset2_deg, potential_model, mpi_layer, rc=localrc )
+      CALL eldyn % Dynamo_Wrapper2(grid, forcing, time_tracker, plasma, &
                                   offset1_deg,offset2_deg, potential_model, mpi_layer, rc=localrc )
       IF ( ipe_error_check(localrc, msg="call to Dynamo_Wrapper failed", &
         line=__LINE__, file=__FILE__, rc=rc) ) RETURN
@@ -911,6 +914,325 @@ CONTAINS
     eldyn % electric_field(2,:,:) = eldyn % electric_potential
 
   END SUBROUTINE Dynamo_Wrapper
+
+  subroutine Dynamo_wrapper2(eldyn, grid, forcing, time_tracker, &
+                             plasma,offset1_deg,offset2_deg,potential_model, mpi_layer, rc)
+
+    use module_init_cons!,only:init_cons
+    use module_init_heelis!,only:init_heelis
+    use module_highlat!,only: highlat
+    use module_sub_dynamo!,only: dynamo
+    use params_module
+    use cons_module
+    use dynamo_module
+    use heelis_module, only:ctpoten
+    use module_magfield
+    use ipe_error_module
+
+    class( ipe_electrodynamics ), intent(inout) :: eldyn
+    type( ipe_forcing ),          intent(in)    :: forcing
+    type( ipe_time ),             intent(in)    :: time_tracker
+    type( ipe_grid ),             intent(in)    :: grid
+    type( ipe_plasma ),           intent(in)    :: plasma
+    type( ipe_mpi_layer ),        intent(in)    :: mpi_layer
+    REAL(prec),                   INTENT(in)    :: offset1_deg,offset2_deg
+    INTEGER,                      INTENT(in)    :: potential_model
+    integer, optional,            intent(out)   :: rc
+
+
+
+   !real(prec) :: work2d(6, 2*grid%nlp, kmlonp1     )
+    real(prec) :: work2d(6, 2*grid%nlp, grid%nmp + 1)
+
+
+   !real(prec) :: ed_conductivities(6, kmlonp1,      kmlat)
+    real(prec) :: ed_conductivities(6, grid%nmp + 1, kmlat)
+    real(prec) :: mlat1d(2*grid%nlp)
+    real(prec) :: mlon1d(  grid%nmp)
+    real(prec) :: w
+
+    integer :: nlp, nmp, nlp2
+    integer    :: year, i, j, k, l
+    integer    :: localrc
+    real(prec) :: fkp
+    real(prec) :: ylatm_deg_map(kmlat)
+    real(prec) :: xlonm_deg_map(0:kmlonp1)
+    real(prec) :: ed1dy_map(0:kmlonp1,kmlat)
+    real(prec) :: ed2dy_map(0:kmlonp1,kmlat)
+
+
+    if ( present( rc ) ) rc = ipe_success
+
+
+    nlp  =     grid%nlp
+    nmp  =     grid%nmp
+    nlp2 = 2 * grid%nlp
+
+
+    ed_conductivities(:,:,:) = 0.0
+
+
+    call init_cons
+
+    sangle = forcing % solarwind_angle ( forcing % current_index )
+    bt     = forcing % solarwind_bt (forcing % current_index )
+    swvel  = forcing % solarwind_velocity (forcing % current_index )
+    swden  = forcing % solarwind_density (forcing % current_index )
+    stilt  = get_tilt(time_tracker%year,time_tracker%month,time_tracker%day,time_tracker%utime)
+    fkp     = forcing % kp ( forcing % current_index )
+    ctpoten = 15.0 + 15.0 * fkp + 0.8 * fkp**2
+
+    year = 2000
+
+    call sunloc( year, time_tracker % day_of_year, time_tracker % utime, sunlons, localrc )
+    if ( ipe_error_check( localrc, msg="call to sunloc failed", line=__line__, file=__file__, rc=rc ) ) return
+
+
+    ! magnetic_longitude start from 'zero', but this is not used
+    do j = 1, grid % nmp
+   !mlon1d(j) = grid % magnetic_longitude(j) * rtd
+   !mlon1d(j) = real((j-1), prec) * dlonm90km
+    mlon1d(j) = real((j-1), prec) * 360.0 / nmp
+    enddo
+
+    ! forming a 1d global mlat: starting from SH
+    ! SH
+    do i = 1, grid % nlp
+    mlat1d(i) = 90.0 - grid % magnetic_colatitude(grid % flux_tube_max(i),i) * rtd
+    enddo
+
+    ! NH
+    do i = 1, grid % nlp
+    k = nlp + (nlp - i + 1)
+    mlat1d(k) = 90.0 - grid % magnetic_colatitude(1,i) * rtd
+    enddo
+
+
+!   if (mpi_layer % rank_id == 0) then
+!      print *, ' mlon1d = ', mlon1d
+!      print *, ' mlat1d = ', mlat1d
+!      print *, ' xlatm_deg', xlatm_deg
+!   endif
+
+
+    ! form a 2d global conductivities: start from SH to NH
+    ! also re-arrange magnetic longitudes: start from -pi to pi
+    ! assume kmlon = grid % nmp: no interpolation
+
+    do j = 1, nmp
+
+    l = j + nmp / 2
+    if (l > nmp + 1) l = l - nmp
+
+    ! SH
+    do i = 1, grid % nlp
+    work2d(:,i,l) = plasma % conductivities(:,2,i,j)
+    enddo
+
+    ! NH
+    do i = 1, grid % nlp
+    k = nlp + (nlp - i + 1)
+    work2d(:,k,l) = plasma % conductivities(:,1,i,j)
+    enddo
+
+    enddo
+
+
+    ! add periodicity in magnetic longitudes
+    do i = 1, nlp2
+    work2d(:, i, 1) = work2d(:,i,nmp+1)
+    enddo
+
+
+
+    ! interploate conductivities from 'plasma' grid to 'dynamo' grid
+
+    do i = 1, kmlat ! from SH -> NH
+
+    ! near the south pole
+    if (xlatm_deg(i) <= mlat1d(1)) then
+
+       do j = 1, nmp+1
+       ed_conductivities(:, j, i) = work2d(:,1,j)
+       enddo
+
+    ! near the north pole
+    else if (xlatm_deg(i) >= mlat1d(nlp2)) then
+
+       do j = 1, nmp+1
+       ed_conductivities(:, j, i) = work2d(:,nlp2,j)
+       enddo
+
+    ! in-between
+    else
+
+       do k = 2, nlp2
+
+       if (mlat1d(k-1) <= xlatm_deg(i) .and. xlatm_deg(i) <= mlat1d(k)) then
+
+          w = (xlatm_deg(i) - mlat1d(k-1)) / (mlat1d(k) - mlat1d(k-1))
+
+          do j = 1, nmp+1
+          ed_conductivities(:, j, i) = (1.0 - w) * work2d(:,k-1,j) + &
+                                       w * work2d(:,k,j)
+          enddo
+
+          exit
+
+       endif
+
+       enddo
+
+    endif
+
+    enddo
+
+    ! add periodicity in magnetic longitudes
+   !do i = 1, kmlat
+   !ed_conductivities(:, nmp+1, i) = ed_conductivities(:, 1, i)
+   !enddo
+
+
+!   if (mpi_layer % rank_id == 0) then
+!      do i = 1, 6
+!      print *, ' plasma cond: ', minval(plasma % conductivities(i,:,:,:)), &
+!                                 maxval(plasma % conductivities(i,:,:,:))
+!      print *, ' work2d cond: ', minval(work2d(i,:,:)), maxval(work2d(i,:,:))
+!      print *, ' dynamo cond: ', minval(ed_conductivities(i,:,:)), &
+!                                 maxval(ed_conductivities(i,:,:))
+!      enddo
+!   endif
+
+
+
+    zigm11     = ed_conductivities(1,:,:)
+    zigm22     = ed_conductivities(2,:,:)
+    zigm2      = ed_conductivities(3,:,:)
+    zigmc      = ed_conductivities(4,:,:)
+    rim(:,:,1) = ed_conductivities(5,:,:)
+    rim(:,:,2) = ed_conductivities(6,:,:)
+
+
+
+! am 10/04 change sign of k_(m lam)^d in the sh- that's what tiegcm dynamo
+! expects
+    do j = 1, kmlath
+    rim(:,j,2) = -rim(:,j,2)
+    enddo
+
+
+
+    call highlat( offset1_deg,offset2_deg, potential_model, rc=localrc )
+    if (ipe_error_check(localrc,msg="call to highlat failed", &
+      line=__LINE__, file=__FILE__, rc=rc)) return
+
+    call dynamo( rc = localrc )
+    if (ipe_error_check(localrc,msg="call to dynamo failed", &
+        line=__line__, file=__file__, rc=rc)) return
+
+
+
+    dlonm = two_pi/float(kmlon)
+
+    do i = 1, kmlonp1
+    xlonm(i)     = -pi + float(i-1)*dlonm
+    xlonm_deg(i) = xlonm(i)*rtd
+    enddo
+
+
+
+    ! global magnetic colatitude: start from SH as in dynamo solver
+    ylatm_deg_map = 90.0 - xlatm_deg
+
+    ! in dynamo solver magnetic longitudes start from -pi to pi
+    ! re-arrange so that magnetic longitude start from 'zero'
+
+   !do j = 1, kmlon
+    do j = 0, kmlon
+
+    l = j + kmlon / 2
+    if (l > kmlon + 1) l = l - kmlon
+
+    xlonm_deg_map(j) = xlonm_deg(l)
+    if (xlonm_deg_map(j) < 0.0) xlonm_deg_map(j) = xlonm_deg_map(j) + 360.0
+
+    ed1dy_map(j,:) = ed1dy(l,:)
+    ed2dy_map(j,:) = ed2dy(l,:)
+
+    enddo
+
+    ! add periodicity in magnetic longitudes
+    xlonm_deg_map(kmlonp1) = 360.0
+
+    ed1dy_map(kmlonp1,:)   = ed1dy(1,:)
+    ed2dy_map(kmlonp1,:)   = ed2dy(1,:)
+
+
+    ! add one more longitude
+    xlonm_deg_map(0) = xlonm_deg_map(1) - dlonm * rtd
+
+   !ed1dy_map(0,:)   = ed1dy(kmlon/2,:)
+   !ed2dy_map(0,:)   = ed2dy(kmlon/2,:)
+
+
+
+!   if (mpi_layer % rank_id == 0) then
+
+!      print *, ' ylatm_deg_map = ', ylatm_deg_map
+!      print *, ' xlonm_deg_map = ', xlonm_deg_map
+
+!      print *, ' ed1dy = ', minval(ed1dy), maxval(ed1dy) 
+!      print *, ' ed1dy = ', ed1dy
+
+!      print *, ' ed1dym= ', minval(ed1dy_map), maxval(ed1dy_map)
+!      print *, ' ed1dym= ', ed1dy_map
+
+!      print *, ' ed2dy = ', minval(ed2dy), maxval(ed2dy) 
+!      print *, ' ed2dy = ', ed2dy
+
+!      print *, ' ed2dym= ', minval(ed2dy_map), maxval(ed2dy_map)
+!      print *, ' ed2dym= ', ed2dy_map
+
+!      write (101) ed1dy
+!      write (101) ed2dy
+!      write (101) ed1dy_map
+!      write (101) ed2dy_map
+
+!   endif
+
+
+    call eldyn % regrid_potential( grid, mpi_layer, time_tracker, ed1dy_map, &
+                 xlonm_deg_map, ylatm_deg_map, 0, kmlonp1, kmlat, rc=localrc )
+
+
+    if ( ipe_error_check( localrc, msg="call to regrid_potential (ed1dy_map) failed", line=__line__, file=__file__, rc=rc ) ) return
+
+
+    eldyn % electric_field(1,:,:) = eldyn % electric_potential
+
+
+    call eldyn % regrid_potential( grid, mpi_layer, time_tracker, ed2dy_map, &
+                 xlonm_deg_map, ylatm_deg_map, 0, kmlonp1, kmlat, rc=localrc )
+
+
+    if ( ipe_error_check( localrc, msg="call to regrid_potential (ed2dy_map) failed", line=__line__, file=__file__, rc=rc ) ) return
+
+
+    eldyn % electric_field(2,:,:) = eldyn % electric_potential
+
+
+
+!      print *, ' eldyn1= ', minval(eldyn % electric_field(1,:,:)), &
+!                            maxval(eldyn % electric_field(1,:,:))
+!      print *, ' eldyn1= ', eldyn % electric_field(1,:,:)
+
+!      print *, ' eldyn2= ', minval(eldyn % electric_field(2,:,:)), &
+!                            maxval(eldyn % electric_field(2,:,:))
+!      print *, ' eldyn2= ', eldyn % electric_field(2,:,:)
+
+
+  end subroutine Dynamo_wrapper2
+                                       
 
         FUNCTION GET_TILT(YEAR,MONTH,DAY,HOUR)  RESULT(get_tilt_angle)
 !
