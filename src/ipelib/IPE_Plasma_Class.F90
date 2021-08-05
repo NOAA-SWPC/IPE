@@ -62,7 +62,7 @@ MODULE IPE_Plasma_Class
   INTEGER, PARAMETER, PRIVATE    :: n_ion_species = 9
   REAL(prec), PARAMETER, PRIVATE :: safe_density_minimum = 1.0e+06_prec
   REAL(prec), PARAMETER, PRIVATE :: safe_temperature_minimum = 100.0_prec
-  REAL(prec), PARAMETER, PRIVATE :: colfac = 1.3_prec
+!  REAL(prec), PARAMETER, PRIVATE :: colfac = 1.3_prec
   REAL(prec), PARAMETER, PRIVATE :: qeoNao10 = 9.6489E7_prec        !  qe/m_e*1000 [C/g]
   REAL(prec), PARAMETER, PRIVATE :: qeomeo10 = 1.7588028E11_prec    ! qe/m_e*1000 [C/g]
   REAL(prec), PARAMETER, PRIVATE :: rmassinv_nop = 1.0_prec / NO_mass ! inverted rmass
@@ -94,8 +94,8 @@ MODULE IPE_Plasma_Class
 
   INTEGER, PARAMETER, PRIVATE    :: n_transport_species    = 4
   REAL(prec), PARAMETER, PRIVATE :: transport_min_altitude = 150000.0_prec
-  INTEGER, PARAMETER , PRIVATE   :: transport_highlat_lp   = 30
-  INTEGER, PARAMETER , PRIVATE   :: perp_transport_max_lp  = 151
+!  INTEGER, PARAMETER , PRIVATE   :: transport_highlat_lp   = 30
+!  INTEGER, PARAMETER , PRIVATE   :: perp_transport_max_lp  = 151
 
   ! :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: !
 
@@ -110,7 +110,7 @@ MODULE IPE_Plasma_Class
   REAL(dp), PARAMETER, PRIVATE :: DTMIN    = 1.0D0
   REAL(dp), PARAMETER, PRIVATE :: FPAS     = 0.0D0
   REAL(dp), PARAMETER, PRIVATE :: HEPRAT   = 9.0D-2
-  REAL(dp), PARAMETER, PRIVATE :: HPEQ     = 0.0D0
+!  REAL(dp), PARAMETER, PRIVATE :: HPEQ     = 0.0D0
   ! IHEPLS,INPLS turn on diffusive solutions if > 0. no solution if 0, chemical equilibrium if < 0
   INTEGER, PARAMETER, PRIVATE  :: IHEPLS   = 1
   INTEGER, PARAMETER, PRIVATE  :: INPLS    = 1
@@ -220,7 +220,8 @@ CONTAINS
   END SUBROUTINE Trash_IPE_Plasma
  
 
-  SUBROUTINE Update_IPE_Plasma( plasma, grid, neutrals, forcing, time_tracker, mpi_layer, v_ExB, time_step, rc )
+  SUBROUTINE Update_IPE_Plasma( plasma, grid, neutrals, forcing, time_tracker, mpi_layer, v_ExB, time_step, colfac, hpeq, &
+                                transport_highlat_lp, perp_transport_max_lp, rc )
     IMPLICIT NONE
     CLASS( IPE_Plasma ),   INTENT(inout) :: plasma
     TYPE( IPE_Grid ),      INTENT(in)    :: grid
@@ -230,6 +231,10 @@ CONTAINS
     TYPE( IPE_MPI_Layer ), INTENT(in)    :: mpi_layer
     REAL(prec),            INTENT(in)    :: v_ExB(1:3,1:grid % NLP,grid % mp_low:grid % mp_high)
     REAL(prec),            INTENT(in)    :: time_step
+    REAL(prec),            INTENT(in)    :: colfac
+    REAL(prec),            INTENT(in)    :: hpeq
+    INTEGER,               INTENT(in)    :: transport_highlat_lp
+    INTEGER,               INTENT(in)    :: perp_transport_max_lp
     INTEGER, OPTIONAL,     INTENT(out)   :: rc
 
     ! Local
@@ -247,7 +252,8 @@ CONTAINS
       IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
       CALL plasma % Test_Transport_Time_step( grid, v_ExB, time_step, mpi_layer, &
-                                              max_transport_convection_ratio_local )
+                                              max_transport_convection_ratio_local, &
+                                              perp_transport_max_lp )
 !     write(6,7999) time_tracker % utime, mpi_layer % rank_id , grid % mp_low, grid % mp_high, max_transport_convection_ratio_local, &
 !                                          v_ExB(1,5:7,grid % mp_low), v_ExB(2,5:7,grid % mp_high)     
 !7999 format('GHGM convect ratio ', f7.1, 3i4 , f12.1, 6e10.2)
@@ -308,7 +314,9 @@ CONTAINS
 
 #endif
 
-        CALL plasma % Cross_Flux_Tube_Transport( grid, v_ExB, transport_time_step2, mpi_layer, localrc )
+        CALL plasma % Cross_Flux_Tube_Transport( grid, v_ExB, transport_time_step2, &
+                                                 transport_highlat_lp,perp_transport_max_lp, &
+                                                 mpi_layer, localrc )
         IF ( ipe_error_check( localrc, msg="call to Cross_Flux_Tube_Transport failed", &
           line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
@@ -329,10 +337,10 @@ CONTAINS
                                   neutrals,     &
                                   forcing,      &
                                   time_tracker, &
-                                  time_step,nflag_t,nflag_d )
+                                  time_step, colfac, hpeq, nflag_t,nflag_d )
 
       !TWFANG, calculate field line integrals for dynamo solver
-      CALL plasma % Calculate_Field_Line_Integrals(grid, neutrals, mpi_layer)
+      CALL plasma % Calculate_Field_Line_Integrals(grid, neutrals, colfac, mpi_layer)
 
   END SUBROUTINE Update_IPE_Plasma
 
@@ -707,13 +715,14 @@ CONTAINS
 
 
   SUBROUTINE Test_Transport_Time_step( plasma, grid, v_ExB, time_step, mpi_layer, &
-                                       max_transport_convection_ratio )
+                                       max_transport_convection_ratio, perp_transport_max_lp )          
     IMPLICIT NONE
     CLASS( IPE_Plasma ), INTENT(inout) :: plasma
     TYPE( IPE_Grid ), INTENT(in)       :: grid
     REAL(prec), INTENT(in)             :: v_ExB(1:3,1:grid % NLP, grid % mp_low:grid % mp_high)
     REAL(prec), INTENT(in)             :: time_step
     TYPE( IPE_MPI_Layer ), INTENT(in)  :: mpi_layer
+    INTEGER, INTENT(in)                :: perp_transport_max_lp
     ! Local
     REAL(prec) :: colat_90km(1:grid % NLP)
     REAL(prec) :: phi_t0 !magnetic longitude,phi[rad] at t0(previous time step)
@@ -721,9 +730,11 @@ CONTAINS
     REAL(prec) :: coslam, sinim
     INTEGER    :: mp, lp, i, lpx, mpx, jth
     REAL(prec), PARAMETER :: rad_to_deg = 57.295779513
-    REAL(prec) :: transport_convection_ratio(1:perp_transport_max_lp, grid % mp_low:grid % mp_high)
+    REAL(prec) :: transport_convection_ratio(1:grid % NLP, grid % mp_low:grid % mp_high)
     REAL(prec) :: max_transport_convection_ratio
     REAL(prec) :: longitude_spacing, r
+
+    transport_convection_ratio = 0.0_prec
 
       colat_90km(1:grid % NLP) = grid % magnetic_colatitude(1,1:grid % NLP)
       r = earth_radius + 90000.0_prec
@@ -748,13 +759,16 @@ CONTAINS
   END SUBROUTINE Test_Transport_Time_step
 
 
-  SUBROUTINE Cross_Flux_Tube_Transport( plasma, grid, v_ExB, time_step, mpi_layer, rc )
+  SUBROUTINE Cross_Flux_Tube_Transport( plasma, grid, v_ExB, time_step, &
+                                        transport_highlat_lp,perp_transport_max_lp, mpi_layer, rc )  
     IMPLICIT NONE
     CLASS( IPE_Plasma ),   INTENT(inout) :: plasma
     TYPE( IPE_Grid ),      INTENT(in)    :: grid
     REAL(prec),            INTENT(in)    :: v_ExB(1:3,1:grid % NLP, grid % mp_low:grid % mp_high)
     REAL(prec),            INTENT(in)    :: time_step
     TYPE( IPE_MPI_Layer ), INTENT(in)    :: mpi_layer
+    INTEGER,               INTENT(in)    :: transport_highlat_lp
+    INTEGER,               INTENT(in)    :: perp_transport_max_lp
     INTEGER,               INTENT(out)   :: rc
     ! Local
     INTEGER, PARAMETER :: n_conv_spec = 4   ! number of ions for ExB convection ( = 4)
@@ -1347,8 +1361,7 @@ CONTAINS
   END SUBROUTINE Auroral_Precipitation
 
 
-  SUBROUTINE FLIP_Wrapper( plasma, grid, neutrals, forcing, time_tracker, flip_time_step, &
-    nflag_t,nflag_d )
+  SUBROUTINE FLIP_Wrapper( plasma, grid, neutrals, forcing, time_tracker, flip_time_step, colfac, hpeq, nflag_t, nflag_d )
     IMPLICIT NONE
     CLASS( IPE_Plasma ), INTENT(inout) :: plasma
     TYPE( IPE_Grid ), INTENT(in)       :: grid
@@ -1356,6 +1369,8 @@ CONTAINS
     TYPE( IPE_Forcing ), INTENT(in)    :: forcing
     TYPE( IPE_Time ), INTENT(in)       :: time_tracker
     REAL(prec), INTENT(in)             :: flip_time_step
+    REAL(prec), INTENT(in)             :: colfac
+    REAL(prec), INTENT(in)             :: hpeq
     ! Local
     INTEGER  :: i, lp, mp, iprint, ii
     INTEGER  :: JMINX, JMAXX
@@ -1388,6 +1403,7 @@ CONTAINS
     REAL(dp) :: dotprod, sini
     REAL(sp) :: F107D, F107A
     CHARACTER(len=95) :: ERRMSG
+    CHARACTER(len=10) :: mp_lp_string
     LOGICAL, EXTERNAL :: CTIP_CHECK_EFLAG
 
       F107D = forcing % f107( forcing % current_index )
@@ -1515,16 +1531,19 @@ CONTAINS
                         NHEAT(1:JMAXX), & !.. OUT: array, Neutral heating rate (eV/cm^3/s)
                         EFLAG,mp,lp,nflag_t(lp,mp),nflag_d(lp,mp) ) !.. OUT: 2D array, Error Flags
 
-          IF ( CTIP_CHECK_EFLAG( ERRMSG, EFLAG ) ) CALL ipe_warning_log( msg=ERRMSG, line=__LINE__, file=__FILE__ )
+          IF ( CTIP_CHECK_EFLAG( ERRMSG, EFLAG ) ) THEN
+            write(mp_lp_string,"(2i4)") mp,lp
+            CALL ipe_warning_log( msg=trim(ERRMSG)//trim(mp_lp_string), line=__LINE__, file=__FILE__ )
+          ENDIF
 
           DO i=1, grid % flux_tube_max(lp)
 
             ! Ion Densities
             plasma % ion_densities(1:9,i,lp,mp) = XIONNX(1:9,i)
             ! Electron Density
-            plasma % electron_density(i,lp,mp) = XIONNX(1,i) + XIONNX(2,i) + XIONNX(3,i) + XIONNX(4,i) + XIONNX(5,i) + XIONNX(6,i) + XIONNX(7,i) + XIONNX(8,i) + XIONNX(9,i)
+!           plasma % electron_density(i,lp,mp) = XIONNX(1,i) + XIONNX(2,i) + XIONNX(3,i) + XIONNX(4,i) + XIONNX(5,i) + XIONNX(6,i) + XIONNX(7,i) + XIONNX(8,i) + XIONNX(9,i)
 ! Just make electron density be Oplus + Hplus for now
-!           plasma % electron_density(i,lp,mp) = XIONNX(1,i) + XIONNX(2,i)
+            plasma % electron_density(i,lp,mp) = XIONNX(1,i) + XIONNX(2,i)
             ! Along Flux Tube Ion Velocities
             plasma % ion_velocities(1:9,i,lp,mp) = XIONVX(1:9,i)
 
@@ -1591,7 +1610,7 @@ CONTAINS
   END FUNCTION Solar_Zenith_Angle
 
 
-  SUBROUTINE Calculate_Field_Line_Integrals( plasma, grid, neutrals, mpi_layer )
+  SUBROUTINE Calculate_Field_Line_Integrals( plasma, grid, neutrals, colfac, mpi_layer )
 
 
     ! this routine takes in the plasma, grid, and neutral fields and returns the six conductivities on IPE
@@ -1601,6 +1620,7 @@ CONTAINS
     CLASS( IPE_Plasma ), INTENT(inout)  :: plasma
     TYPE( IPE_Grid ), INTENT(in)        :: grid
     TYPE( IPE_Neutrals ), INTENT(in)    :: neutrals
+    REAL(prec),            INTENT(in)   :: colfac
     TYPE( IPE_MPI_Layer ), INTENT(in)   :: mpi_layer
     ! Local
     INTEGER    :: i, ihem, istart, istop, istep, mp, lp
@@ -1703,7 +1723,7 @@ CONTAINS
                                  effective_temp,                          &
                                  neutrals % temperature(i,lp,mp),         &
                                  grid % magnetic_field_strength(i,lp,mp), &
-                                 rnu_o2p,rnu_op,rnu_nop,rnu_ne)
+                                 rnu_o2p,rnu_op,rnu_nop,rnu_ne,colfac)
 
 !! get pedersen & hall conductivities
 !! more ion spieces can be added for calculating electron density
@@ -1844,9 +1864,9 @@ CONTAINS
   END SUBROUTINE Calculate_Field_Line_Integrals
 
 
-  SUBROUTINE calc_collfreq(o1_cm3,o2_cm3,n2_cm3,tnti,tn,apex_Bmag,rnu_o2p,rnu_op,rnu_nop,rnu_ne)
+  SUBROUTINE calc_collfreq(o1_cm3,o2_cm3,n2_cm3,tnti,tn,apex_Bmag,rnu_o2p,rnu_op,rnu_nop,rnu_ne,colfac)
       IMPLICIT NONE
-      REAL(prec), INTENT(in)::o1_cm3,o2_cm3,n2_cm3,tnti,tn,apex_Bmag
+      REAL(prec), INTENT(in)::o1_cm3,o2_cm3,n2_cm3,tnti,tn,apex_Bmag,colfac
       REAL(prec), INTENT(out):: rnu_o2p,rnu_op,rnu_nop,rnu_ne
 
 ! local

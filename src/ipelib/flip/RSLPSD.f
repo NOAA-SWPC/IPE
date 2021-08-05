@@ -109,10 +109,18 @@ C*** OUTER LOOP: Return here on Non-Convergence with reduced time step
         MIT=JBNS-JBNN+1       !.. Number of points on field line
         IEQ=2*(MIT-2)         !.. Number of equations to set up      
 !dbg20120304:
-      if ( IEQ<=2 ) then
-        STOP 'STOP! sub-DLOOPS:MIT'
-      end if
-
+        if ( IEQ<=2 ) then
+!    STOP 'STOP! sub-DLOOPS:MIT'
+!-- Restore densities and velocities to original saved values.
+          write(6,*) 'WARNING previous: STOP! sub-DLOOPS:MIT ', mp, lp
+          DO J=JMIN,JMAX
+            N(1,J)=NORIG(1,J)
+            N(2,J)=NORIG(2,J)
+            XIONV(1,J)=VORIG(1,J)
+            XIONV(2,J)=VORIG(2,J)
+          ENDDO
+          return
+        end if
         !.. Main loop: On each iteration the Jacobian is formed and solved for
         !.. the increments of to add to N. 
         DO ITER=1,20

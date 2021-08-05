@@ -191,7 +191,7 @@ CONTAINS
   END SUBROUTINE Trash_IPE_Neutrals
 
 
-  SUBROUTINE Update_IPE_Neutrals( neutrals, params, grid, time, forcing, mpi_layer, rc )
+  SUBROUTINE Update_IPE_Neutrals( neutrals, params, grid, time, forcing, mpi_layer, vertical_wind_limit, rc )
 
     CLASS( IPE_Neutrals         ), INTENT(inout) :: neutrals
     TYPE ( IPE_Model_Parameters ), INTENT(in   ) :: params
@@ -199,6 +199,8 @@ CONTAINS
     TYPE ( IPE_Time             ), INTENT(in   ) :: time
     TYPE ( IPE_Forcing          ), INTENT(in   ) :: forcing
     TYPE ( IPE_MPI_Layer        ), INTENT(in   ) :: mpi_layer
+    REAL ( prec ),                 INTENT(in   ) :: vertical_wind_limit
+
     INTEGER, OPTIONAL,             INTENT(out  ) :: rc
 
     ! Local
@@ -217,7 +219,7 @@ CONTAINS
 
     CALL neutrals % IPE_Neutrals_Extrapolate( grid, forcing )
 
-    CALL neutrals % Geographic_to_Apex_Velocity( grid )
+    CALL neutrals % Geographic_to_Apex_Velocity( grid, vertical_wind_limit )
 
   END SUBROUTINE Update_IPE_Neutrals
 
@@ -426,17 +428,18 @@ CONTAINS
   END SUBROUTINE IPE_Neutrals_Empirical
 
 
-  SUBROUTINE Geographic_to_Apex_Velocity( neutrals, grid )
+  SUBROUTINE Geographic_to_Apex_Velocity( neutrals, grid, vertical_wind_limit )
 
     IMPLICIT NONE
 
     CLASS( IPE_Neutrals ), INTENT(inout) :: neutrals
     TYPE( IPE_Grid ),      INTENT(in)    :: grid
+    REAL(prec), INTENT(in) :: vertical_wind_limit
 
     ! Local
     INTEGER    :: i_D_vec, kp, lp, mp
     REAL(prec) :: dotprod
-
+    REAL(prec) :: neutral_vertical_velocity
 
     DO mp = grid % mp_low, grid % mp_high
       DO lp = 1, grid % NLP
@@ -450,10 +453,18 @@ CONTAINS
 
              IF ( dotprod > 0.0_prec ) THEN
 
+               if (neutrals % velocity_geographic(3,kp,lp,mp).gt.vertical_wind_limit) then
+                 neutral_vertical_velocity = vertical_wind_limit
+               else if (neutrals % velocity_geographic(3,kp,lp,mp).lt.0.0 - vertical_wind_limit) then
+                 neutral_vertical_velocity = 0.0 - vertical_wind_limit
+               else
+                 neutral_vertical_velocity = neutrals % velocity_geographic(3,kp,lp,mp)
+               endif
+
                neutrals % velocity_apex(i_D_vec,kp,lp,mp) = &
                  ( grid % apex_d_vectors(1,i_D_vec,kp,lp,mp)*neutrals % velocity_geographic(1,kp,lp,mp) + &
                    grid % apex_d_vectors(2,i_D_vec,kp,lp,mp)*neutrals % velocity_geographic(2,kp,lp,mp) + &
-                   grid % apex_d_vectors(3,i_D_vec,kp,lp,mp)*neutrals % velocity_geographic(3,kp,lp,mp) ) &
+                   grid % apex_d_vectors(3,i_D_vec,kp,lp,mp)*neutral_vertical_velocity ) &
                  / SQRT( dotprod )
 
              ELSE

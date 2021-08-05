@@ -61,9 +61,6 @@ CONTAINS
       RETURN
     ENDIF
 
-    ! Set IPE run mode to coupled
-    ipe % forcing % coupled = .true.
-
     ! Set IPE internal clock
     CALL ESMF_ClockGet(clock, startTime=startTime, currTime=currTime, rc=localrc)
     IF( ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -76,6 +73,9 @@ CONTAINS
       line=__LINE__, &
       FILE=__FILE__, &
       rcToReturn=rc) ) RETURN  ! bail out
+
+    ! Set IPE run mode to coupled
+    ipe % forcing % coupled = .true.
 
     init_file = "IPE_State.apex."//ipe % time_tracker % DateStamp( )//".h5"
     INQUIRE( FILE = TRIM(init_file), EXIST = file_exists, IOSTAT = localrc )
