@@ -92,11 +92,13 @@
         call init_heelis
         call colath(offset1_deg,offset2_deg)
       else  !  0 - potential_model='NONE'
+      print *,'FANG, no high lat'
         do j=1,kmlat0
           do i=1,kmlonp1
             phihm(i,j) = 0.
           enddo ! i=1,kmlonp1
         enddo ! j=1,kmlat0
+        call init_heelis
         call colath(offset1_deg,offset2_deg)
       endif
       

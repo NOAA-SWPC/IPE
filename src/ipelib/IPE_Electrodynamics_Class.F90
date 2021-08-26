@@ -58,6 +58,7 @@ IMPLICIT NONE
       PROCEDURE, PRIVATE :: Empirical_E_Field_Wrapper
       PROCEDURE, PRIVATE :: Dynamo_Wrapper
       PROCEDURE, PRIVATE :: Regrid_Potential
+      PROCEDURE, PRIVATE :: Regrid_Potential_new
       PROCEDURE, PRIVATE :: Calculate_Potential_Gradient
       PROCEDURE, PRIVATE :: Calculate_ExB_Velocity
 
@@ -289,15 +290,15 @@ CONTAINS
 
     longitude_updated=geospace_longitude(1:n_lon_geospace-1)
   
-    IF( mpi_layer % rank_id == 0 )THEN
-    print *,'potential_local',Maxval(potential_local),minval(potential_local)
-    print *,'colat',colat_local
-    ENDIF 
+!   IF( mpi_layer % rank_id == 0 )THEN
+!   print *,'potential_local',Maxval(potential_local),minval(potential_local)
+!   print *,'colat',colat_local
+!   ENDIF 
 
 
 
 !    CALL eldyn % Regrid_Potential(grid,mpi_layer,time_tracker,potential_local,geospace_longitude,colat_local,1,n_lon_geospace,n_lat_geospace, rc=localrc )
-     CALL eldyn % Regrid_Potential(grid,mpi_layer,time_tracker,potential_updated,longitude_updated,colat_local,1,n_lon_geospace-1,n_lat_geospace, rc=localrc )
+     CALL eldyn % Regrid_Potential_new(grid,mpi_layer,time_tracker,potential_updated,longitude_updated,colat_local,1,n_lon_geospace-1,n_lat_geospace, rc=localrc )
 
   END SUBROUTINE Interpolate_Geospace_to_MHDpotential
 
@@ -358,7 +359,7 @@ CONTAINS
 !    print *,'in dynamo,',time_tracker % month, time_tracker % day, &
 !          time_tracker % hour, time_tracker % minute 
 !    ENDIF
-     filename='../wam_potentials/potential_SMG_20150317_000000.h5'
+     filename='../wam_potentials/potential_SMG_20150315_000000.h5'
       write(filename(39:40),'(i2.2)') time_tracker % day
       write(filename(42:43),'(i2.2)') time_tracker % hour
       write(filename(44:45),'(i2.2)') time_tracker % minute
@@ -561,8 +562,236 @@ CONTAINS
 
   END SUBROUTINE Calculate_Potential_Gradient
 
-
   SUBROUTINE Regrid_Potential( eldyn, grid, mpi_layer, time_tracker, potential, mlt, colat, start_index, nlon, nlat, rc )
+  ! This subroutine regrids electric potential from a structured grid
+  ! on (magnetic local time, magnetic colatitude) to IPE's grid.
+  !
+  ! Input :
+  !
+  !   grid
+  !
+  !   time_tracker
+  !
+  !   potential
+  !
+  !   mlt - magnetic local time [ deg ]
+  !
+  !   colat - magnetic colatitude [ deg ]
+  !
+  !   start_index - starting index for the potential, mlt, and colat arrays
+  !
+  !   nlon - last index in the longitude direction
+  !
+  !   nlat - last index in the latitude direction
+  !
+    CLASS( IPE_Electrodynamics ), INTENT(inout) :: eldyn
+    TYPE( IPE_Grid ),             INTENT(in)    :: grid
+    TYPE( IPE_MPI_Layer ),        INTENT(in)    :: mpi_layer
+    TYPE( IPE_Time ),             INTENT(in)    :: time_tracker
+    INTEGER,                      INTENT(in)    :: start_index, nlon, nlat
+    REAL(prec),                   INTENT(in)    :: potential(start_index:nlon,start_index:nlat)
+    REAL(prec),                   INTENT(in)    :: mlt(start_index:nlon)
+    REAL(prec),                   INTENT(in)    :: colat(start_index:nlat)
+    INTEGER, OPTIONAL,            INTENT(out)   :: rc
+
+    ! Local
+    INTEGER :: mp, lp, i, j, i1, i2, j1, j2, ii, localrc
+    INTEGER :: ilat(1:grid % NLP), jlon(grid % mp_low - grid % mp_halo:grid % mp_high+grid % mp_halo)
+    REAL(prec) :: lat, lon, dlon, difflon, mindiff
+    REAL(prec) :: lat_weight(1:2), lon_weight(1:2)
+    REAL(prec) :: mlon90_rad(start_index:nlon)
+    REAL(prec) :: mlat90_rad(start_index:nlat)
+
+    IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
+
+    IF( dynamo_efield ) THEN
+      mlon90_rad = dtr * mlt
+      mlat90_rad = dtr * colat
+    ELSE
+      mlon90_rad = MLT_to_MagneticLongitude( mlt, 1999, time_tracker % day_of_year, time_tracker % utime, &
+                                             start_index, nlon, rc=localrc )
+      IF ( ipe_error_check( localrc, msg="call to MLT_to_MagneticLongitude failed", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+      mlat90_rad = dtr * colat
+    ENDIF
+
+
+    ! Search for nearest grid points in the magnetic longitude/latitude grid
+    DO mp = grid % mp_low - grid % mp_halo, grid % mp_high + grid % mp_halo
+      lon = grid % magnetic_longitude(mp)
+
+
+      ! Note that the mlon90_rad(j) array is not monotonically increasing
+      ! with index j. This happens because the empirical model provides data
+      ! on the MLT grid so that magnetic longitude=0 may not occur at j=0.
+      ! Instead, magnetic longitude =0 may occur at any index in mlon90_rad.
+      ! Because of this, we have to perform a full search of the array
+
+      ! Initial condition for the minimum difference is something absurd that
+      ! is guaranteed to be larger than the differences calculated.
+      mindiff = 1000.0_prec
+      DO j = start_index, nlon
+        difflon = ABS( mlon90_rad(j) - lon )
+
+        IF( difflon < mindiff )THEN
+          jlon(mp) = j
+          mindiff = difflon
+        ENDIF
+
+      ENDDO
+
+    ENDDO
+
+    DO lp = 1, grid % NLP
+
+      lat = grid % magnetic_colatitude(1,lp)
+      ! colatitude decreases with increasing lp
+      ilat(lp) = nlat
+      DO i = start_index, nlat
+
+        ! Need to pass in colatitude through the call stack (theta90_rad ->
+        ! colatitude )
+        IF( mlat90_rad(i) < lat )THEN
+          ilat(lp) = i
+
+          EXIT
+        ENDIF
+
+      ENDDO
+
+    ENDDO
+
+    DO mp = grid % mp_low - grid % mp_halo, grid % mp_high + grid % mp_halo
+      DO lp = 1, grid % NLP
+
+        lat = grid % magnetic_colatitude(1,lp)
+        lon = grid % magnetic_longitude(mp)
+
+        IF( ilat(lp) == start_index )THEN
+
+          i1 = ilat(lp)
+          i2 = ilat(lp)
+          lat_weight(1) = 1.0_prec
+          lat_weight(2) = 0.0_prec
+
+        ELSE
+
+          i1 = ilat(lp)-1
+          i2 = ilat(lp)
+          lat_weight(1) =  ( lat - mlat90_rad(i2) )/( mlat90_rad(i1) - mlat90_rad(i2) )
+          lat_weight(2) = -( lat - mlat90_rad(i1) )/( mlat90_rad(i1) - mlat90_rad(i2) )
+
+        ENDIF
+
+
+        IF( jlon(mp) == start_index )THEN
+
+          IF( lon > mlon90_rad(jlon(mp)) ) THEN
+
+            ! In this case, the nearest empricial grid point is the first index
+            ! and is to the left of the IPE grid point. The indices bounding
+            ! the IPE grid point are jlon(mp) and jlon(mp)+1
+
+            j1 = start_index
+            j2 = start_index+1
+
+          ELSE
+
+            ! In this case the first longitude point on the empirical model grid
+            ! is greater than the mp-longitude point on the IPE grid. Here, the
+            ! bounding points are at empirical longitude points start_index and nlon
+
+            j1 = nlon
+            j2 = start_index
+
+          ENDIF
+
+
+        ELSEIF( jlon(mp) == nlon )THEN
+
+          IF( lon > mlon90_rad(jlon(mp)) ) THEN
+
+            ! In this case the first longitude point on the empirical model grid
+            ! is greater than the mp-longitude point on the IPE grid. Here, the
+            ! bounding points are at empirical longitude points start_index and nlon
+
+            j1 = nlon
+!           j2 = start_index
+! GHGM - this special case:
+            j2 = start_index + 1
+! GHGM
+
+          ELSE
+
+            j1 = nlon-1
+            j2 = nlon
+
+          ENDIF
+
+        ELSE
+
+          ! In this case, the IPE longitude point is interior to the empirical
+          ! model grid. The point we found (associated with jlon(mp)) is
+          ! greater than the IPE longitude point. Because of this, the bounding
+          ! points are at [jlon(mp)-1] and at [jlon(mp)].
+
+          IF( lon > mlon90_rad(jlon(mp)) ) THEN
+
+            ! In this case the first longitude point on the empirical model grid
+            ! is greater than the mp-longitude point on the IPE grid. Here, the
+            ! bounding points are at empirical longitude points start_index and nlon
+
+            j1 = jlon(mp)
+            j2 = jlon(mp)+1
+
+          ELSE
+
+            j1 = jlon(mp)-1
+            j2 = jlon(mp)
+
+          ENDIF
+
+        ENDIF
+
+        dlon = mlon90_rad(j1) - mlon90_rad(j2)
+!       IF( dlon > 0.0_prec )THEN
+! GHGM .ge. (I think)
+        IF( dlon.ge.0.0_prec )THEN
+
+          dlon = dlon - two_pi
+
+          IF( mp <= 1 )THEN
+
+            lon_weight(1) =  ( lon - mlon90_rad(j2) )/dlon
+            lon_weight(2) = -( lon - (mlon90_rad(j1)-two_pi) )/dlon
+
+          ELSEIF( mp >= grid % NMP )THEN
+
+            lon_weight(1) =  ( lon - (mlon90_rad(j2)+two_pi) )/dlon
+            lon_weight(2) = -( lon - mlon90_rad(j1) )/dlon
+
+          ENDIF
+
+        ELSE
+
+          lon_weight(1) =  ( lon - mlon90_rad(j2) )/dlon
+          lon_weight(2) = -( lon - mlon90_rad(j1) )/dlon
+
+        ENDIF
+
+        eldyn % electric_potential(lp,mp) = ( potential(j1,i1)*lat_weight(1)*lon_weight(1) +&
+                                              potential(j2,i1)*lat_weight(1)*lon_weight(2) +&
+                                              potential(j1,i2)*lat_weight(2)*lon_weight(1) +&
+                                              potential(j2,i2)*lat_weight(2)*lon_weight(2) )
+
+      ENDDO
+    ENDDO
+
+  END SUBROUTINE Regrid_Potential
+
+                                                                   
+
+  SUBROUTINE Regrid_Potential_new( eldyn, grid, mpi_layer, time_tracker, potential, mlt, colat, start_index, nlon, nlat, rc )
   ! This subroutine regrids electric potential from a structured grid
   ! on (magnetic local time, magnetic colatitude) to IPE's grid.
   !
@@ -855,7 +1084,7 @@ CONTAINS
      write(2000 + mpi_layer % rank_id, *) eldyn % electric_potential2
 
 
-  END SUBROUTINE Regrid_Potential
+  END SUBROUTINE Regrid_Potential_new
 
 
   FUNCTION MLT_to_MagneticLongitude( mlt, year, day_of_year, utime, start_index, nlon, rc ) RESULT( mag_longitude )
