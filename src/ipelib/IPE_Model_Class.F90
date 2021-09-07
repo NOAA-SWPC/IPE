@@ -200,7 +200,7 @@ CONTAINS
       call ipe % forcing % Update_Current_Index( ipe % parameters, &
                                                  ipe % time_tracker % elapsed_sec, &
                                                  rc = localrc )
-      IF ( ipe_error_check( localrc, msg="Failed to update neutrals", &
+      IF ( ipe_error_check( localrc, msg="Failed to update current index", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
       CALL ipe % neutrals % Update( ipe % parameters, &
