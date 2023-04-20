@@ -261,6 +261,8 @@ CONTAINS
     ! Local
     INTEGER :: localrc
 
+    rc = IPE_SUCCESS
+
     forcing % current_index = INT( deltime / real(params % f107_kp_interval) ) + &
                                       1 + params % f107_kp_skip_size
 
