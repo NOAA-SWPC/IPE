@@ -229,7 +229,7 @@ CONTAINS
     TYPE( IPE_Forcing ),   INTENT(in)    :: forcing
     TYPE( IPE_Time ),      INTENT(in)    :: time_tracker
     TYPE( IPE_MPI_Layer ), INTENT(in)    :: mpi_layer
-    REAL(prec),            INTENT(in)    :: v_ExB(1:3,1:grid % NLP,grid % mp_low:grid % mp_high)
+    REAL(prec),            INTENT(in)    :: v_ExB(1:3,1:grid % NLP,grid % mp_low:grid % mp_high,2) ! am2023.04 add hemisphere
     REAL(prec),            INTENT(in)    :: time_step
     REAL(prec),            INTENT(in)    :: colfac
     REAL(prec),            INTENT(in)    :: hpeq
@@ -255,7 +255,7 @@ CONTAINS
                                               max_transport_convection_ratio_local, &
                                               perp_transport_max_lp )
 !     write(6,7999) time_tracker % utime, mpi_layer % rank_id , grid % mp_low, grid % mp_high, max_transport_convection_ratio_local, &
-!                                          v_ExB(1,5:7,grid % mp_low), v_ExB(2,5:7,grid % mp_high)     
+!                                          v_ExB(1,5:7,grid % mp_low,1), v_ExB(2,5:7,grid % mp_high,1)     
 !7999 format('GHGM convect ratio ', f7.1, 3i4 , f12.1, 6e10.2)
 
 #ifdef HAVE_MPI
@@ -338,9 +338,17 @@ CONTAINS
                                   forcing,      &
                                   time_tracker, &
                                   time_step, colfac, hpeq, nflag_t,nflag_d )
-
+       
+!       write(6,890) time_tracker % year, time_tracker % month, time_tracker % day, &       
+!                    time_tracker % hour, time_tracker % minute,mpi_layer % rank_id
+! 890   format('Calling Field_line         ', i4,x,i2.2,x,i2.2,2x,i2.2,':'i2.2,x,i3)
+ 
       !TWFANG, calculate field line integrals for dynamo solver
       CALL plasma % Calculate_Field_Line_Integrals(grid, neutrals, colfac, mpi_layer)
+      
+!       write(6,880) time_tracker % year, time_tracker % month, time_tracker % day, &       
+!                    time_tracker % hour, time_tracker % minute,mpi_layer % rank_id
+! 880   format('After Field_line         ', i4,x,i2.2,x,i2.2,2x,i2.2,':'i2.22,x,i3)
 
   END SUBROUTINE Update_IPE_Plasma
 
@@ -719,7 +727,7 @@ CONTAINS
     IMPLICIT NONE
     CLASS( IPE_Plasma ), INTENT(inout) :: plasma
     TYPE( IPE_Grid ), INTENT(in)       :: grid
-    REAL(prec), INTENT(in)             :: v_ExB(1:3,1:grid % NLP, grid % mp_low:grid % mp_high)
+    REAL(prec), INTENT(in)             :: v_ExB(1:3,1:grid % NLP, grid % mp_low:grid % mp_high,2) ! am2023.04 add hemisphere
     REAL(prec), INTENT(in)             :: time_step
     TYPE( IPE_MPI_Layer ), INTENT(in)  :: mpi_layer
     INTEGER, INTENT(in)                :: perp_transport_max_lp
@@ -728,11 +736,11 @@ CONTAINS
     REAL(prec) :: phi_t0 !magnetic longitude,phi[rad] at t0(previous time step)
     REAL(prec) :: theta_t0 !magnetic latitude,theta[rad] at t0
     REAL(prec) :: coslam, sinim
-    INTEGER    :: mp, lp, i, lpx, mpx, jth
+    INTEGER    :: mp, lp, i, lpx, mpx, jth, ih  ! am2023.04 add hemisphere
     REAL(prec), PARAMETER :: rad_to_deg = 57.295779513
     REAL(prec) :: transport_convection_ratio(1:grid % NLP, grid % mp_low:grid % mp_high)
     REAL(prec) :: max_transport_convection_ratio
-    REAL(prec) :: longitude_spacing, r
+    REAL(prec) :: longitude_spacing, r, v_exb_ns
 
     transport_convection_ratio = 0.0_prec
 
@@ -740,14 +748,18 @@ CONTAINS
       r = earth_radius + 90000.0_prec
       longitude_spacing = 360.0_prec / REAL( plasma % NMP )
 
-!     write(7000 + mpi_layer % rank_id, *) 'mp_low mp_high ', plasma % mp_low, plasma % mp_high
-
+     !write(7000 + mpi_layer % rank_id, *) 'mp_low mp_high ', plasma % mp_low, plasma % mp_high
+     !write(7000 + mpi_layer % rank_id, *) 'perp_transport_max_lp ', perp_transport_max_lp
+     !write(7000 + mpi_layer % rank_id, *) 'grid % NLP',grid % NLP, grid % nFluxTube
+     
       DO 100 mp = plasma % mp_low, plasma % mp_high
         DO 200 lp = 1, perp_transport_max_lp
+          v_exb_ns = 0.5*(v_ExB(1,lp,mp,1)+v_ExB(1,lp,mp,2))  ! am2023.04 average of both hemispheres
+           !write(7000 + mpi_layer % rank_id, *) 'colat_90km(lp) ', lp, colat_90km(lp),grid % altitude(1,lp)
 
-
-          transport_convection_ratio(lp,mp) = (abs(v_ExB(1,lp,mp)*time_step/(r*sin( colat_90km(lp)))) * rad_to_deg) / longitude_spacing
-!         write(7000 + mpi_layer % rank_id, *) mp , lp , transport_convection_ratio(lp,mp)
+          transport_convection_ratio(lp,mp) = (abs(v_exb_ns)*abs(time_step/(r*sin( colat_90km(lp)))) * rad_to_deg) / longitude_spacing ! am2023.04
+!          transport_convection_ratio(lp,mp) = (v_ExB(1,lp,mp,1)*abs(*time_step/(r*sin( colat_90km(lp)))) * rad_to_deg) / longitude_spacing ! am2023.04
+           ! write(7000 + mpi_layer % rank_id, *) 'transport_convection_ratio', mp , lp , transport_convection_ratio(lp,mp)
 
  200    CONTINUE
  100  CONTINUE
@@ -764,7 +776,7 @@ CONTAINS
     IMPLICIT NONE
     CLASS( IPE_Plasma ),   INTENT(inout) :: plasma
     TYPE( IPE_Grid ),      INTENT(in)    :: grid
-    REAL(prec),            INTENT(in)    :: v_ExB(1:3,1:grid % NLP, grid % mp_low:grid % mp_high)
+    REAL(prec),            INTENT(in)    :: v_ExB(1:3,1:grid % NLP, grid % mp_low:grid % mp_high,2)  ! add hemisphere am2023.04
     REAL(prec),            INTENT(in)    :: time_step
     TYPE( IPE_MPI_Layer ), INTENT(in)    :: mpi_layer
     INTEGER,               INTENT(in)    :: transport_highlat_lp
@@ -796,7 +808,8 @@ CONTAINS
     INTEGER    :: lp_t0(1:2)
     INTEGER    :: mp_t0(1:2)
     INTEGER    :: lp_min, mp_min, isouth, inorth, ii, ispecial
-    INTEGER    :: mp, lp, i, lpx, mpx, jth
+    INTEGER    :: mp, lp, i, lpx, mpx, jth, ih ! add hemisphere am2023.04
+    real(prec) :: v1_exb_ns, v2_exb_ns   ! use the average of NH & SH ExB drift at the footpoints am2023.04
     INTEGER    :: i_min(1:2)
     LOGICAL    :: i_convection_too_far_in_lp
     REAL(prec), PARAMETER :: rad_to_deg = 57.295779513
@@ -819,12 +832,17 @@ CONTAINS
         DO 200 lp = 1, perp_transport_max_lp
 
           i_convection_too_far_in_lp = .FALSE.
+      
+          v1_exb_ns = 0.5*(v_ExB(1,lp,mp,1) + v_ExB(1,lp,mp,2))       ! average of hemisphere am2023.04
+          v2_exb_ns = 0.5*(v_ExB(2,lp,mp,1) + v_ExB(2,lp,mp,2))
 
-          phi_t0   = grid % magnetic_longitude(mp) - v_ExB(1,lp,mp)*time_step/(r*sin( colat_90km(lp) ) )
+          phi_t0   = grid % magnetic_longitude(mp) - v1_ExB_ns*time_step/(r*sin( colat_90km(lp) ) )            ! use average ExB am2023.04
+          !phi_t0   = grid % magnetic_longitude(mp) - v_ExB(1,lp,mp,ih)*time_step/(r*sin( colat_90km(lp) ) )  ! am2023.04
 
           coslam = cos( half_pi - grid % magnetic_colatitude(1,lp) )
           sinim  = 2.0_prec*sqrt( 1.0_prec - coslam*coslam )/sqrt( 4.0_prec - 3.0_prec*coslam*coslam )
-          theta_t0 = colat_90km(lp) - v_ExB(2,lp,mp)*time_step/(r*sinim)
+          theta_t0 = colat_90km(lp) - v2_ExB_ns*time_step/(r*sinim)           !  use average ExB am2023.04
+          ! theta_t0 = colat_90km(lp) - v_ExB(2,lp,mp,ih)*time_step/(r*sinim)  ! am2023.04
 
           ! If a Lagrangian trajectory crosses the equator, we clip the colatitude
           ! so that the point resides at the equator.
@@ -950,8 +968,8 @@ CONTAINS
 
             DO i = 1, grid % flux_tube_max(lp)
 
-              plasma % ion_densities(1:n_conv_spec,i,lp,mp) = ion_densities_pole_value(1:n_conv_spec,i)
-              plasma % ion_velocities(1:n_conv_spec,i,lp,mp) = ion_velocities_pole_value(1:n_conv_spec,i)
+              plasma % ion_densities(1:n_conv_spec,i,lp,mp)   = ion_densities_pole_value(1:n_conv_spec,i)
+              plasma % ion_velocities(1:n_conv_spec,i,lp,mp)  = ion_velocities_pole_value(1:n_conv_spec,i)
               plasma % ion_temperature(i,lp,mp)               = ion_temperature_pole_value(i)
               plasma % electron_temperature(i,lp,mp)          = electron_temperature_pole_value(i)
 
@@ -963,7 +981,7 @@ CONTAINS
               if(lp_t0(2).eq.0) then
                 lp_t0(1) = 1
                 lp_t0(2) = 2
-                write(6,*) 'GHGM LP_T0 ',mp,lp,v_ExB(1,lp,mp), v_ExB(2,lp,mp)
+                write(6,*) 'GHGM LP_T0 ',mp,lp,v1_ExB_ns, v2_ExB_ns
               endif
 
             lp_comp_weight(1) =  ( theta_t0 - colat_90km(lp_t0(2)) )/( colat_90km(lp_t0(1))-colat_90km(lp_t0(2)) )
@@ -977,9 +995,9 @@ CONTAINS
                 DO lpx = 1,2
 
                   B(lpx,mpx) = 0.0_prec
-                  density(1:n_conv_spec,lpx,mpx) = 0.0_prec
+                  density(1:n_conv_spec,lpx,mpx)  = 0.0_prec
                   velocity(1:n_conv_spec,lpx,mpx) = 0.0_prec
-                  temperature(lpx,mpx) = 0.0_prec
+                  temperature(lpx,mpx)   = 0.0_prec
                   e_temperature(lpx,mpx) = 0.0_prec
 
                   ! We assume by default the last flux tube point should be used
@@ -997,7 +1015,7 @@ CONTAINS
                       q_int(1) = grid % q_factor(isouth, lp_t0(lpx), mp_t0(mpx))
                       q_int(2) = grid % q_factor(inorth, lp_t0(lpx), mp_t0(mpx))
 
-                      i_comp_weight(1) = ( q_value - q_int(2) )/( q_int(1) - q_int(2) )
+                      i_comp_weight(1) =  ( q_value - q_int(2) )/( q_int(1) - q_int(2) )
                       i_comp_weight(2) = -( q_value - q_int(1) )/( q_int(1) - q_int(2) )
                       EXIT
 
@@ -1019,10 +1037,10 @@ CONTAINS
                                grid % magnetic_field_strength(inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
 
                   density(1:n_conv_spec,lpx,mpx) = plasma % ion_densities_old(1:n_conv_spec,isouth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(1) +&
-                                                     plasma % ion_densities_old(1:n_conv_spec,inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
+                                                   plasma % ion_densities_old(1:n_conv_spec,inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
 
                   velocity(1:n_conv_spec,lpx,mpx) = plasma % ion_velocities_old(1:n_conv_spec,isouth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(1) +&
-                                                      plasma % ion_velocities_old(1:n_conv_spec,inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
+                                                    plasma % ion_velocities_old(1:n_conv_spec,inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
 
                   temperature(lpx,mpx) = plasma % ion_temperature_old(isouth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(1) +&
                                          plasma % ion_temperature_old(inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
@@ -1039,7 +1057,7 @@ CONTAINS
               ! mp,lp interpolation
               ! Reduction over mpx, lpx
               ion_densities_int   = 0.0_prec
-              ion_velocities_int   = 0.0_prec
+              ion_velocities_int  = 0.0_prec
               ion_temperature_int = 0.0_prec
               electron_temperature_int = 0.0_prec
               B_int               = 0.0_prec
@@ -1047,10 +1065,10 @@ CONTAINS
                 DO lpx = 1, 2
                   B_int = B_int + B(lpx,mpx)*lp_comp_weight(lpx)*mp_comp_weight(mpx)
 
-                  ion_densities_int(1:n_conv_spec) = ion_densities_int(1:n_conv_spec) + density(1:n_conv_spec,lpx,mpx)*lp_comp_weight(lpx)*mp_comp_weight(mpx)
+                  ion_densities_int(1:n_conv_spec)  = ion_densities_int(1:n_conv_spec) + density(1:n_conv_spec,lpx,mpx)*lp_comp_weight(lpx)*mp_comp_weight(mpx)
                   ion_velocities_int(1:n_conv_spec) = ion_velocities_int(1:n_conv_spec) + velocity(1:n_conv_spec,lpx,mpx)*lp_comp_weight(lpx)*mp_comp_weight(mpx)
 
-                  ion_temperature_int = ion_temperature_int + temperature(lpx,mpx)*lp_comp_weight(lpx)*mp_comp_weight(mpx)
+                  ion_temperature_int      = ion_temperature_int + temperature(lpx,mpx)*lp_comp_weight(lpx)*mp_comp_weight(mpx)
                   electron_temperature_int = electron_temperature_int + e_temperature(lpx,mpx)*lp_comp_weight(lpx)*mp_comp_weight(mpx)
                 ENDDO
               ENDDO
@@ -1080,7 +1098,7 @@ CONTAINS
                  electron_temperature_int = plasma % electron_temperature_old(i,lp,mp)
               endif
 
-              plasma % ion_densities(1:n_conv_spec,i,lp,mp) = ion_densities_int(1:n_conv_spec)*( ksi_fac**2 )
+              plasma % ion_densities(1:n_conv_spec,i,lp,mp)  = ion_densities_int(1:n_conv_spec)*( ksi_fac**2 )
               plasma % ion_velocities(1:n_conv_spec,i,lp,mp) = ion_velocities_int(1:n_conv_spec)
 !             plasma % ion_temperature(i,lp,mp) = ion_temperature_int
 !             plasma % electron_temperature(i,lp,mp) = electron_temperature_int
@@ -1405,6 +1423,7 @@ CONTAINS
     CHARACTER(len=95) :: ERRMSG
     CHARACTER(len=10) :: mp_lp_string
     LOGICAL, EXTERNAL :: CTIP_CHECK_EFLAG
+    logical, parameter :: debug=.false.  ! debug one timestep am2023.05
 
       F107D = forcing % f107( forcing % current_index )
       F107A = forcing % f107_81day_avg( forcing % current_index )
@@ -1415,6 +1434,7 @@ CONTAINS
 
       DO mp = plasma % mp_low, plasma % mp_high
         DO lp = 1, plasma % NLP
+	  if(debug) write(6,'("In FLIP_Wrapper1st,2nd loop",5(x,i4))') mp,lp, plasma % mp_low, plasma % mp_high,plasma % NLP
 
           ! Copy over the grid information (for now)
           ZX(1:grid % flux_tube_max(lp))  = grid % altitude(1:grid % flux_tube_max(lp),lp)/1000.0_prec !convert from m to km
@@ -1424,6 +1444,8 @@ CONTAINS
           BMX(1:grid % flux_tube_max(lp)) = grid % magnetic_field_strength(1:grid % flux_tube_max(lp),lp,mp)   !Tesla
 ! Need a -SinI factor for the GRX
           DO i=1, grid % flux_tube_max(lp)
+	    if(debug) write(6,*) 'In FLIP_Wrapper 3rdloop', mp,lp,i
+	    
             dotprod = SQRT( grid % apex_d_vectors(1,3,i,lp,mp)**2 + &
                         grid % apex_d_vectors(2,3,i,lp,mp)**2 + &
                         grid % apex_d_vectors(3,3,i,lp,mp)**2  )
@@ -1459,6 +1481,7 @@ CONTAINS
 !         write(966,*) 'GHGM 966 ', mp,lp, plasma % ion_densities(6,1,lp,mp)
 
           DO i=1, grid % flux_tube_max(lp)
+	    if(debug) write(6,'("In FLIP_Wrapper 4rdloop",6(x,i4))') mp,lp,i, plasma % mp_low, plasma % mp_high,plasma % NLP,grid % flux_tube_max(lp)
 
 ! GHGM - for some reason the O2Plus at the very bottom point can be negative
 ! GHGM - sort that out
@@ -1490,6 +1513,8 @@ CONTAINS
 
           JMINX = 1
           JMAXX = grid % flux_tube_max(lp)
+	    
+	    if(debug) write(6,'("In FLIP_Wrapper before CTIPINIT ",6(x,i4))') mp,lp,i, plasma % mp_low, plasma % mp_high,plasma % NLP,grid % flux_tube_max(lp)
 
           CALL CTIPINT( JMINX, & !.. index of the first point on the field line
                         JMAXX, & !.. index of the last point on the field line
@@ -1538,6 +1563,7 @@ CONTAINS
 
           DO i=1, grid % flux_tube_max(lp)
 
+	    if(debug) write(6,*) 'In FLIP_Wrapper 5th loop', mp,lp,i
             ! Ion Densities
             plasma % ion_densities(1:9,i,lp,mp) = XIONNX(1:9,i)
             ! Electron Density

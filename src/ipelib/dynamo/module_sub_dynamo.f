@@ -36,6 +36,7 @@
 !t      use module_muh,ONLY:muh
 !t      use module_mudmod,ONLY:mudmod
       use module_threed,ONLY:threed
+      use cons_module,only:xlatm_deg,xlonm_deg
 !t      use module_sub_ncplot,ONLY:ncplot
       implicit none
 !
@@ -60,9 +61,10 @@
 ! 
       integer, optional, intent(out) :: rc
 ! Local:
-      integer :: i,j,jj,jjj,j0,jntl,k,n,ncc,nmaglat,nmaglon,ier,lrc
-      real :: sym
+      integer :: i,j,jj,jjj,j0,jntl,k,n,ncc,nmaglat,nmaglon,ier,lrc,jep
+      real :: sym,diff
       real :: array(-15:kmlon0+16,kmlat0),cs(kmlat0)
+      real :: phihm_sym(kmlonp1,kmlat)          ! use the NH+SH average potential
       character :: fname*10,labl*56,units*12
 
       if (present(rc)) rc = IPE_SUCCESS
@@ -280,17 +282,27 @@
 !  back into the 2-D phim before the call threed, and before it is
 !  transformed to geographic coordinates.
 !
+!  calculate the average highlat potential
+      do j=1,kmlat0
+        jj = kmlat-j+1
+        phihm_sym(:,j)  = 0.5*(phihm(:,j)+phihm(:,jj))
+        phihm_sym(:,jj) = phihm_sym(:,j)
+        ! phihm_sym(:,j) = phihm(:,j)
+!        write(6,"('SYM: i=20 j=',2i4,3(x,e12.4))")j,jj,phihm_sym(20,j),
+!     |     phihm(20,j),phihm(20,jj)
+      end do
+!
       ncc = 1
       nmaglon = kmlon0
       nmaglat = kmlat0
       do n=1,5
-        if (isolve==2) then
-          call stenmd(nmaglon,nmaglat,cee(ncc),phihm(1,kmlat0),pfrac)
-        else
-          call stenmod(nmaglon,nmaglat,cee(ncc),phihm(1,kmlat0),pfrac)
-        endif
+       if (isolve==2) then
+         call stenmd(nmaglon,nmaglat,cee(ncc),phihm_sym(1,kmlat0),pfrac)
+       else
+        call stenmod(nmaglon,nmaglat,cee(ncc),phihm_sym(1,kmlat0),pfrac)
+       endif
         ncc = ncc+9*nmaglon*nmaglat
-        if (n==1) ncc = ncc+nmaglon*nmaglat ! rhs is in 10th slot
+       if (n==1) ncc = ncc+nmaglon*nmaglat ! rhs is in 10th slot
         nmaglon = (nmaglon+1)/2
         nmaglat = (nmaglat+1)/2
       enddo ! n=1,5
@@ -340,20 +352,45 @@
 !  ie, need (1.-pfrac(i,kmlat0)) at phim(i,1), etc
 ! jn index for NH part of potential (kmlat down to ~kmlat0)
 ! jp index for NH pfrac (kmlat0 down to 1)
+!  rim(1 pole, kmlath eq)
+!  pfrac(1 eq, kmlath pole)
+!  phihm(1 Spole, kmlat Npole)
+!  phim(1 Spole, kmlat Npole)
 !
       do j=1,kmlat0
-        jn = kmlat - j + 1
-        jp = kmlat0 - j + 1
+        jn = kmlat - j + 1   ! from N-pole to eq. kmlat,kmlath
+        jp = kmlat0 - j + 1  ! eq. to S-pole or   1,kmlath
+        jep= j+kmlat0-1      ! eq. to pole NH     kmlath,kmlat
         do i=1,kmlonp1
-          phim(i,j)=rim(i,j,1)+(1.-pfrac(i,jp))*(phihm(i,j)-phihm(i,jn))
+          !phim(i,j)=rim(i,j,1)+(1.-pfrac(i,jp))*(phihm(i,j)-phihm(i,jn))
+          diff      = phihm_sym(i,j)-phihm(i,jn)
+          phim(i,j) = rim(i,j,1)+(1.-pfrac(i,jp))*diff
+          diff      = phihm_sym(i,j)-phihm(i,j)
+          phim(i,jn)= rim(i,j,1)+(1.-pfrac(i,jp))*diff
+	  
+!          write(4024,"('rim:lat,lons',2(x,f8.3),5(x,e12.4))")
+!     |      xlatm_deg(j),xlonm_deg(i),phim(i,j),phihm(i,j),rim(i,j,1),
+!     |      phihm_sym(i,j),pfrac(i,jp)
+!     
+!          write(4024,"('rim:lat,lonn',2(x,f8.3),5(x,e12.4))")
+!     |     xlatm_deg(jn),xlonm_deg(i),phim(i,jn),phihm(i,jn),rim(i,j,1),
+!     |      phihm_sym(i,j),pfrac(i,jp)
+!         if(j.ne.kmlat0) then
+!          write(4024,"('rim:lat,lon',2(x,f8.3),3(x,e12.4))")
+!     |   xlatm_deg(jn),xlonm_deg(i),phim(i,jn),phihm(i,jn),rim(i,j,1)
+!          end if
         enddo ! i=1,kmlonp1
+        
+!        write(6,"('rim: i=20 j=',4i3,6(x,e12.4))")j,jn,j,jep,phim(i,j),
+!     |      phim(i,jn),rim(i,j,1),phihm_sym(i,j),phihm(i,j),phihm(i,jn)
       enddo ! j=1,kmlat0
-      do j=kmlat0+1,kmlat
-        jp = j - kmlat0
-        do i=1,kmlonp1
-          phim(i,j) = rim(i,j,1)
-        enddo ! i=1,kmlonp1
-      enddo ! j=1,kmlat 
+!      do j=kmlat0+1,kmlat
+!        do i=1,kmlonp1
+!          phim(i,j) = rim(i,j,1)
+!          write(4024,"('rim: lat,lon',2(x,f8.3),3(x,e12.4))")
+!     |      xlatm_deg(j),xlonm_deg(i),phim(i,j),phihm(i,j),rim(i,j,1)
+!        enddo ! i=1,kmlonp1
+!      enddo ! j=1,kmlat 
 
 !      write(unit=4024,FMT='(20E12.4)')phim
 !

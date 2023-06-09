@@ -19,11 +19,11 @@ IMPLICIT NONE
   TYPE IPE_Electrodynamics
     INTEGER    :: nFluxTube, NLP, NMP
     INTEGER    :: mp_low, mp_high, mp_halo
-    REAL(prec), ALLOCATABLE :: electric_potential(:,:)
-    REAL(prec), ALLOCATABLE :: electric_potential2(:,:)
-    REAL(prec), ALLOCATABLE :: electric_field(:,:,:)
+    REAL(prec), ALLOCATABLE :: electric_potential(:,:,:)  ! add hemisphere as a dimension am2023.04
+    REAL(prec), ALLOCATABLE :: electric_potential2(:,:,:) ! add hemisphere as a dimension am2023.04
+    REAL(prec), ALLOCATABLE :: electric_field(:,:,:,:)    ! add hemisphere as a dimension am2023.04
     REAL(prec), POINTER     :: v_ExB_geographic(:,:,:,:)  ! "zonal" and "meridional" direction on the geographic grid
-    REAL(prec), ALLOCATABLE :: v_ExB_apex(:,:,:) ! "zonal" and "meridional" direction ( VEXBth, VEXBe ) on the apex grid
+    REAL(prec), ALLOCATABLE :: v_ExB_apex(:,:,:,:)        ! "zonal" and "meridional" direction ( VEXBth, VEXBe ) on the apex grid add hemisphere am2023.04apex
 
     REAL(prec), ALLOCATABLE, PRIVATE :: lat_interp_weights(:,:) ! Weights for interpolating from magnetic longitude to ipe longitude
     REAL(prec), ALLOCATABLE, PRIVATE :: lon_interp_weights(:,:) ! Weights for interpolating from magnetic longitude to ipe longitude
@@ -88,11 +88,11 @@ CONTAINS
       eldyn % mp_halo   = halo
 
 
-      ALLOCATE( eldyn % electric_potential(1:NLP,mp_low-halo:mp_high+halo), &
-                eldyn % electric_potential2(1:NLP,mp_low-halo:mp_high+halo), &
-                eldyn % electric_field(1:2,1:NLP,mp_low:mp_high), &
+      ALLOCATE( eldyn % electric_potential(1:NLP,mp_low-halo:mp_high+halo,2), &      ! add hemisphere 2 as a dimension am2023.04
+                eldyn % electric_potential2(1:NLP,mp_low-halo:mp_high+halo,2), &     ! add hemisphere 2 as a dimension am2023.04
+                eldyn % electric_field(1:2,1:NLP,mp_low:mp_high,2), &                ! add hemisphere 2 as a dimension am2023.04
                 eldyn % v_ExB_geographic(1:3,1:nFluxTube,1:NLP,mp_low:mp_high), &
-                eldyn % v_ExB_apex(1:3,1:NLP,mp_low:mp_high), &
+                eldyn % v_ExB_apex(1:3,1:NLP,mp_low:mp_high,2), &                    ! add hemisphere 2 as a dimension am2023.04apex
                 eldyn % hall_conductivity(1:NLP,mp_low:mp_high), &
                 eldyn % pedersen_conductivity(1:NLP,mp_low:mp_high), &
                 eldyn % b_parallel_conductivity(1:NLP,mp_low:mp_high), &
@@ -257,7 +257,7 @@ CONTAINS
 
     ! Local
     INTEGER :: i, j, year, localrc
-    INTEGER :: lp, mp
+    INTEGER :: lp, mp, iflag       ! am2023.04 iflag added for mapping since called several time
     REAL(prec) :: utime, lat
     REAL(prec) :: potent_local(0:nmlon,0:nmlat)
     REAL(prec) :: mlt_local(0:nmlon)
@@ -290,7 +290,8 @@ CONTAINS
     potent_local = potent
     mlt_local    = ylonm
     colat_local  = rtd * theta90_rad
-    CALL eldyn % Regrid_Potential( grid, mpi_layer, time_tracker, potent_local, mlt_local, colat_local, 0, nmlon, nmlat, rc=localrc )
+    iflag = 0
+    CALL eldyn % Regrid_Potential( grid, mpi_layer, time_tracker, potent_local, mlt_local, colat_local, 0, nmlon, nmlat, iflag, rc=localrc )
     IF ( ipe_error_check( localrc, msg="call to Regrid_Potential failed", line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
   END SUBROUTINE Empirical_E_Field_Wrapper
@@ -303,9 +304,10 @@ CONTAINS
     TYPE( IPE_Grid ), INTENT(in)                :: grid
     TYPE( IPE_MPI_Layer ), INTENT(in)  :: mpi_layer
     ! Local
-    INTEGER    :: mp, lp, i_90km
+    INTEGER    :: mp, lp, i_90km, ih     ! ih is for hemisphere am2023.04
     REAL(prec) :: max_v_exb
     REAL(prec) :: v_boost_factor
+    logical, parameter :: debug=.false.  ! debug one timestep am2023.04
 
     v_boost_factor = 1.0
 
@@ -314,23 +316,35 @@ CONTAINS
 
     DO mp = grid % mp_low, grid % mp_high
       DO lp = 1, grid % NLP
-         eldyn % v_ExB_apex(1,lp,mp) = eldyn % electric_field(2,lp,mp)/grid % apex_be3(lp,mp)
-         eldyn % v_ExB_apex(2,lp,mp) = -eldyn % electric_field(1,lp,mp)/grid % apex_be3(lp,mp)
-         DO i_90km = 1, grid % flux_tube_max(lp)
+      
+         DO i_90km = 1, grid % flux_tube_max(lp)  ! loop over points on fluxtube
+	 
+           ih = 1       ! ih is for hemisphere am2023.04
+           if(grid % magnetic_colatitude(i_90km,lp)*rtd.gt.90.) ih = 2     ! check on what side of the apex; for southern hemisphere am2023.04
+         
+           eldyn % v_ExB_apex(1,lp,mp,ih) =  eldyn % electric_field(2,lp,mp,ih)/grid % apex_be3(lp,mp) ! am2023.04apex
+           eldyn % v_ExB_apex(2,lp,mp,ih) = -eldyn % electric_field(1,lp,mp,ih)/grid % apex_be3(lp,mp) ! am2023.04apex
 
 !         eldyn % v_ExB_apex(1,lp,mp) = v_boost_factor * (eldyn % electric_field(2,lp,mp)/grid % apex_be3(lp,mp))
 !         eldyn % v_ExB_apex(2,lp,mp) = v_boost_factor * (-eldyn % electric_field(1,lp,mp)/grid % apex_be3(lp,mp))
 
 ! TWFANG modify the equation and add i_90km (May 2019)
 ! geographic eastward....
-        eldyn % v_exb_geographic(1,i_90km,lp,mp) = (eldyn % v_ExB_apex(1,lp,mp) * grid % apex_e_vectors(1,1,i_90km,lp,mp)) &
-                                                 + (eldyn % v_ExB_apex(2,lp,mp) * grid % apex_e_vectors(1,2,i_90km,lp,mp))
+          eldyn % v_exb_geographic(1,i_90km,lp,mp) = (eldyn % v_ExB_apex(1,lp,mp,ih) * grid % apex_e_vectors(1,1,i_90km,lp,mp)) &   ! add hemisphere am2023.04apex
+                                                 + (eldyn % v_ExB_apex(2,lp,mp,ih) * grid % apex_e_vectors(1,2,i_90km,lp,mp))
 ! geographic northward....
-        eldyn % v_exb_geographic(2,i_90km,lp,mp) = (eldyn % v_ExB_apex(1,lp,mp) * grid % apex_e_vectors(2,1,i_90km,lp,mp)) &
-                                                 + (eldyn % v_ExB_apex(2,lp,mp) * grid % apex_e_vectors(2,2,i_90km,lp,mp))
+          eldyn % v_exb_geographic(2,i_90km,lp,mp) = (eldyn % v_ExB_apex(1,lp,mp,ih) * grid % apex_e_vectors(2,1,i_90km,lp,mp)) &
+                                                 + (eldyn % v_ExB_apex(2,lp,mp,ih) * grid % apex_e_vectors(2,2,i_90km,lp,mp))
 ! geographic upwards....
-        eldyn % v_exb_geographic(3,i_90km,lp,mp) = (eldyn % v_ExB_apex(1,lp,mp) * grid % apex_e_vectors(3,1,i_90km,lp,mp)) &
-                                                 + (eldyn % v_ExB_apex(2,lp,mp) * grid % apex_e_vectors(3,2,i_90km,lp,mp))
+          eldyn % v_exb_geographic(3,i_90km,lp,mp) = (eldyn % v_ExB_apex(1,lp,mp,ih) * grid % apex_e_vectors(3,1,i_90km,lp,mp)) &
+                                                 + (eldyn % v_ExB_apex(2,lp,mp,ih) * grid % apex_e_vectors(3,2,i_90km,lp,mp))
+          if(debug) write(*,"('ExB: lat,lon',2(x,f8.3),4(x,e12.4))") &
+             grid%magnetic_colatitude(i_90km,lp),grid%magnetic_longitude(mp),grid%altitude(i_90km,lp), &
+             eldyn % v_exb_geographic(1,i_90km,lp,mp), &
+             eldyn % v_exb_geographic(2,i_90km,lp,mp),eldyn % v_exb_geographic(3,i_90km,lp,mp)
+          if(debug) write(*,"('ExB:  apex  ',2(x,f8.3),5(x,e12.4))") &
+             grid%magnetic_colatitude(i_90km,lp),grid%magnetic_longitude(mp),grid%altitude(i_90km,lp), &
+             eldyn % v_ExB_apex(1,lp,mp,ih),eldyn % v_ExB_apex(2,lp,mp,ih),eldyn % electric_field(2,lp,mp,ih),eldyn % electric_field(1,lp,mp,ih)
         ENDDO
 
       ENDDO
@@ -351,7 +365,7 @@ CONTAINS
     TYPE( IPE_Grid ),             INTENT(in)    :: grid
 
     ! Local
-    INTEGER    :: mp, lp
+    INTEGER    :: mp, lp , ih, ip      ! add hemisphere  am2023.04
     REAL(prec) :: r, d_lp, d_mp, coslam, sinim
 
 
@@ -365,14 +379,22 @@ CONTAINS
     ! by sin_Im*r.
 
     DO mp = grid % mp_low, grid % mp_high
+     DO ih = 1,2  ! loop over both hemispheres am2023.04
       DO lp = 1, grid % NLP
+        if(ih.eq.1) then    ! get the point# of footpoint in the other hemisphere am2023.04
+           ip = 1
+        else
+           ip = grid % flux_tube_max(lp)
+        endif   
+         
 
-        coslam = cos( half_pi - grid % magnetic_colatitude(1,lp) )
+        coslam = cos( half_pi - grid % magnetic_colatitude(ip,lp) )  ! which hemisphere am2023.04
         d_mp   = coslam*r*( grid % magnetic_longitude(mp+1) - grid % magnetic_longitude(mp-1) )
 
-        eldyn % electric_field(1,lp,mp) = -( eldyn % electric_potential(lp,mp+1) - &
-                                            eldyn % electric_potential(lp,mp-1) )/d_mp
+        eldyn % electric_field(1,lp,mp,ih) = -( eldyn % electric_potential(lp,mp+1,ih) - &      ! which hemisphere am2023.04
+                                                eldyn % electric_potential(lp,mp-1,ih) )/d_mp
       ENDDO
+     ENDDO
     ENDDO
 
     ! latitude component of e-field ( ed2 ): Eq(4.9)
@@ -388,34 +410,46 @@ CONTAINS
       sinim  = 2.0_prec*sqrt( 1.0_prec - coslam*coslam )/sqrt( 4.0_prec - 3.0_prec*coslam*coslam )
       d_lp = sinim*r*( grid % magnetic_colatitude(1,lp+1) - grid % magnetic_colatitude(1,lp) )
 
-      eldyn % electric_field(2,lp,mp) = -( eldyn % electric_potential(lp+1,mp) - &
-                                          eldyn % electric_potential(lp,mp) )/d_lp
-
+      eldyn % electric_field(2,lp,mp,ih) = -( eldyn % electric_potential(lp+1,mp,ih) - &  ! which hemisphere am2023.04
+                                              eldyn % electric_potential(lp,mp,ih) )/d_lp
+      DO ih = 1,2  ! loop over both hemispheres
       DO lp = 2, grid % NLP-1
 
-        coslam = cos( half_pi - grid % magnetic_colatitude(1,lp) )
+        if(ih.eq.1) then    ! get the point# of footpoint in the other hemisphere am2023.04
+           ip = 1
+        else
+           ip = grid % flux_tube_max(lp)
+        endif   
+        
+        coslam = cos( half_pi - grid % magnetic_colatitude(ip,lp) )
         sinim  = 2.0_prec*sqrt( 1.0_prec - coslam*coslam )/sqrt( 4.0_prec - 3.0_prec*coslam*coslam )
-        d_lp = sinim*r*( grid % magnetic_colatitude(1,lp+1) - grid % magnetic_colatitude(1,lp-1) )
+        d_lp = sinim*r*( grid % magnetic_colatitude(ip,lp+1) - grid % magnetic_colatitude(ip,lp-1) )  ! am2023.04
 
-        eldyn % electric_field(2,lp,mp) = -( eldyn % electric_potential(lp+1,mp) - &
-                                            eldyn % electric_potential(lp-1,mp) )/d_lp
+        eldyn % electric_field(2,lp,mp,ih) = -( eldyn % electric_potential(lp+1,mp,ih) - &
+                                                eldyn % electric_potential(lp-1,mp,ih) )/d_lp
 
       ENDDO
 
+      if(ih.eq.1) then    ! get the point# of footpoint in the other hemisphere am2023.04
+         ip = 1
+      else
+         ip = grid % flux_tube_max(lp)
+      endif  
+         
       lp = grid % NLP
-      coslam = cos( half_pi - grid % magnetic_colatitude(1,lp) )
+      coslam = cos( half_pi - grid % magnetic_colatitude(ip,lp) ) !  am2023.04
       sinim  = 2.0_prec*sqrt( 1.0_prec - coslam*coslam )/sqrt( 4.0_prec - 3.0_prec*coslam*coslam )
-      d_lp = sinim*r*( grid % magnetic_colatitude(1,lp) - grid % magnetic_colatitude(1,lp-1) )
+      d_lp = sinim*r*( grid % magnetic_colatitude(ip,lp) - grid % magnetic_colatitude(ip,lp-1) )    !  am2023.04
 
-      eldyn % electric_field(2,lp,mp) = -( eldyn % electric_potential(lp,mp) - &
-                                          eldyn % electric_potential(lp-1,mp) )/d_lp
-
+      eldyn % electric_field(2,lp,mp,ih) = -( eldyn % electric_potential(lp,mp,ih) - &
+                                              eldyn % electric_potential(lp-1,mp,ih) )/d_lp
+      ENDDO  ! hemispheres
     ENDDO
 
   END SUBROUTINE Calculate_Potential_Gradient
 
 
-  SUBROUTINE Regrid_Potential( eldyn, grid, mpi_layer, time_tracker, potential, mlt, colat, start_index, nlon, nlat, rc )
+  SUBROUTINE Regrid_Potential( eldyn, grid, mpi_layer, time_tracker, potential, mlt, colat, start_index, nlon, nlat, iflag, rc )
   ! This subroutine regrids electric potential from a structured grid
   ! on (magnetic local time, magnetic colatitude) to IPE's grid.
   !
@@ -436,24 +470,29 @@ CONTAINS
   !   nlon - last index in the longitude direction
   !
   !   nlat - last index in the latitude direction
+  !   iflag- flag added for I/O debugging
+  !
+    use cons_module
+
   !
     CLASS( IPE_Electrodynamics ), INTENT(inout) :: eldyn
     TYPE( IPE_Grid ),             INTENT(in)    :: grid
     TYPE( IPE_MPI_Layer ),        INTENT(in)    :: mpi_layer
     TYPE( IPE_Time ),             INTENT(in)    :: time_tracker
-    INTEGER,                      INTENT(in)    :: start_index, nlon, nlat
+    INTEGER,                      INTENT(in)    :: start_index, nlon, nlat,iflag
     REAL(prec),                   INTENT(in)    :: potential(start_index:nlon,start_index:nlat)
     REAL(prec),                   INTENT(in)    :: mlt(start_index:nlon)
     REAL(prec),                   INTENT(in)    :: colat(start_index:nlat)
     INTEGER, OPTIONAL,            INTENT(out)   :: rc
-
     ! Local
     INTEGER :: mp, lp, i, j, i1, i2, j1, j2, ii, localrc
-    INTEGER :: ilat(1:grid % NLP), jlon(grid % mp_low - grid % mp_halo:grid % mp_high+grid % mp_halo)
+    INTEGER :: ilat(1:grid % NLP,2), jlon(grid % mp_low - grid % mp_halo:grid % mp_high+grid % mp_halo)  ! am4023.04 add hemispheres
+    INTEGER :: ip, ih   ! for loop over hemisphere am4023.04
     REAL(prec) :: lat, lon, dlon, difflon, mindiff
     REAL(prec) :: lat_weight(1:2), lon_weight(1:2)
     REAL(prec) :: mlon90_rad(start_index:nlon)
     REAL(prec) :: mlat90_rad(start_index:nlat)
+    logical, parameter :: debug=.false.
 
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
@@ -496,41 +535,52 @@ CONTAINS
     ENDDO
 
     DO lp = 1, grid % NLP
+      do ih = 1,2 ! 1 = northern hemisphere; 2 southern hemisphere  am2023.04
+        if(ih.eq.1) then    ! get the point# of footpoint in the other hemisphere
+           ip = 1
+        else
+           ip = grid % flux_tube_max(lp)
+        endif   
+        lat = grid % magnetic_colatitude(ip,lp)
+        ! colatitude decreases with increasing lp
+        ilat(lp,ih) = nlat
+        DO i = start_index, nlat
 
-      lat = grid % magnetic_colatitude(1,lp)
-      ! colatitude decreases with increasing lp
-      ilat(lp) = nlat
-      DO i = start_index, nlat
+          ! Need to pass in colatitude through the call stack (theta90_rad ->
+          ! colatitude )
+          IF( mlat90_rad(i) < lat )THEN
+            ilat(lp,ih) = i
 
-        ! Need to pass in colatitude through the call stack (theta90_rad ->
-        ! colatitude )
-        IF( mlat90_rad(i) < lat )THEN
-          ilat(lp) = i
+            EXIT
+          ENDIF
 
-          EXIT
-        ENDIF
-
+        ENDDO
       ENDDO
 
     ENDDO
 
     DO mp = grid % mp_low - grid % mp_halo, grid % mp_high + grid % mp_halo
-      DO lp = 1, grid % NLP
-
-        lat = grid % magnetic_colatitude(1,lp)
+      DO lp = 1, grid % NLP  ! loop over latitudes
+       DO ih=1,2            ! process both hemispheres since high-lat potential/electric field can differ am2023.04
+        if(ih.eq.1) then    ! get the point# of footpoint in the other hemisphere
+           ip = 1
+        else
+           ip = grid % flux_tube_max(lp)
+        endif   
+        
+        lat = grid % magnetic_colatitude(ip,lp)
         lon = grid % magnetic_longitude(mp)
 
-        IF( ilat(lp) == start_index )THEN
+        IF( ilat(lp,ih) == start_index )THEN  ! add hemisphere am2023.04
 
-          i1 = ilat(lp)
-          i2 = ilat(lp)
+          i1 = ilat(lp,ih)
+          i2 = ilat(lp,ih)
           lat_weight(1) = 1.0_prec
           lat_weight(2) = 0.0_prec
-
         ELSE
 
-          i1 = ilat(lp)-1
-          i2 = ilat(lp)
+          i1 = ilat(lp,ih)-1
+          i2 = ilat(lp,ih)
           lat_weight(1) =  ( lat - mlat90_rad(i2) )/( mlat90_rad(i1) - mlat90_rad(i2) )
           lat_weight(2) = -( lat - mlat90_rad(i1) )/( mlat90_rad(i1) - mlat90_rad(i2) )
 
@@ -631,13 +681,25 @@ CONTAINS
 
         ENDIF
 
-        eldyn % electric_potential(lp,mp) = ( potential(j1,i1)*lat_weight(1)*lon_weight(1) +&
+        eldyn % electric_potential(lp,mp,ih) = ( potential(j1,i1)*lat_weight(1)*lon_weight(1) +&  ! add hemisphere am2023.04
                                               potential(j2,i1)*lat_weight(1)*lon_weight(2) +&
                                               potential(j1,i2)*lat_weight(2)*lon_weight(1) +&
                                               potential(j2,i2)*lat_weight(2)*lon_weight(2) )
-
+					      
+        if(debug.and.iflag.eq.0) write(*,"('PotE:lat,lon',2(x,f8.3),1(x,e12.4),2i4)") &
+           lat*rtd,lon*rtd,eldyn % electric_potential(lp,mp,ih),lp,mp
+        if(debug.and.iflag.eq.1) write(*,"('Med1:lat,lon',2(x,f8.3),1(x,e12.4),2i4)") &
+           lat*rtd,lon*rtd,eldyn % electric_potential(lp,mp,ih),lp,mp
+        if(debug.and.iflag.eq.2) write(*,"('Med2:lat,lon',2(x,f8.3),1(x,e12.4),2i4)") &
+           lat*rtd,lon*rtd,eldyn % electric_potential(lp,mp,ih),lp,mp
+	   
+       ENDDO   ! end of hemisphere loop
       ENDDO
     ENDDO
+    
+    if(debug) write(*,"(' ')") 
+    if(debug) write(*,"('next quantity ')") 
+    if(debug) write(*,"(' ')") 
 
   END SUBROUTINE Regrid_Potential
 
@@ -745,7 +807,7 @@ CONTAINS
     INTEGER    :: year,i,i_dyn,j,k,l,ilat_dyn,ilon_dyn
     INTEGER    :: diffval,imlat_plas,imlat_dyn
     INTEGER    :: tube_need(dyn_midpoint),ihem,lp_dyn
-    INTEGER    :: localrc
+    INTEGER    :: localrc,iflag
     REAL(prec) :: mlat_plas,mlat_dyn
     REAL(prec) :: fkp,fkpa
     REAL(prec) :: ed_dyn(170,80,2)
@@ -761,12 +823,12 @@ CONTAINS
     CALL init_cons
 
     sangle= forcing % solarwind_angle ( forcing % current_index )
-    bt= forcing % solarwind_Bt (forcing % current_index )
-    swvel= forcing % solarwind_velocity (forcing % current_index )
-    swden= forcing % solarwind_density (forcing % current_index )
-    stilt= get_tilt(time_tracker%year,time_tracker%month,time_tracker%day,time_tracker%utime)
-    fkp= forcing % kp ( forcing % current_index )
-    ctpoten= 15.+15.*fkp+0.8*fkp**2
+    bt    = forcing % solarwind_Bt (forcing % current_index )
+    swvel = forcing % solarwind_velocity (forcing % current_index )
+    swden = forcing % solarwind_density (forcing % current_index )
+    stilt = get_tilt(time_tracker%year,time_tracker%month,time_tracker%day,time_tracker%utime)
+    fkp   = forcing % kp ( forcing % current_index )
+    ctpoten = 15.+15.*fkp+0.8*fkp**2
 
     year=2000
 
@@ -776,6 +838,7 @@ CONTAINS
     DO i = 1, grid % NLP
       mlat_plas  = 90. - grid % magnetic_colatitude(1,i)*rtd
       imlat_plas = INT(mlat_plas*10.)
+      
       DO i_dyn=1,dyn_midpoint !from SH toward eq
         mlat_dyn  = xlatm_deg(i_dyn) ![deg]
         imlat_dyn = INT(mlat_dyn*10.)
@@ -787,13 +850,15 @@ CONTAINS
         endif
       ENDDO
     ENDDO
+
+! set fieldline integrals for the dynamo solver Richmond (1995) - 6 terms    
     DO i=1, grid % NMP
       DO j= 1, 48
         DO k=1,2
          if (tube_need(j).lt.1) then
-         eldyn_conductivities(1:6,k,j,i)=0.
+           eldyn_conductivities(1:6,k,j,i)=0.
          else
-         eldyn_conductivities(1:6,k,j,i)=plasma % conductivities(1:6,k,tube_need(j),i)
+           eldyn_conductivities(1:6,k,j,i)=plasma % conductivities(1:6,k,tube_need(j),i)
          endif
 ! no FLI values on 1,47,48,49(mag. equ.)
 ! eldyn_conductivities(1:6,1:2,2:47,1:grid % NMP)=plasma % conductivities(1:6,1:2,tube_need,1:grid % NMP)
@@ -801,7 +866,8 @@ CONTAINS
          ENDDO
        ENDDO
     ENDDO
-    
+
+! sort the flux tube values into a global dynamo grid    
     DO j=1,6
       DO lp_dyn=2,46 !from SH toward eq
         DO ihem=1,2
@@ -886,29 +952,31 @@ CONTAINS
       xlonm_deg(i) = xlonm(i)*rtd
     enddo ! i=1,kmlonp1
 
-    xlonm_deg_map(2:41)=xlonm_deg(41:80)
-    xlonm_deg_map(42:81)=xlonm_deg(1:40)+360.
-    xlonm_deg_map(1)=xlonm_deg(40)
-    xlonm_deg_map(82)=xlonm_deg(41)+360.
-    ylatm_deg_map=90.-xlatm_deg
+    xlonm_deg_map(2:41) = xlonm_deg(41:80)
+    xlonm_deg_map(42:81)= xlonm_deg(1:40)+360.
+    xlonm_deg_map(1)    = xlonm_deg(40)
+    xlonm_deg_map(82)   = xlonm_deg(41)+360.
+    ylatm_deg_map       = 90.-xlatm_deg
 
-    ed1dy_map(2:41,:)=ed1dy(41:80,:)
-    ed1dy_map(42:81,:)=ed1dy(1:40,:)
-    ed1dy_map(1,:)=ed1dy(40,:)
-    ed1dy_map(82,:)=ed1dy(41,:)
+    ed1dy_map(2:41,:)   = ed1dy(41:80,:)
+    ed1dy_map(42:81,:)  = ed1dy(1:40,:)
+    ed1dy_map(1,:)      = ed1dy(40,:)
+    ed1dy_map(82,:)     = ed1dy(41,:)
 
-    ed2dy_map(2:41,:)=ed2dy(41:80,:)
-    ed2dy_map(42:81,:)=ed2dy(1:40,:)
-    ed2dy_map(1,:)=ed2dy(40,:)
-    ed2dy_map(82,:)=ed2dy(41,:)
+    ed2dy_map(2:41,:)  = ed2dy(41:80,:)
+    ed2dy_map(42:81,:) = ed2dy(1:40,:)
+    ed2dy_map(1,:)     = ed2dy(40,:)
+    ed2dy_map(82,:)    = ed2dy(41,:)
 
-    CALL eldyn % Regrid_Potential( grid,mpi_layer, time_tracker,ed1dy_map,xlonm_deg_map,ylatm_deg_map, 1, 82,kmlat, rc=localrc )
+    iflag = 1
+    CALL eldyn % Regrid_Potential(grid,mpi_layer, time_tracker,ed1dy_map,xlonm_deg_map,ylatm_deg_map, 1, 82,kmlat, iflag, rc=localrc )
     IF ( ipe_error_check( localrc, msg="call to Regrid_Potential (ed1dy_map) failed", line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-    eldyn % electric_field(1,:,:) = eldyn % electric_potential
+    eldyn % electric_field(1,:,:,:) = eldyn % electric_potential  ! add hemisphere am2023.04
 
-    CALL eldyn % Regrid_Potential( grid,mpi_layer, time_tracker,ed2dy_map,xlonm_deg_map,ylatm_deg_map, 1, 82,kmlat, rc=localrc )
+    iflag = 2
+    CALL eldyn % Regrid_Potential(grid,mpi_layer, time_tracker,ed2dy_map,xlonm_deg_map,ylatm_deg_map, 1, 82,kmlat, iflag, rc=localrc )
     IF ( ipe_error_check( localrc, msg="call to Regrid_Potential (ed2dy_map) failed", line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-    eldyn % electric_field(2,:,:) = eldyn % electric_potential
+    eldyn % electric_field(2,:,:,:) = eldyn % electric_potential  ! add hemisphere am2023.04
 
   END SUBROUTINE Dynamo_Wrapper
 

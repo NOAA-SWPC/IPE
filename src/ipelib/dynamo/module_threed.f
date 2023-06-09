@@ -12,7 +12,8 @@
       use dynamo_module,only: ed1dy,ed2dy,phim
 !     
 ! !USES:
-      use cons_module,only: dlatm,dlonm,rcos0s,r0,pi_dyn,dt1dts
+      use cons_module,only: dlatm,dlonm,rcos0s,r0,pi_dyn,dt1dts,
+     |     xlatm_deg,xlonm_deg
 !t      use module_sub_ncplot,ONLY:ncplot
       IMPLICIT NONE
 !     
@@ -38,6 +39,7 @@
 !
 ! Externals:
       real,external :: sddot ! in util.F
+      logical, parameter :: debug=.false.
 !
       pi = pi_dyn
 !
@@ -60,6 +62,8 @@
         do i=1,kmlonp1
           ed2dy(i,j) = -(phim(i,j+1)-phim(i,j-1))/(2.*dlatm)*dt1dts(j)/
      |      (r0*1.e-2)
+          if(debug) write(4022,"('ed12: lat,lon',2(x,f8.3),2(x,e12.4))")
+     |      xlatm_deg(j),xlonm_deg(i),ed1dy(i,j),ed2dy(i,j)
         enddo ! i=1,kmlonp1
       enddo ! j=2,kmlath-1
 !
@@ -68,6 +72,8 @@
         do i=1,kmlonp1
           ed2dy(i,j) = (phim(i,j+1)-phim(i,j-1))/(2.*dlatm)*dt1dts(j)/
      |      (r0*1.e-2)
+          if(debug) write(4022,"('ed12: lat,lon',2(x,f8.3),2(x,e12.4))")
+     |      xlatm_deg(j),xlonm_deg(i),ed1dy(i,j),ed2dy(i,j)
         enddo ! i=1,kmlonp1
       enddo ! j=kmlath+1,kmlat-1
 !
@@ -95,6 +101,17 @@
      |    -3.*phim(i,kmlath+1))/(2.*dlatm)/(R0*1.e-2)
        ed2dy(i,kmlath-1) = (4.*phim(i,kmlath-2)-phim(i,kmlath-3)
      |    -3.*phim(i,kmlath-1))/(2.*dlatm)/(R0*1.e-2)
+       if(debug) then
+       j=1
+       write(4022,"('ed12: lat,lon',2(x,f8.3),2(x,e12.4))")xlatm_deg(j),
+     |      xlonm_deg(i),ed1dy(i,j),ed2dy(i,j)
+       j=kmlat
+       write(4022,"('ed12: lat,lon',2(x,f8.3),2(x,e12.4))")xlatm_deg(j),
+     |      xlonm_deg(i),ed1dy(i,j),ed2dy(i,j)
+       j=kmlath
+       write(4022,"('ed12: lat,lon',2(x,f8.3),2(x,e12.4))")xlatm_deg(j),
+     |      xlonm_deg(i),ed1dy(i,j),ed2dy(i,j)
+       endif  ! end debug
       enddo ! i = 1,kmlonp1
 !
 !

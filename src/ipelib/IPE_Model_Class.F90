@@ -194,9 +194,10 @@ CONTAINS
       nSteps = 1
 
     ENDIF
+    !write(6,*) 'In Update_IPE_Model Start',nSteps,ipe % mpi_layer % rank_id
 
     DO i = 1, nSteps
-
+      
       call ipe % forcing % Update_Current_Index( ipe % parameters, &
                                                  ipe % time_tracker % elapsed_sec, &
                                                  rc = localrc )
@@ -237,6 +238,7 @@ CONTAINS
                                   ipe % parameters % transport_highlat_lp, &
                                   ipe % parameters % perp_transport_max_lp, &
                                   rc = localrc )
+				  !write(6,*) 'AAfterPlasmaUpdate'
       IF ( ipe_error_check( localrc, msg="Failed to update plasma", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
@@ -244,6 +246,7 @@ CONTAINS
       CALL ipe % time_tracker % Increment( ipe % parameters % time_step )
 
     ENDDO
+    !write(6,*) 'In Update_IPE_Model Done',nSteps,ipe % mpi_layer % rank_id
 
   END SUBROUTINE Update_IPE_Model
 
@@ -651,6 +654,7 @@ CONTAINS
     CALL ipe % io % close()
     IF (ipe % io % err % check(msg="Unable to close file "//filename, &
       file=__FILE__, line=__LINE__)) RETURN
+      
 
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
