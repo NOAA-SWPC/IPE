@@ -571,12 +571,12 @@ C.... Written by P. Richards June-September 2010.
 !
 ! GHGM - had an issue at 158 - trying 156 as the max
 !
-      IF(lp.LE.158) THEN
+!      IF(lp.LE.158) THEN  ! am 2023.06 from Chen-Yu
 
       CALL PE2S(F107,F107A,N,temp_ti_te,FPAS,electron_density,UVFAC,
      >          COLUM,IHEPLS,INPLS,INNO,mp,lp)
 
-      ENDIF
+!     ENDIF
 
       ENDIF
 
