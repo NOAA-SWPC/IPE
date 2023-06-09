@@ -34,15 +34,21 @@
       real*8 :: plmtable(mxtablesize,csize)
       real*8 :: colattable(mxtablesize)
       real*8 :: nlms(csize)
+      real*8 :: weictpoten(2)  ! ctpoten in SH & N
 !
       PRIVATE
-      PUBLIC :: setmodel2005Ipe,epotval2005Ipe,fileLocation
+      PUBLIC :: setmodel2005Ipe,epotval2005Ipe,fileLocation,
+     |   weictpoten,bndyfitr
       contains
 !----------------------------------------------------------------------
 !----------------------------------------------------------------------
       subroutine setmodel2005Ipe(angle,bt,tilt,swvel,swden,file_path    &
      &,model,rc)
       implicit none
+!      
+! Calculate the complete set of the models' SCHA coeficients,
+!   given an arbitrary IMF angle (degrees from northward toward +Y),
+!   given byimf, bzimf, solar wind velocity (km/sec), and density.
 !
 ! Args:
 !
@@ -70,18 +76,19 @@
 !
 ! Read data:
       if (trim(model) == 'epot') then
-      call read_potential2005Ipe('global_idea_coeff_W05scEpot.dat'
-     &  ,rc=lrc)
-      if (ipe_error_check(lrc,
-     &  msg="call to read_potential2005Ipe failed - model="//model,
-     &  rc=rc)) return
+        call read_potential2005Ipe('global_idea_coeff_W05scEpot.dat',
+     &      rc=lrc)
+        if (ipe_error_check(lrc,
+     &    msg="call to read_potential2005Ipe failed - model="//model,
+     &      rc=rc)) return
       else
-      call read_potential2005Ipe('global_idea_coeff_W05scBpot.dat'
-     & ,rc=lrc)
-      if (ipe_error_check(lrc,
-     &  msg="call to read_potential2005Ipe failed - model="//model,
-     &  rc=rc)) return
+        call read_potential2005Ipe('global_idea_coeff_W05scBpot.dat',
+     &   rc=lrc)
+        if (ipe_error_check(lrc,
+     &     msg="call to read_potential2005Ipe failed - model="//model,
+     &     rc=rc)) return
       endif
+      
       call schatable2005Ipe('global_idea_coeff_W05SCHAtable.dat',
      &  rc=lrc)
       if (ipe_error_check(lrc,
@@ -96,17 +103,17 @@
       if (ipe_error_check(lrc,
      &  msg="call to setboundary2005Ipe failed",rc=rc)) return
 !
-      stilt = sin(tilt*deg2rad)
+      stilt  = sin(tilt*deg2rad)
       stilt2 = stilt**2
-      sw = bt*swvel/1000.
-      swe = (1.-exp(-sw*ex_pot(2)))*sw**ex_pot(1)
-      c0 = 1.
-      swp = swvel**2 * swden*1.6726d-6
-      rang = angle*deg2rad
-      cosa = cos(rang)
-      sina = sin(rang)
-      cos2a = cos(2.*rang)
-      sin2a = sin(2.*rang)
+      sw     = bt*swvel/1000.
+      swe    = (1.-exp(-sw*ex_pot(2)))*sw**ex_pot(1)
+      c0     = 1.
+      swp    = swvel**2 * swden*1.6726d-6
+      rang   = angle*deg2rad
+      cosa   = cos(rang)
+      sina   = sin(rang)
+      cos2a  = cos(2.*rang)
+      sin2a  = sin(2.*rang)
       if (bt < 1.) then         ! remove angle dependency for IMF under 1 nT
          cosa = -1.+bt*(cosa+1.)
          cos2a = 1.+bt*(cos2a-1.)
@@ -115,8 +122,8 @@
       endif
       cfits = schfits           ! schfits(d1_pot,csize) is in module w05read_data
       a = (/c0      , swe       , stilt      , stilt2     , swp,        &
-     &     swe*cosa, stilt*cosa, stilt2*cosa, swp*cosa,                 &
-     &     swe*sina, stilt*sina, stilt2*sina, swp*sina,                 &
+     &     swe*cosa , stilt*cosa, stilt2*cosa, swp*cosa,                &
+     &     swe*sina , stilt*sina, stilt2*sina, swp*sina,                &
      &     swe*cos2a,swe*sin2a/)
       if (trim(model) == 'epot') then
          esphc(:) = 0.
@@ -195,7 +202,7 @@
 !   write(6,"('setboundary: cosa=',f8.3,' btx=',f8.3)") cosa,btx
 !   write(6,"('setboundary: x=',/,(6e12.4))") x
 !   write(6,"('setboundary: c=',/,(6e12.4))") c
-!   write(6,"('setboundary: bndyfitr=',e12.4)") bndyfitr
+      write(6,"('setboundary:bndyfitr=',4e12.4)")tilt,angle,btx,bndyfitr
 
       end subroutine setboundary2005Ipe
 !-----------------------------------------------------------------------
