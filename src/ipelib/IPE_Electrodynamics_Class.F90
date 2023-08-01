@@ -342,7 +342,8 @@ CONTAINS
              grid%magnetic_colatitude(i_90km,lp),grid%magnetic_longitude(mp),grid%altitude(i_90km,lp), &
              eldyn % v_exb_geographic(1,i_90km,lp,mp), &
              eldyn % v_exb_geographic(2,i_90km,lp,mp),eldyn % v_exb_geographic(3,i_90km,lp,mp)
-          if(debug) write(*,"('ExB:  apex  ',2(x,f8.3),5(x,e12.4))") &
+          if(debug)  write(*,"('ExB:apex  ',1(x,i4),2(x,f8.3),5(x,e12.4))") ih, & 
+             write(*,"('ExB:apex  ',1(x,i4),2(x,f8.3),5(x,e12.4))") ih, & 
              grid%magnetic_colatitude(i_90km,lp),grid%magnetic_longitude(mp),grid%altitude(i_90km,lp), &
              eldyn % v_ExB_apex(1,lp,mp,ih),eldyn % v_ExB_apex(2,lp,mp,ih),eldyn % electric_field(2,lp,mp,ih),eldyn % electric_field(1,lp,mp,ih)
         ENDDO
@@ -410,10 +411,10 @@ CONTAINS
       sinim  = 2.0_prec*sqrt( 1.0_prec - coslam*coslam )/sqrt( 4.0_prec - 3.0_prec*coslam*coslam )
       d_lp = sinim*r*( grid % magnetic_colatitude(1,lp+1) - grid % magnetic_colatitude(1,lp) )
 
-      eldyn % electric_field(2,lp,mp,ih) = -( eldyn % electric_potential(lp+1,mp,ih) - &  ! which hemisphere am2023.04
-                                              eldyn % electric_potential(lp,mp,ih) )/d_lp
       DO ih = 1,2  ! loop over both hemispheres
-      DO lp = 2, grid % NLP-1
+          eldyn % electric_field(2,lp,mp,ih) = -( eldyn % electric_potential(lp+1,mp,ih) - &  ! which hemisphere am2023.04
+                                              eldyn % electric_potential(lp,mp,ih) )/d_lp
+       DO lp = 2, grid % NLP-1
 
         if(ih.eq.1) then    ! get the point# of footpoint in the other hemisphere am2023.04
            ip = 1
@@ -428,7 +429,7 @@ CONTAINS
         eldyn % electric_field(2,lp,mp,ih) = -( eldyn % electric_potential(lp+1,mp,ih) - &
                                                 eldyn % electric_potential(lp-1,mp,ih) )/d_lp
 
-      ENDDO
+       ENDDO
 
       if(ih.eq.1) then    ! get the point# of footpoint in the other hemisphere am2023.04
          ip = 1
