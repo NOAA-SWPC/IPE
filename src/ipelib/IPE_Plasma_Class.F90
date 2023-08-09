@@ -996,7 +996,6 @@ CONTAINS
 
             lp_comp_weight(1) =  ( theta_t0 - colat_90km(lp_t0(2)) )/( colat_90km(lp_t0(1))-colat_90km(lp_t0(2)) )
             lp_comp_weight(2) = -( theta_t0 - colat_90km(lp_t0(1)) )/( colat_90km(lp_t0(1))-colat_90km(lp_t0(2)) )
-	  
 	 
             DO 300 i =ibottom_flux_tube,grid % flux_tube_midpoint(lp),isign   ! am_2023.06.20 convect NH & SH flux tube part separately
 
@@ -1009,9 +1008,9 @@ CONTAINS
                 DO lpx = 1,2
 	         if(ih.eq.1) then       ! am_2023.06 for the ii loop which has to work for both hemisphere NH q goes from 1 (footpoint) to 0(apex), SH  q goes from 0 (apex) to -1 (footpoint)
 	           iiq_start = ibottom_flux_tube+isign
-	           iiq_end   = grid % flux_tube_midpoint(lp_t0(lpx))
+	           iiq_end   = grid % flux_tube_midpoint(lp_t0(lpx))+1
 	         else
-	           iiq_start = grid % flux_tube_midpoint(lp_t0(lpx))+1
+	           iiq_start = grid % flux_tube_midpoint(lp_t0(lpx))-1
 	           iiq_end   = grid % flux_tube_max(lp_t0(lpx))  ! ibottom_flux_tube+isign
 	         end if	
 
@@ -1028,8 +1027,9 @@ CONTAINS
                   i_comp_weight(1) = 1.0_prec
                   i_comp_weight(2) = 0.0_prec
                   ! Search for the nearest q_factor
-                  DO ii = iiq_start,iiq_end                                            ! am_2023.06.20 q is decreasing along the flux-tube NH (+1) to SH (-1)
-                    IF(  grid % q_factor(ii, lp_t0(lpx), mp_t0(mpx)) < q_value )THEN   ! this should also be fine for the SH... maybe I would not need the change of the loop above but do not need values of whole flux tube
+                  DO ii = iiq_start,iiq_end                                            ! am_2023.06.20 q is decreasing along the flux-tube NH (>0) to SH (<0), only for high lat flux tube from ~1 to -1
+	                
+		    IF(  grid % q_factor(ii, lp_t0(lpx), mp_t0(mpx)) <= q_value )THEN   ! this should also be fine for the SH... maybe I would not need the change of the loop above but do not need values of whole flux tube
 
                       isouth   = ii
                       inorth   = ii-1
@@ -1055,6 +1055,7 @@ CONTAINS
 
                   B(lpx,mpx) = grid % magnetic_field_strength(isouth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(1) +&
                                grid % magnetic_field_strength(inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
+	       
 
                   density(1:n_conv_spec,lpx,mpx) = plasma % ion_densities_old(1:n_conv_spec,isouth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(1) +&
                                                    plasma % ion_densities_old(1:n_conv_spec,inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
