@@ -343,7 +343,6 @@ CONTAINS
              eldyn % v_exb_geographic(1,i_90km,lp,mp), &
              eldyn % v_exb_geographic(2,i_90km,lp,mp),eldyn % v_exb_geographic(3,i_90km,lp,mp)
           if(debug)  write(*,"('ExB:apex  ',1(x,i4),2(x,f8.3),5(x,e12.4))") ih, & 
-             write(*,"('ExB:apex  ',1(x,i4),2(x,f8.3),5(x,e12.4))") ih, & 
              grid%magnetic_colatitude(i_90km,lp),grid%magnetic_longitude(mp),grid%altitude(i_90km,lp), &
              eldyn % v_ExB_apex(1,lp,mp,ih),eldyn % v_ExB_apex(2,lp,mp,ih),eldyn % electric_field(2,lp,mp,ih),eldyn % electric_field(1,lp,mp,ih)
         ENDDO
