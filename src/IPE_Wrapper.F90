@@ -119,7 +119,6 @@ CONTAINS
     TYPE(ESMF_Time)         :: currTime, startTime
     TYPE(ESMF_TimeInterval) :: timeStep
     INTEGER                 :: localrc
-    CHARACTER(LEN=30)       :: hdf5_file
 
     ! begin
     IF (PRESENT(rc)) rc = ESMF_SUCCESS
@@ -155,10 +154,9 @@ CONTAINS
 
     IF( MOD( ipe % time_tracker % elapsed_sec, ipe % parameters % file_output_frequency ) == 0.0_prec )THEN
 
-      hdf5_file = "IPE_State.apex."//ipe % time_tracker % DateStamp( )//".h5"
-      CALL ipe % Write( hdf5_file, rc=localrc )
+      CALL ipe % Write( rc=localrc )
       IF( localrc /= IPE_SUCCESS ) THEN
-        CALL ESMF_LogSetError(ESMF_RC_FILE_WRITE, msg="Error writing to HDF5 file "//hdf5_file, &
+        CALL ESMF_LogSetError(ESMF_RC_FILE_WRITE, msg="Error writing IPE output", &
           line=__LINE__, &
           file=__FILE__, &
           rcToReturn=rc)

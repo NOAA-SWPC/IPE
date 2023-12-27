@@ -60,13 +60,15 @@ MODULE IPE_Model_Parameters_Class
     REAL(prec) :: solarwind_density
 
     !FileIO
-    LOGICAL :: read_apex_neutrals
-    LOGICAL :: read_geographic_neutrals
-    LOGICAL :: write_apex_neutrals
-    LOGICAL :: write_geographic_neutrals
-    LOGICAL :: write_geographic_eldyn
-    LOGICAL :: write_apex_eldyn
-    REAL(prec) :: file_output_frequency
+    LOGICAL        :: read_apex_neutrals
+    LOGICAL        :: read_geographic_neutrals
+    LOGICAL        :: write_apex_neutrals
+    LOGICAL        :: write_geographic_neutrals
+    LOGICAL        :: write_geographic_eldyn
+    LOGICAL        :: write_apex_eldyn
+    REAL(prec)     :: file_output_frequency
+    CHARACTER(200) :: file_prefix
+    CHARACTER(3)   :: file_extension
 
     !ElDyn
     LOGICAL :: dynamo_efield
@@ -120,13 +122,15 @@ CONTAINS
     LOGICAL        :: write_geographic_neutrals
     LOGICAL        :: write_geographic_eldyn
     LOGICAL        :: write_apex_eldyn
-    LOGICAL        :: dynamo_efield
     REAL(prec)     :: file_output_frequency
+    CHARACTER(200) :: file_prefix
+    CHARACTER(3)   :: file_extension
     REAL(prec)     :: mesh_height_min
     REAL(prec)     :: mesh_height_max
     INTEGER        :: mesh_fill
     INTEGER        :: mesh_write
     CHARACTER(200) :: mesh_write_file
+    LOGICAL        :: dynamo_efield
     ! >> Fixed parameters
     REAL(prec) :: f107
     REAL(prec) :: f107_81day_avg
@@ -157,7 +161,7 @@ CONTAINS
     REAL(prec) :: vertical_wind_limit
 
     ! Communication buffers
-    CHARACTER(LEN=200), DIMENSION( 4) :: sbuf
+    CHARACTER(LEN=200), DIMENSION( 6) :: sbuf
     INTEGER,            DIMENSION(24) :: ibuf
     REAL(prec),         DIMENSION(26) :: rbuf
 
@@ -170,7 +174,7 @@ CONTAINS
                                  nhemi_power_index, shemi_power, shemi_power_index, solarwind_By, solarwind_angle, &
                                  solarwind_velocity, solarwind_Bz, solarwind_density
     NAMELIST / FileIO          / read_apex_neutrals, read_geographic_neutrals, write_apex_neutrals, write_geographic_neutrals, &
-                                 write_geographic_eldyn, write_apex_eldyn, file_output_frequency
+                                 write_geographic_eldyn, write_apex_eldyn, file_output_frequency, file_prefix, file_extension
     NAMELIST / IPECAP          / mesh_height_min, mesh_height_max, mesh_fill, mesh_write, mesh_write_file
     NAMELIST / ElDyn           / dynamo_efield
     NAMELIST / OPERATIONAL     / colfac, offset1_deg, offset2_deg, potential_model, hpeq, &
@@ -229,6 +233,8 @@ CONTAINS
     write_geographic_eldyn    = .TRUE.
     write_apex_eldyn          = .TRUE.
     file_output_frequency     = 180.0_prec
+    file_prefix               = "output/IPE_State.apex."
+    file_extension            = ".h5"
 
     ! IPECAP !
     mesh_height_min =   0.
@@ -303,7 +309,7 @@ CONTAINS
 
       ! prepare buffers
       ! -- strings
-      sbuf = (/ grid_file, initial_timestamp, f107_kp_file, mesh_write_file /)
+      sbuf = (/ grid_file, initial_timestamp, f107_kp_file, mesh_write_file, file_prefix, file_extension /)
       ! -- integers
       ibuf(1:13) = (/ f107_kp_size, f107_kp_interval, f107_kp_skip_size, f107_kp_realtime_interval, &
                       f107_kp_data_size, f107_kp_read_in_start, mesh_fill, mesh_write, &
@@ -340,6 +346,8 @@ CONTAINS
     params % initial_timestamp = sbuf(2)
     params % f107_kp_file      = sbuf(3)
     params % mesh_write_file   = sbuf(4)
+    params % file_prefix       = sbuf(5)
+    params % file_extension    = sbuf(6)
 
 #ifdef HAVE_MPI
     CALL MPI_BCAST( ibuf, size(ibuf), MPI_INTEGER, 0, mpi_layer % mpi_communicator, ierr )

@@ -44,7 +44,7 @@ IMPLICIT NONE
 
       CALL CPU_TIME(t2)
 
-      CALL ipe % Write( "IPE_State.apex."//ipe % time_tracker % DateStamp( )//".h5", rc=rc )
+      CALL ipe % Write( rc=rc )
       IF ( ipe_iostatus_check( rc, msg="Error writing IPE output file", &
         line=__LINE__, file=__FILE__ ) ) CALL ipe % Trash()
       IF( ipe % mpi_layer % rank_id == 0 )THEN
