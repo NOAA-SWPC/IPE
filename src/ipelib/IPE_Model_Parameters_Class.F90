@@ -233,7 +233,7 @@ CONTAINS
     write_geographic_eldyn    = .TRUE.
     write_apex_eldyn          = .TRUE.
     file_output_frequency     = 180.0_prec
-    file_prefix               = "output/IPE_State.apex."
+    file_prefix               = "IPE_State.apex."
     file_extension            = ".h5"
 
     ! IPECAP !
