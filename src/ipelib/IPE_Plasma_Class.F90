@@ -2,7 +2,7 @@ MODULE IPE_Plasma_Class
 
   USE IPE_Precision
   USE IPE_Constants_Dictionary
-  USE IPE_Grid_Class
+  USE IPE_Grid_Classw
   USE IPE_Neutrals_Class
   USE IPE_Forcing_Class
   USE IPE_Time_Class
@@ -983,11 +983,9 @@ CONTAINS
               plasma % electron_temperature(i,lp,mp)          = electron_temperature_pole_value(i)
 
             ENDDO
-	    !write(77,'("lpmin==1 ", 3(x,i4))')  mp,lp,lp_min
 
           ELSE ! lp_min =/= 1 ....
          
-	      !write(77,'("lpmin=/1 ", 3(x,i4))')  mp,lp,lp_min
               if(lp_t0(2).eq.0) then
                 lp_t0(1) = 1
                 lp_t0(2) = 2

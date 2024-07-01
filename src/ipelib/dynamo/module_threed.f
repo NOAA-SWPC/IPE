@@ -101,6 +101,7 @@
      |    -3.*phim(i,kmlath+1))/(2.*dlatm)/(R0*1.e-2)
        ed2dy(i,kmlath-1) = (4.*phim(i,kmlath-2)-phim(i,kmlath-3)
      |    -3.*phim(i,kmlath-1))/(2.*dlatm)/(R0*1.e-2)
+     
        if(debug) then
        j=1
        write(4022,"('ed12: lat,lon',2(x,f8.3),2(x,e12.4))")xlatm_deg(j),
@@ -112,6 +113,7 @@
        write(4022,"('ed12: lat,lon',2(x,f8.3),2(x,e12.4))")xlatm_deg(j),
      |      xlonm_deg(i),ed1dy(i,j),ed2dy(i,j)
        endif  ! end debug
+       
       enddo ! i = 1,kmlonp1
 !
 !
