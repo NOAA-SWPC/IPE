@@ -31,7 +31,8 @@ libdynamo_a-module_divide.$(OBJEXT): libdynamo_a-dynamo_module.$(OBJEXT)
 libdynamo_a-module_edges.$(OBJEXT): libdynamo_a-dynamo_module.$(OBJEXT)
 libdynamo_a-module_flwv32.$(OBJEXT): libdynamo_a-cons_module.$(OBJEXT) libdynamo_a-heelis_module.$(OBJEXT)
 libdynamo_a-module_highlat.$(OBJEXT): libdynamo_a-dynamo_module.$(OBJEXT) libdynamo_a-module_colath.$(OBJEXT) \
-	libdynamo_a-module_sub_heelis.$(OBJEXT) libdynamo_a-module_weimer2005Ipe.$(OBJEXT) libdynamo_a-params.$(OBJEXT)
+	libdynamo_a-module_sub_heelis.$(OBJEXT) libdynamo_a-module_weimer2005Ipe.$(OBJEXT) libdynamo_a-params.$(OBJEXT) \
+	libdynamo_a-module_init_heelis.$(OBJEXT)
 libdynamo_a-module_htrpex.$(OBJEXT): libdynamo_a-dynamo_module.$(OBJEXT)
 libdynamo_a-module_init_cons.$(OBJEXT): libdynamo_a-cons_module.$(OBJEXT)
 libdynamo_a-module_init_heelis.$(OBJEXT): libdynamo_a-cons_module.$(OBJEXT) libdynamo_a-heelis_module.$(OBJEXT)
