@@ -8,7 +8,7 @@ MODULE IPE_Neutrals_Class
   USE ipe_error_module
 
   ! MSIS
-  USE physics_msis ! gtd7
+  USE physics_msis ! gtd7, tselec
   USE utils_constants, ONLY : msis_dp => dp
 
   IMPLICIT NONE
@@ -77,7 +77,13 @@ CONTAINS
 
     INTEGER :: stat
 
+    REAL(msis_dp), DIMENSION(25):: switch
+
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
+
+    switch(:) =  1.0_msis_dp
+    switch(9) = -1.0_msis_dp
+    CALL tselec( switch )
 
     neutrals % nFluxTube = nFluxTube
     neutrals % NLP       = NLP
@@ -392,6 +398,7 @@ CONTAINS
           msis_stl     = REAL(time % utime / 3600.0_prec + geo_lon / 15.0_prec, KIND=msis_dp)
           densities    = 0.0_msis_dp
           temperatures = 0.0_msis_dp
+
 
           call gtd7( iyd,         &    ! Input, year and day as yyddd
                      msis_sec,    &    ! Input, universal time ( sec )
