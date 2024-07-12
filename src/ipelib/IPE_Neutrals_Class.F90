@@ -8,8 +8,8 @@ MODULE IPE_Neutrals_Class
   USE ipe_error_module
 
   ! MSIS
-  USE physics_msis ! gtd7
-  USE utils_constants, ONLY : msis_dp => dp
+  USE msis_gtd8d
+  USE msis_constants, ONLY : rp
 
   IMPLICIT NONE
 
@@ -322,10 +322,10 @@ CONTAINS
     REAL(4)               :: hwm_sec, hwm_f107d, hwm_f107a, hwm_alt, hwm_lat, hwm_lon
     REAL(4), DIMENSION(2) :: hwm_ap, w
 
-    REAL(msis_dp)               :: msis_alt, msis_f107d, msis_f107a, msis_lat, msis_lon, msis_sec, msis_stl
-    REAL(msis_dp), DIMENSION(7) :: msis_ap
-    REAL(msis_dp), DIMENSION(2) :: temperatures
-    REAL(msis_dp), DIMENSION(9) :: densities
+    REAL(rp)               :: msis_alt, msis_f107d, msis_f107a, msis_lat, msis_lon, msis_sec, msis_stl
+    REAL(rp), DIMENSION(7) :: msis_ap
+    REAL(rp), DIMENSION(2) :: temperatures
+    REAL(rp), DIMENSION(9) :: densities
 
     INTEGER, PARAMETER    :: msis_mass = 48
 
@@ -339,11 +339,11 @@ CONTAINS
     hwm_f107a = REAL(forcing % f107_81day_avg( forcing % current_index ), KIND=4)
     hwm_f107d = REAL(forcing % f107( forcing % current_index ),           KIND=4)
 
-    msis_ap      = REAL(AP,    KIND=msis_dp)
-    msis_f107a   = REAL(forcing % f107_81day_avg( forcing % current_index ), KIND=msis_dp)
-    msis_f107d   = REAL(forcing % f107( forcing % current_index ),           KIND=msis_dp)
-    densities    = 0.0_msis_dp
-    temperatures = 0.0_msis_dp
+    msis_ap      = REAL(AP,    KIND=rp)
+    msis_f107a   = REAL(forcing % f107_81day_avg( forcing % current_index ), KIND=rp)
+    msis_f107d   = REAL(forcing % f107( forcing % current_index ),           KIND=rp)
+    densities    = 0.0_rp
+    temperatures = 0.0_rp
 
     iyd = 99000 + time % day_of_year    ! Input, year and day as yyddd
 
@@ -385,15 +385,15 @@ CONTAINS
           ENDIF
 
           ! -- composition & temperature
-          msis_sec     = REAL(time % utime, KIND=msis_dp)
+          msis_sec     = REAL(time % utime, KIND=rp)
           msis_alt     = geo_alt
           msis_lat     = geo_lat
           msis_lon     = geo_lon
-          msis_stl     = REAL(time % utime / 3600.0_prec + geo_lon / 15.0_prec, KIND=msis_dp)
-          densities    = 0.0_msis_dp
-          temperatures = 0.0_msis_dp
+          msis_stl     = REAL(time % utime / 3600.0_prec + geo_lon / 15.0_prec, KIND=rp)
+          densities    = 0.0_rp
+          temperatures = 0.0_rp
 
-          call gtd7( iyd,         &    ! Input, year and day as yyddd
+          call gtd8d(iyd,         &    ! Input, year and day as yyddd
                      msis_sec,    &    ! Input, universal time ( sec )
                      msis_alt,    &    ! Input, altitude ( km )
                      msis_lat,    &    ! Input, geodetic latitude ( degrees )

@@ -1,4 +1,4 @@
-SUBDIRS = shared dynamo empirical_efield flip msise00 .
+SUBDIRS = shared dynamo empirical_efield flip msis2.1 .
 
 lib_LIBRARIES = libipe.a
 
@@ -12,13 +12,13 @@ libipe_a_FCFLAGS = $(FC_MODINC) . \
 	$(FC_MODINC) dynamo \
 	$(FC_MODINC) empirical_efield \
 	$(FC_MODINC) flip \
-	$(FC_MODINC) msise00 \
+	$(FC_MODINC) msis2.1 \
 	$(FC_MODINC) shared
 
 libipe_a_LIBADD = dynamo/*.$(OBJEXT) \
 	empirical_efield/*.$(OBJEXT) \
 	flip/*.$(OBJEXT) \
-	msise00/*.$(OBJEXT) \
+	msis2.1/*.$(OBJEXT) \
 	shared/*.$(OBJEXT)
 
 .PHONY: clean-modules
