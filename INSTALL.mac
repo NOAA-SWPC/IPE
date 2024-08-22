@@ -1,0 +1,33 @@
+# remove obsolete hdf5 installation
+mv bin/hdf5_1.8.8 bin/hdf5_nagfor
+
+sudo -s
+# make sure gcc is GNU and mpif90 is from /opt
+load_gfortran
+
+# Install parallel netcdf
+port install pnetcdf  (install with mpich, fails with openmpi)
+# Make python 3.11 the default
+port select --set python python311
+port select --set python3 python311
+
+# Make MPICH the default
+port select --set mpi mpich-mp-fortran
+
+# Install hdf5
+port install hdf5 +gfortran
+exit # back to regular user
+
+gitclone COMIO
+cd COMIO
+./configure
+make
+sudo make install
+cd ..
+
+# Make sure ESMF_DIR and ESMFMKFILE are set!
+
+gitclone IPE
+./configure --prefix=....
+make
+make install
