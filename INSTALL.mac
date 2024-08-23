@@ -25,7 +25,10 @@ make
 sudo make install
 cd ..
 
-# Make sure ESMF_DIR and ESMFMKFILE are set!
+# install ESMF with gfortran and gcc (incompatible with MPICH)
+# or clang (does not have openmp)?!
+
+# Make sure ESMF_DIR and ESMFMKFILE environment variables are set!
 
 gitclone IPE
 ./configure --prefix=....
