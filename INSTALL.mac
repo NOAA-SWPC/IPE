@@ -1,36 +1,75 @@
-# remove obsolete hdf5 installation
-mv bin/hdf5_1.8.8 bin/hdf5_nagfor
-
+##### Use gfortran + gnu cc + mpich
 sudo -s
-# make sure gcc is GNU and mpif90 is from /opt
-load_gfortran
 
-# Install parallel netcdf
-port install pnetcdf  (install with mpich, fails with openmpi)
+# set path and make sure gcc is GNU compiler, not clang
+gcc --version
+gcc-mp-13 (MacPorts gcc13 13.2.0_4+stdlib_flag) 13.2.0
+
+# Install hdf5 with gfortran and gcc13
+port install hdf5 +gfortran
+
+# Install mpich with gcc13
+port install mpich-gcc13
+# select mpich with port (or link files into the path)
+port select --set mpi mpich-gcc13-fortran
+# Check that it is indeed used
+mpicxx -show
+/opt/local/bin/gcc-mp-13 -Wl,-syslibroot,/Library/Developer/CommandLineTools/SDKs/MacOSX14.sdk -I/opt/local/include/mpich-gcc13 -L/opt/local/lib/mpich-gcc13 -lmpicxx -lmpi -lpmpi
+
+# Install parallel netcdf with GNU C
+port install pnetcdf +gcc
 # Make python 3.11 the default
 port select --set python python311
 port select --set python3 python311
 
-# Make MPICH the default
-port select --set mpi mpich-mp-fortran
+# Back to normal user
+exit
 
-# Install hdf5
-port install hdf5 +gfortran
-exit # back to regular user
-
-gitclone COMIO
-cd COMIO
+# Install COMIO
+cd
+gitclone COMIO COMIOSRCDIR
+cd COMIOSRCDIR
 ./configure
 make
-sudo make install
-cd ..
+sudo make install # this installs into /usr/local/lib/libcomio.a
 
-# install ESMF with gfortran and gcc (incompatible with MPICH)
-# or clang (does not have openmp)?!
+# Compile ESMF with mpich + gfortran + g++12 (because g++13 does not work)
+cd
+gitclone ESMF ESMFSRCDIR
+cd ESMFSRCDIR
+setenv ESMF_DIR `pwd`
+setenv ESMF_COMPILER gfortran
+setenv ESMF_COMM mpich
+setenv ESMF_BOPT g
+setenv ESMF_CXXCOMPILEOPTS -Wno-deprecated-declarations
+setenv ESMF_INSTALL_PREFIX /Users/gtoth/ESMF86gfortran
+# set C standard, default 99 cannot compile OSX system source files (clang::...)
+setenv ESMF_CSTD=2x
+# g++-mp-13 does not compile ESMF, switch to g++-mp-12 (port install gcc12)
+setenv MPICH_CXX /opt/local/bin/g++-mp-12
 
-# Make sure ESMF_DIR and ESMFMKFILE environment variables are set!
-
-gitclone IPE
-./configure --prefix=....
 make
 make install
+cd ESMFINSTALLDIR
+# make it easy to include the esmf.mk file
+ln -s lib/libg/*/esmf.mk .
+
+# After ESMF is installed, only these two need to be set
+setenv ESMF_DIR ESMFINSTALLDIR
+setenv ESMFMKFILE ${ESMF_DIR}/esmf.mk
+
+# Install IPE
+gitclone IPE IPESRCDIR
+cd IPESRCDIR
+# switch back to g++13
+setenv MPICH_CXX /opt/local/bin/g++-mp-13
+# configure IPE to produce an executable
+./configure --enable-coupling=no --prefix=IPEINSTALLDIR
+make
+make install
+cd IPEINSTALLDIR
+# Try running IPE executable
+bin/ipe.x
+IPE000: ERROR - IPE_Model_Parameters_Class.F90:265    Input file IPE.inp not found
+
+# This is currently considered correct. To be improved.
