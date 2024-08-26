@@ -44,7 +44,7 @@ setenv ESMF_BOPT g
 setenv ESMF_CXXCOMPILEOPTS -Wno-deprecated-declarations
 setenv ESMF_INSTALL_PREFIX /Users/gtoth/ESMF86gfortran
 # set C standard, default 99 cannot compile OSX system source files (clang::...)
-setenv ESMF_CSTD=2x
+setenv ESMF_CSTD 2x
 # g++-mp-13 does not compile ESMF, switch to g++-mp-12 (port install gcc12)
 setenv MPICH_CXX /opt/local/bin/g++-mp-12
 
