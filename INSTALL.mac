@@ -21,9 +21,17 @@ port install pnetcdf +gcc
 # Make python 3.11 the default
 port select --set python python311
 port select --set python3 python311
+# We need to make everything work with python311:
+port install py3110-pip
+port select --set pip py3110-pip
+port select --set pip3 py3110-pip
 
 # Back to normal user
 exit
+
+# To keep SWMF working we need to install these python packages
+pip install scipy
+pip install swmfpy
 
 # Install COMIO
 cd
