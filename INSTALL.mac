@@ -58,13 +58,12 @@ setenv MPICH_CXX /opt/local/bin/g++-mp-12
 
 make
 make install
+
+# After ESMF is installed set ESMFMKFILE (all other ESMF environment variables are ignored)
 cd ESMFINSTALLDIR
 # make it easy to include the esmf.mk file
 ln -s lib/libg/*/esmf.mk .
-
-# After ESMF is installed, only these two need to be set
-setenv ESMF_DIR ESMFINSTALLDIR
-setenv ESMFMKFILE ${ESMF_DIR}/esmf.mk
+setenv ESMFMKFILE ESMFINSTALLDIR/esmf.mk
 
 # Install IPE
 gitclone IPE IPESRCDIR
