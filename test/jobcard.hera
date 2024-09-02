@@ -1,0 +1,27 @@
+#!/bin/bash
+#SBATCH -J standaloneIPE
+#SBATCH -A swpc
+#SBATCH -t 00:10:00
+#SBATCH -o fcst.log
+#SBATCH -n 40
+#SBATCH -q batch
+
+set -ax
+
+rm -rf run
+cp -r data run
+
+module use -a ../modulefiles/hera.intel
+module load wam-ipe
+
+cd run
+
+ln -fs ../../install/bin/ipe.x .
+
+mpirun -n 40 ./ipe.x
+
+rc=$?
+[ $rc -ne 0 ] && echo "Failure code $rc" && exit
+[ ! -f IPE_State.apex.201303160005.h5 ] && echo "Output file IPE_State.apex.201303160005.h5 not created." && exit
+
+python ../scripts/compare.py IPE_State.apex.201303160005.h5 ../regression/IPE_State.apex.201303160005.h5.hera

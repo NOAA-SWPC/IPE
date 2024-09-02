@@ -14,3 +14,9 @@ ipe.mk
 #install
 IPE_INSTALL/
 install/
+
+#test
+test/data
+test/run
+test/regression
+test/fcst.log

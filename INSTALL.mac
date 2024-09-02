@@ -32,6 +32,8 @@ exit
 # To keep SWMF working we need to install these python packages
 pip install scipy
 pip install swmfpy
+# test requires python netcdf4 package
+pip install netCDF4
 
 # Install COMIO
 cd
@@ -71,12 +73,19 @@ cd IPESRCDIR
 # switch back to g++13
 setenv MPICH_CXX /opt/local/bin/g++-mp-13
 # configure IPE to produce an executable
-./configure --enable-coupling=no --prefix=IPEINSTALLDIR
-make
+./configure --prefix=$(pwd)/install
+make -j
 make install
 cd IPEINSTALLDIR
 # Try running IPE executable
 bin/ipe.x
 IPE000: ERROR - IPE_Model_Parameters_Class.F90:265    Input file IPE.inp not found
+
+## run test
+cd test
+# get fix and regression data
+./get_data.sh
+# run test
+./jobcard.local
 
 # This is currently considered correct. To be improved.
