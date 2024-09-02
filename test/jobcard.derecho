@@ -1,0 +1,29 @@
+#!/bin/bash
+#PBS -N coupled_march_2013
+#PBS -A UCUB0098
+#PBS -l walltime=00:10:00
+#PBS -o fcst.log
+#PBS -j oe
+#PBS -l select=1:ncpus=128:mpiprocs=40
+#PBS -q main
+#PBS -W umask=022
+
+set -ax
+
+rm -rf run
+cp -r data run
+
+module use -a ../modulefiles/derecho.intel
+module load wam-ipe
+
+cd run
+
+ln -fs ../../install/bin/ipe.x .
+
+mpiexec -n 40 ./ipe.x
+
+rc=$?
+[ $rc -ne 0 ] && echo "Failure code $rc" && exit
+[ ! -f IPE_State.apex.201303160005.h5 ] && echo "Output file IPE_State.apex.201303160005.h5 not created." && exit
+
+python ../scripts/compare.py IPE_State.apex.201303160005.h5 ../regression/IPE_State.apex.201303160005.h5.derecho

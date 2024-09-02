@@ -1,0 +1,18 @@
+## load modules
+module use -a modulefiles
+module load hera.intel
+
+## configure, make, make install
+./configure --prefix=$(pwd)/install && make -j && make install
+
+## run test
+cd test
+# get fix and regression data
+./get_data.sh
+
+# submit to queue, as mpiexec cannot be used on front-end node...
+# note you may need to adjust the "#PBS -A" directive on line 3
+# to reflect your charge group for the run
+qsub < jobcard.hera
+
+# job stdout/stderr will appear in test/fcst.log

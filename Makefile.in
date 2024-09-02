@@ -88,6 +88,14 @@ NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
 subdir = .
+DIST_COMMON = INSTALL README.md \
+	$(srcdir)/Makefile.in $(srcdir)/Makefile.am \
+	$(top_srcdir)/configure $(am__configure_deps) $(dist_doc_DATA) \
+	COPYING build-aux/ar-lib build-aux/depcomp \
+	build-aux/install-sh build-aux/missing \
+	$(top_srcdir)/build-aux/ar-lib \
+	$(top_srcdir)/build-aux/install-sh \
+	$(top_srcdir)/build-aux/missing
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ar-lib.m4 \
 	$(top_srcdir)/m4/ax_compiler_vendor.m4 \
@@ -353,7 +361,7 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 SUBDIRS = src
-dist_doc_DATA = README
+dist_doc_DATA = README.md
 ACLOCAL_AMFLAGS = -I m4
 @COUPLED_TRUE@nodist_include_HEADERS = src/ipecap.$(FC_MODEXT)
 @COUPLED_TRUE@nodist_data_DATA = ipe.mk

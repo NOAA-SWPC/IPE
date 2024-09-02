@@ -16,9 +16,12 @@ AC_PROG_SED
 # Parse configure option
 # - build
 AC_ARG_ENABLE([coupling],
-  [AS_HELP_STRING([--enable-coupling],[enable IPE coupling infrastructure (default: yes)])],
-  [],[enable_coupling=yes])
+  [AS_HELP_STRING([--enable-coupling],[enable IPE coupling infrastructure (default: no)])],
+  [enable_coupling=yes],[enable_coupling=no])
 AM_CONDITIONAL([COUPLED], [test x$enable_coupling = xyes])
+AC_ARG_ENABLE([esmf],
+  [AS_HELP_STRING([--disable-esmf],[disable ESMF checks (default: no)])],
+  [disable_esmf=yes],[disable_esmf=no])
 
 # Looks for Fortran compiler
 AC_LANG_PUSH([Fortran])
@@ -60,6 +63,13 @@ AC_ARG_ENABLE([safe-fp],
 AC_ARG_ENABLE([debug],
   [AS_HELP_STRING([--enable-debug],[enable debug mode (default: no).])],
   [enable_debug=${enableval}], [enable_debug=no])
+
+AS_CASE(["$ax_cv_fc_compiler_vendor"],
+  [gnu|clang], [FFLAGS="-fallow-argument-mismatch $FFLAGS"],
+)
+AS_CASE(["$ax_cv_fc_compiler_vendor"],
+  [gnu|clang], [FCFLAGS="-fallow-argument-mismatch $FFLAGS"],
+)
 
 # Checks for debug/optimization options
 AS_IF([test "x$enable_debug" = xyes],[
@@ -142,9 +152,11 @@ AS_IF([test "x$with_comio" = x],
 
 # - ESMF
 AX_LIB_ESMF
-AS_IF([test "$with_esmf" = no],
+AS_IF([test "$disable_esmf" = no], AS_IF([test "$with_esmf" = no],
   [AC_MSG_ERROR([Unable to find required ESMF library])],
   [ext_libs="${ext_libs} ESMF"])
+)
+
 
 # Adds library include paths
 fc_inc=

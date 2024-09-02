@@ -1,0 +1,37 @@
+#!/bin/bash
+#PBS -N wam-ipe_test
+#PBS -W group_list=s2901
+#PBS -l walltime=00:10:00
+#PBS -o fcst.log
+#PBS -j oe
+#PBS -l select=2:ncpus=28:mpiprocs=28:model=bro
+#PBS -q devel
+#PBS -W umask=022
+
+set -ax
+
+rm -rf run
+rm -rf /u/$USER/IPE.h5
+mkdir -p run
+
+source /nobackup/akubaryk/lmod/lmod/init/bash
+module use -a ../modulefiles/pleiades.intel
+module load wam-ipe
+module list
+
+cd run
+
+ln -fs ../data/* .
+ln -fs ../../install/bin/ipe.x .
+ln -fs /u/$USER/IPE.h5 IPE_State.apex.201303160005.h5
+
+mpiexec -np 40 ./ipe.x
+
+rm -rf IPE_State.apex.201303160005.h5
+mv /u/$USER/IPE.h5 IPE_State.apex.201303160005.h5
+
+rc=$?
+[ $rc -ne 0 ] && echo "Failure code $rc" && exit
+[ ! -f IPE_State.apex.201303160005.h5 ] && echo "Output file IPE_State.apex.201303160005.h5 not created." && exit
+
+python ../scripts/compare.py IPE_State.apex.201303160005.h5 ../regression/IPE_State.apex.201303160005.h5.pleiades

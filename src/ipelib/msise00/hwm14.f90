@@ -1096,7 +1096,7 @@ subroutine dwm07(IYD,SEC,ALT,GLAT,GLON,AP,DW,rc)
     ut = sec / 3600.0
     if ((day .ne. daylast) .or. (ut .ne. utlast) .or. &
         (glat .ne. glatlast) .or. (glon .ne. glonlast)) then
-      mlt = mltcalc(mlat,mlon,day,ut)
+      mlt = mltcalc(mlat,mlon,day,ut,lrc)
     endif
 
     !RETRIEVE DWM WINDS
