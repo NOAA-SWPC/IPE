@@ -2,6 +2,8 @@
 
 bucket="https://noaa-nws-wam-ipe-pds.s3.amazonaws.com"
 
+rm -rf IPE_STANDALONE_{FIX,REGRESSION}.tar.gz
+
 if [ ! -d data ] ; then
   wget $bucket/NON-OPERATIONAL_RESEARCH/SWORD_DATA/IPE_STANDALONE_FIX.tar.gz
   tar xvf IPE_STANDALONE_FIX.tar.gz

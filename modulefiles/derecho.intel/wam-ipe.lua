@@ -71,6 +71,7 @@ load(pathJoin("prod_util", prod_util_ver))
 
 -- set recommended Fortran compiler flags
 setenv("FCFLAGS", "-O2 -fp-model precise -ftz -fast-transcendentals -no-prec-div -no-prec-sqrt -align array64byte -align sequence -march=core-avx2")
+setenv("FC", "mpifort")
 
 whatis("Description: WAM-IPE build environment")
 

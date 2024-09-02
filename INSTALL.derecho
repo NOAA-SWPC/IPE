@@ -3,7 +3,7 @@ module use -a modulefiles
 module load derecho.intel
 
 ## configure, make, make install
-FC=mpifort ./configure --prefix=$(pwd)/install && make -j && make install
+./configure --prefix=$(pwd)/install && make -j && make install
 
 ## run test
 cd test

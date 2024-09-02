@@ -459,15 +459,15 @@ CONTAINS
 
   END SUBROUTINE Read_IPE_State
 
-  SUBROUTINE Write_IPE_State( ipe, filename, rc )
+  SUBROUTINE Write_IPE_State( ipe, rc )
 
     IMPLICIT NONE
 
     CLASS( IPE_Model ), INTENT(inout) :: ipe
-    CHARACTER(*),       INTENT(in)    :: filename
     INTEGER, OPTIONAL,  INTENT(out)   :: rc
 
     ! Local
+    CHARACTER(215)  :: filename
     INTEGER, PARAMETER :: num_groups = 1
     CHARACTER(LEN=*), DIMENSION(num_groups),   PARAMETER :: groups = (/ "apex" /)
 
@@ -522,6 +522,10 @@ CONTAINS
     ! Begin
 
     IF ( PRESENT( rc ) ) rc = IPE_FAILURE
+
+    filename = TRIM(ipe % parameters % file_prefix) // &
+               ipe % time_tracker % DateStamp ( ) // &
+               ipe % parameters % file_extension
 
     IF( ipe % mpi_layer % rank_id == 0 )THEN
       PRINT *, '  Writing output file : '//TRIM(filename)
