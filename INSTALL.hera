@@ -13,6 +13,6 @@ cd test
 # submit to queue, as mpiexec cannot be used on front-end node...
 # note you may need to adjust the "#PBS -A" directive on line 3
 # to reflect your charge group for the run
-qsub < jobcard.hera
+sbatch < jobcard.hera
 
 # job stdout/stderr will appear in test/fcst.log
