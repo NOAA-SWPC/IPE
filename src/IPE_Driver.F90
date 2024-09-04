@@ -16,7 +16,7 @@ IMPLICIT NONE
     IF ( ipe_error_check( rc, msg="IPE model initialization unsuccessful", &
       line=__LINE__, file=__FILE__ ) ) CALL ipe % Trash()
 
-    init_file = "IPE_State.apex."//ipe % time_tracker % DateStamp( )//".h5"
+    init_file = trim(ipe % parameters % file_prefix)//ipe % time_tracker % DateStamp( )//ipe % parameters % file_extension
     INQUIRE( FILE = TRIM(init_file), EXIST = fileExists, iostat=stat )
     IF ( ipe_iostatus_check( rc, msg="Error inquiring about IPE initial state file "//init_file, &
       line=__LINE__, file=__FILE__ ) ) CALL ipe % Trash()

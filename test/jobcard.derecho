@@ -24,6 +24,6 @@ mpiexec -n 40 ./ipe.x
 
 rc=$?
 [ $rc -ne 0 ] && echo "Failure code $rc" && exit
-[ ! -f IPE_State.apex.201303160005.h5 ] && echo "Output file IPE_State.apex.201303160005.h5 not created." && exit
+[ ! -f IPE_State.apex.201303160005.nc ] && echo "Output file IPE_State.apex.201303160005.nc not created." && exit
 
-python ../scripts/compare.py IPE_State.apex.201303160005.h5 ../regression/IPE_State.apex.201303160005.h5.derecho
+python ../scripts/compare.py IPE_State.apex.201303160005.nc ../regression/IPE_State.apex.201303160005.nc.derecho

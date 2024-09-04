@@ -64,13 +64,6 @@ AC_ARG_ENABLE([debug],
   [AS_HELP_STRING([--enable-debug],[enable debug mode (default: no).])],
   [enable_debug=${enableval}], [enable_debug=no])
 
-AS_CASE(["$ax_cv_fc_compiler_vendor"],
-  [gnu|clang], [FFLAGS="-fallow-argument-mismatch $FFLAGS"],
-)
-AS_CASE(["$ax_cv_fc_compiler_vendor"],
-  [gnu|clang], [FCFLAGS="-fallow-argument-mismatch $FFLAGS"],
-)
-
 # Checks for debug/optimization options
 AS_IF([test "x$enable_debug" = xyes],[
   AC_MSG_CHECKING([compiler for debug options])

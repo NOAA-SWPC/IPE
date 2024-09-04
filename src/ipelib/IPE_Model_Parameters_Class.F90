@@ -186,7 +186,7 @@ CONTAINS
     ! Default Parameters !
 
     ! SpaceManagement
-    grid_file = './IPE_Grid.h5'
+    grid_file = 'IPE_Grid.nc'
 
     ! TimeStepping !
     time_step   = 180.0_prec
@@ -234,7 +234,7 @@ CONTAINS
     write_apex_eldyn          = .TRUE.
     file_output_frequency     = 180.0_prec
     file_prefix               = "IPE_State.apex."
-    file_extension            = ".h5"
+    file_extension            = ".nc"
 
     ! IPECAP !
     mesh_height_min =   0.

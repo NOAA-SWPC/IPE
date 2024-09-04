@@ -10,8 +10,6 @@ MODULE IPE_Plasma_Class
   USE IPE_Common_Routines
   USE ipe_error_module
 
-  USE HDF5
-
   IMPLICIT NONE
 
   TYPE IPE_Plasma
@@ -120,8 +118,7 @@ MODULE IPE_Plasma_Class
 
 
 #ifdef HAVE_MPI
-  INTEGER, ALLOCATABLE, PRIVATE :: ion_requestHandle(:)
-  INTEGER, ALLOCATABLE, PRIVATE :: ion_requestStats(:,:)
+  type(mpi_request), ALLOCATABLE, PRIVATE :: ion_requestHandle(:)
 #endif
 
 CONTAINS
@@ -175,9 +172,8 @@ CONTAINS
       plasma % conductivities          = 0.0_prec
 
 #ifdef HAVE_MPI
-      ALLOCATE( ion_requestHandle(1:16), ion_requestStats(MPI_STATUS_SIZE,1:16) )
-      ion_requestHandle = 0
-      ion_requestStats  = 0
+      ALLOCATE( ion_requestHandle(1:16))
+!      ion_requestHandle = 0
 #endif
 
   END SUBROUTINE Build_IPE_Plasma
@@ -212,7 +208,7 @@ CONTAINS
       line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
 #ifdef HAVE_MPI
-    DEALLOCATE( ion_requestHandle, ion_requestStats, stat=stat )
+    DEALLOCATE( ion_requestHandle, stat=stat )
     IF ( ipe_dealloc_check( stat, msg="Unable to free up memory", &
       line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 #endif
@@ -308,7 +304,7 @@ CONTAINS
 
         CALL MPI_WAITALL( 16, &
                          ion_requestHandle, &
-                         ion_requestStats, &
+                         MPI_STATUSES_IGNORE, &
                          mpiError)
 
 
