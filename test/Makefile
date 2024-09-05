@@ -19,11 +19,16 @@ help:
 	@echo "make test_rundir      - create run directory 'run/'"
 	@echo "make test_run NP=3    - cd run; mpiexec -n 3 ipe.x"
 	@echo "make test_check       - check test results"
+	@echo "make clean            - remove files created by test"
 
 test:
+	@echo test_compile > test.diff
 	$(MAKE) test_compile
+	@echo test_rundir >> test.diff
 	$(MAKE) test_rundir
+	@echo test_run >> test.diff
 	$(MAKE) test_run
+	@echo test_check >> test.diff
 	$(MAKE) test_check
 
 test_compile:
@@ -42,4 +47,9 @@ test_run:
 	cd run;	mpiexec -n $(NP) ./ipe.x > runlog
 
 test_check: regression
-	scripts/compare.py run/$(TESTFILE) regression/$(TESTFILE).derecho
+	scripts/compare.py run/$(TESTFILE) regression/$(TESTFILE).derecho \
+	> test.diff
+	@cat test.diff
+
+clean:
+	rm -rf run test.diff
