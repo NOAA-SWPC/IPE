@@ -1,9 +1,9 @@
 #!/bin/bash
 
-#rm -rf run
-#cp -r data run
+rm -rf run
+cp -r data run
 cd run
-#ln -fs ../../install/bin/ipe.x .
+ln -fs ../../install/bin/ipe.x .
 
 mpirun -n 10 ./ipe.x
 
