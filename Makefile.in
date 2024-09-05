@@ -88,7 +88,7 @@ NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
 subdir = .
-DIST_COMMON = INSTALL README.md \
+DIST_COMMON = INSTALL.gnu README.md \
 	$(srcdir)/Makefile.in $(srcdir)/Makefile.am \
 	$(top_srcdir)/configure $(am__configure_deps) $(dist_doc_DATA) \
 	COPYING build-aux/ar-lib build-aux/depcomp \
@@ -201,8 +201,8 @@ DIST_SUBDIRS = $(SUBDIRS)
 am__DIST_COMMON = $(srcdir)/Makefile.in $(top_srcdir)/build-aux/ar-lib \
 	$(top_srcdir)/build-aux/compile \
 	$(top_srcdir)/build-aux/install-sh \
-	$(top_srcdir)/build-aux/missing AUTHORS COPYING ChangeLog \
-	INSTALL NEWS README build-aux/ar-lib build-aux/compile \
+	$(top_srcdir)/build-aux/missing \
+	INSTALL.gnu README.md build-aux/ar-lib build-aux/compile \
 	build-aux/depcomp build-aux/install-sh build-aux/missing
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 distdir = $(PACKAGE)-$(VERSION)
