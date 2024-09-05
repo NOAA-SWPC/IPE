@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from netCDF4 import Dataset
 from sys import argv
 from os.path import exists
