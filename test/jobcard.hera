@@ -8,20 +8,8 @@
 
 set -ax
 
-rm -rf run
-cp -r data run
-
 module use -a ../modulefiles/hera.intel
 module load wam-ipe
 
-cd run
+make -j test NP=40
 
-ln -fs ../../install/bin/ipe.x .
-
-mpirun -n 40 ./ipe.x
-
-rc=$?
-[ $rc -ne 0 ] && echo "Failure code $rc" && exit
-[ ! -f IPE_State.apex.201303160005.nc ] && echo "Output file IPE_State.apex.201303160005.nc not created." && exit
-
-python ../scripts/compare.py IPE_State.apex.201303160005.nc ../regression/IPE_State.apex.201303160005.nc.derecho

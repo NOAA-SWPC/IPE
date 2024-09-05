@@ -10,28 +10,9 @@
 
 set -ax
 
-rm -rf run
-rm -rf /u/$USER/IPE.nc
-mkdir -p run
-
 source /nobackup/akubaryk/lmod/lmod/init/bash
 module use -a ../modulefiles/pleiades.intel
 module load wam-ipe
 module list
 
-cd run
-
-ln -fs ../data/* .
-ln -fs ../../install/bin/ipe.x .
-ln -fs /u/$USER/IPE.nc IPE_State.apex.201303160005.nc
-
-mpiexec -np 40 ./ipe.x
-
-rm -rf IPE_State.apex.201303160005.nc
-mv /u/$USER/IPE.nc IPE_State.apex.201303160005.nc
-
-rc=$?
-[ $rc -ne 0 ] && echo "Failure code $rc" && exit
-[ ! -f IPE_State.apex.201303160005.nc ] && echo "Output file IPE_State.apex.201303160005.nc not created." && exit
-
-python ../scripts/compare.py IPE_State.apex.201303160005.nc ../regression/IPE_State.apex.201303160005.nc.derecho
+make -j test NP=40
