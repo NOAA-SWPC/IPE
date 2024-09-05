@@ -14,9 +14,9 @@ def main():
         return
     a, b = (nc_open(f) for f in argv[1:])
     print('{:<28} {}'.format('variable_name', 'mean_field_difference'))
-    for key in a.groups['apex'].variables.keys():
-        var = a.groups['apex'].variables[key][:]
-        diff = (b.groups['apex'].variables[key][:] - var )/var
+    for key in a.variables.keys():
+        var = a.variables[key][:]
+        diff = (b.variables[key][:] - var )/var
         print('{:<28} {:+0.2e}'.format(key, diff.mean()))
 
 
