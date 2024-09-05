@@ -53,7 +53,7 @@ CONTAINS
     IMPLICIT NONE
 
     CLASS( IPE_Model ), INTENT(inout) :: ipe
-    type(mpi_comm), OPTIONAL,  INTENT(in)    :: comm
+    integer, OPTIONAL,  INTENT(in)    :: comm
     INTEGER, OPTIONAL,  INTENT(out)   :: rc
 
     ! Local
@@ -69,8 +69,8 @@ CONTAINS
     ! Initialize I/O
     IF ( ipe % mpi_layer % enabled ) THEN
       call COMIO_Create(ipe % io, COMIO_FMT_PNETCDF, &
-                        comm=ipe % mpi_layer % mpi_communicator % mpi_val, &
-                        info=ipe % mpi_layer % mpi_info % mpi_val, &
+                        comm=ipe % mpi_layer % mpi_communicator, &
+                        info=ipe % mpi_layer % mpi_info, &
                         rc=localrc)
       IF ( ipe_error_check( localrc, &
         msg="Failed to initialize I/O layer", &

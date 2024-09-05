@@ -1,7 +1,7 @@
 MODULE IPE_MPI_Layer_Class
 
 #ifdef HAVE_MPI
-  USE mpi_f08
+  USE mpi
 #endif
 
   USE IPE_Precision
@@ -28,9 +28,9 @@ MODULE IPE_MPI_Layer_Class
     INTEGER :: lp_low, lp_high ! This processes nlp lower and upper bounds
     INTEGER :: mp_low, mp_high ! This processes nmp lower and upper bounds
     INTEGER :: mp_halo_size       ! how many mp grid points to the right and left should I keep updated from my neighbors
-    type(mpi_datatype) :: mpi_prec
-    type(mpi_comm) :: mpi_communicator
-    type(mpi_info) :: mpi_info
+    integer :: mpi_prec
+    integer :: mpi_communicator
+    integer :: mpi_info
     INTEGER :: n_ranks
     INTEGER :: rank_id
     INTEGER :: neighbor_rank(1:2)
@@ -49,7 +49,7 @@ CONTAINS
   SUBROUTINE Initialize_MPI_Layer( mpi_layer, comm )
 
     CLASS( IPE_MPI_Layer ), INTENT(inout) :: mpi_layer
-    type(mpi_comm), OPTIONAL,      INTENT(in)    :: comm
+    integer, OPTIONAL,      INTENT(in)    :: comm
 
     ! Local
     INTEGER :: mpiErr
