@@ -301,12 +301,10 @@ CONTAINS
         CALL plasma % Update_Halos( grid, mpi_layer )
 
 #ifdef HAVE_MPI
-        CALL MPI_WAITALL( 16, &
-                         ion_requestHandle, &
-                         MPI_STATUSES_IGNORE, &
-                         mpiError)
-
-
+        if( mpi_layer % n_ranks > 1 ) CALL MPI_WAITALL( 16, &
+             ion_requestHandle, &
+             MPI_STATUSES_IGNORE, &
+             mpiError)
 #endif
 
         CALL plasma % Cross_Flux_Tube_Transport( grid, v_ExB, transport_time_step2, &
