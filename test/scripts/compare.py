@@ -17,7 +17,7 @@ def main():
     print('{:<28} {}'.format('variable_name', 'mean_field_difference'))
     for key in a.variables.keys():
         var = a.variables[key][:]
-        diff = (b.variables[key][:] - var )/var
+        diff = abs((b.variables[key][:] - var)/var)
         print('{:<28} {:+0.2e}'.format(key, diff.mean()))
 
 
