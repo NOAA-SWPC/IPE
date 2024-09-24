@@ -1,3 +1,4 @@
+
 !-----------------------------------------------------------------------
       module module_weimer2005Ipe
 !module w05sc
@@ -30,7 +31,7 @@
       real*8 :: bndyfitr        ! calculated by setboundary
       real*8 :: esphc(csize),bsphc(csize) ! calculated by setmodel
       real*8 :: tmat(3,3),ttmat(3,3) ! from setboundary
-      integer,parameter :: mxtablesize=200
+      integer,parameter :: mxtablesize=225
       real*8 :: plmtable(mxtablesize,csize)
       real*8 :: colattable(mxtablesize)
       real*8 :: nlms(csize)
@@ -338,11 +339,9 @@
       th0 = bndyfitr
       if (prevth0 /= th0) then
          tablesize = 3*nint(th0)
-         if (tablesize > mxtablesize) then 
-           write(errmsg,"('>>> tablesize > mxtablesize: tablesize=',i5,
-     &' mxtablesize=',i5,' tn0=',e12.4)") tablesize,mxtablesize,th0
-           call ipe_error_set(msg=errmsg, rc=rc)
-           return
+         if (tablesize > mxtablesize) then ! clamp to existing limit
+           th0 = real(mxtablesize, 8) / 3 - 0.5
+           tablesize = 3 * nint(th0) ! always <= mxtablesize
          endif
 !     write(6,"('scplm: indx=',i3,' colat=',f8.3,' th0=',e12.4,&
 !       &' tablesize=',i3)") indx,colat,th0,tablesize
