@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -N coupled_march_2013
-#PBS -A UCUB0098
+#PBS -A NHAO0032
 #PBS -l walltime=00:10:00
 #PBS -o fcst.log
 #PBS -j oe
