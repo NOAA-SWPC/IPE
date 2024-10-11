@@ -77,7 +77,7 @@ CONTAINS
     ! Set IPE run mode to coupled
     ipe % forcing % coupled = .true.
 
-    init_file = "IPE_State.apex."//ipe % time_tracker % DateStamp( )//".h5"
+    init_file = trim(ipe % parameters % file_prefix)//ipe % time_tracker % DateStamp( )//ipe % parameters % file_extension
     INQUIRE( FILE = TRIM(init_file), EXIST = file_exists, IOSTAT = localrc )
     IF( localrc /= 0 ) THEN
       CALL ESMF_LogSetError(ESMF_RC_FILE_UNEXPECTED, &
