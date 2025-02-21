@@ -52,7 +52,7 @@ CONTAINS
       rcToReturn=rc) ) RETURN  ! bail out
 
     ! Build IPE
-    CALL ipe % Build(mpi_comm=mpicomm, rc=localrc)
+    CALL ipe % Build(comm=mpicomm, rc=localrc)
     IF( localrc /= IPE_SUCCESS ) THEN
       CALL ESMF_LogSetError(ESMF_RC_INTNRL_BAD, msg="Error building IPE", &
         line=__LINE__, &
