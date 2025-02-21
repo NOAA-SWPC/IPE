@@ -1,3 +1,6 @@
+!nm20240918 version 4 of IPE_Model_Class
+!with separate subroutines for cold vs warm start
+
 MODULE IPE_Model_Class
 
   USE IPE_Precision
@@ -45,6 +48,54 @@ MODULE IPE_Model_Class
       PROCEDURE :: Read       => Read_IPE_State
 
   END TYPE IPE_Model
+
+
+  INTEGER, PARAMETER :: num_ion_densities = 9
+  CHARACTER(LEN=*), DIMENSION(num_ion_densities), PARAMETER :: ion_densities = &
+      (/ &
+        "o_plus_density   ", &
+        "h_plus_density   ", &
+        "he_plus_density  ", &
+        "n_plus_density   ", &
+        "no_plus_density  ", &
+        "o2_plus_density  ", &
+        "n2_plus_density  ", &
+        "o_plus_2D_density", &
+        "o_plus_2P_density"  &
+      /)
+
+  INTEGER, PARAMETER :: num_ion_velocities = 3
+  CHARACTER(LEN=*), DIMENSION(num_ion_velocities), PARAMETER :: ion_velocities = &
+      (/ &
+        "o_plus_velocity ", &
+        "h_plus_velocity ", &
+        "he_plus_velocity"  &
+      /)
+
+  INTEGER, PARAMETER :: num_plasma_datasets = 2
+  CHARACTER(LEN=*), DIMENSION(num_plasma_datasets), PARAMETER :: plasma_datasets = &
+      (/ &
+        "ion_temperature     ", &
+        "electron_temperature"  &
+      /)
+
+  INTEGER, PARAMETER :: num_apex_velocities = 3
+  CHARACTER(LEN=*), DIMENSION(num_apex_velocities), PARAMETER :: apex_velocities = &
+      (/ &
+        "neutral_apex1_velocity", &
+        "neutral_apex2_velocity", &
+        "neutral_apex3_velocity"  &
+      /)
+
+
+  INTEGER, PARAMETER :: num_geo_datasets = 3
+  CHARACTER(LEN=*), DIMENSION(num_geo_datasets), PARAMETER :: geo_datasets = &
+      (/ &
+        "neutral_geographic_velocity1", &
+        "neutral_geographic_velocity2", &
+        "neutral_geographic_velocity3"  &
+      /)
+
 
 CONTAINS
 
@@ -278,53 +329,224 @@ CONTAINS
     CHARACTER(*),       INTENT(in)    :: filename
     INTEGER, OPTIONAL,  INTENT(out)   :: rc
 
+    ! Local variables
+    logical :: is_cold_start
+    integer :: localrc
+
+    IF ( PRESENT( rc ) ) rc = IPE_FAILURE
+
+    ! Determine initialization type from parameters
+    is_cold_start = .true.
+        
+    if (is_cold_start) then
+      call Cold_Start_Initialize(ipe, localrc)
+    else
+      call Warm_Start_Initialize(ipe, filename, localrc)
+    endif !is_cold_start
+        
+    if (present(rc)) rc = localrc
+  END SUBROUTINE Read_IPE_State
+
+  SUBROUTINE Cold_Start_Initialize(ipe, rc)
+
+    IMPLICIT NONE
+
+    CLASS( IPE_Model ), INTENT(inout) :: ipe
+    INTEGER, OPTIONAL,  INTENT(out)   :: rc
+
+    ! Local variables
+    INTEGER :: item
+
+    IF ( PRESENT( rc ) ) rc = IPE_FAILURE
+
+    IF ( ipe % mpi_layer % rank_id == 0 ) THEN
+      PRINT*, '  initializing ipe profiles for cold start'
+    ENDIF
+
+    !!! Setup common data decomposition for datasets
+    !CALL ipe % io % domain( (/ ipe % grid % nFluxtube, ipe % grid % NLP, ipe % grid % NMP /), &
+    !  (/ 1, 1, ipe % mpi_layer % mp_low /), &
+    !  (/ ipe % grid % nFluxtube, ipe % grid % NLP, ipe % mpi_layer % mp_high - ipe % mpi_layer % mp_low + 1 /) )
+    !IF (ipe % io % err % check(msg="Failed to setup I/O data decomposition", &
+    !  file=__FILE__, line=__LINE__)) RETURN
+
+
+    ! --  set up neutral datasets if requested
+    !IF ( ipe % mpi_layer % rank_id == 0 ) 
+    !print*, ' neutral properties'
+    IF( ipe % parameters % read_apex_neutrals )THEN
+      call Initialize_Neutral_Properties(ipe)
+    END IF !( ipe % parameters % read_apex_neutrals )THEN
+
+    ! (1) Set up individual datasets: plasma
+    !IF ( ipe % mpi_layer % rank_id == 0 ) 
+    !print*, 'plasma temperatures'
+    call Initialize_Plasma_Temperatures(ipe)
+
+
+    ! -- Ion densities
+     !IF ( ipe % mpi_layer % rank_id == 0 ) 
+    !print*, ' ion densities'
+    itemLoop1: DO item = 1, num_ion_densities
+      ipe % plasma % ion_densities(item,:,:,:) = 1.0E6
+    END DO itemLoop1
+
+    ! -- Ion velocities
+    !IF ( ipe % mpi_layer % rank_id == 0 ) 
+    !print*, ' ion velocity'
+    ! Initialize ion velocities
+    call Initialize_Ion_Velocities(ipe)
+
+
+    ! -- (2)Compute plasma electron density from ion densities
+    !IF ( ipe % mpi_layer % rank_id == 0 ) 
+    !print*, ' calculate Ne'
+    ipe % plasma % electron_density2(:,:,:) = &
+      SUM(ipe % plasma % ion_densities(1:9, :, :, :), dim=1)
+
+
+
+    ! set up neutral velocities on geographic grid, if requested
+    !IF ( ipe % mpi_layer % rank_id == 0 ) 
+    !print*, ' neutral wind geo'
+    IF( ipe % parameters % read_geographic_neutrals )THEN
+      itemLoop2: DO item = 1, num_geo_datasets
+        ipe % neutrals % velocity_geographic(item,:,:,:) = 10.0
+      END DO itemLoop2
+    END IF
+
+    ! set up initial profiles finished succesfully
+    IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
+
+    IF ( ipe % mpi_layer % rank_id == 0 ) &
+         print*, 'sub-ipe_initialization for cold start finished'    
+  END SUBROUTINE Cold_Start_Initialize
+
+  subroutine Initialize_Ion_Velocities(ipe)
+  
+    IMPLICIT NONE
+  
+    class(IPE_Model), intent(inout) :: ipe
+    !local
+    integer :: item
+        
+        do item = 1, NUM_ION_VELOCITIES
+            ipe%plasma%ion_velocities(item,:,:,:) = 10.0
+        end do
+  end subroutine Initialize_Ion_Velocities
+
+
+  subroutine Initialize_Plasma_Temperatures(ipe)
+  
+    IMPLICIT NONE
+  
+    class(IPE_Model), intent(inout) :: ipe
+    !local
+
+!    PRINT*, 'Initializing plasma temperatures'
+
+    ipe % plasma % ion_temperature(:,:,:) = 1800.0
+    ipe % plasma % electron_temperature(:,:,:) = 3000.0
+
+!    PRINT*, 'Plasma temperatures initialized successfully'
+  end subroutine Initialize_Plasma_Temperatures
+
+  subroutine Initialize_Neutral_Properties(ipe)
+     IMPLICIT NONE
+  
+    class(IPE_Model), intent(inout) :: ipe
+    !local
+    integer :: item
+
+    !o_density
+    ipe % neutrals % oxygen(:,:,:) = 1.0E+11
+
+    !h_density
+    ipe % neutrals % hydrogen(:,:,:) = 1.0E+5
+
+    !he_density
+    ipe % neutrals % helium(:,:,:) = 1.0E+5
+      
+    !n_density
+    ipe % neutrals % nitrogen(:,:,:) = 1.0E+5
+    
+    !o2_density
+    ipe % neutrals % molecular_oxygen(:,:,:) = 1.0E+10
+     
+    !n2_density
+    ipe % neutrals % molecular_nitrogen(:,:,:) = 1.0E+11
+      
+
+    !neutral_temperature
+    !IF ( ipe % mpi_layer % rank_id == 0 ) 
+    !print*, ' neutral temperature'
+    ipe % neutrals % temperature(:,:,:) = 600.0
+
+    ! set up neutral velocities on apex grid
+    !IF ( ipe % mpi_layer % rank_id == 0 ) 
+    !print*, ' neutral wind apex'
+    itemLoop: DO item = 1, num_apex_velocities
+      ipe % neutrals % velocity_apex(item,:,:,:) = 10.0
+    END DO itemLoop
+ 
+  END subroutine Initialize_Neutral_Properties !(ipe)
+
+  SUBROUTINE Warm_Start_Initialize(ipe, filename, rc)  
+
+    IMPLICIT NONE
+
+    CLASS( IPE_Model ), INTENT(inout) :: ipe
+    CHARACTER(*),       INTENT(in)    :: filename
+    INTEGER, OPTIONAL,  INTENT(out)   :: rc
+
+ 
+!    INTEGER, PARAMETER :: num_ion_densities = 9
+!    CHARACTER(LEN=*), DIMENSION(num_ion_densities), PARAMETER :: ion_densities = &
+!      (/ &
+!        "o_plus_density   ", &
+!        "h_plus_density   ", &
+!        "he_plus_density  ", &
+!        "n_plus_density   ", &
+!        "no_plus_density  ", &
+!        "o2_plus_density  ", &
+!        "n2_plus_density  ", &
+!        "o_plus_2D_density", &
+!        "o_plus_2P_density"  &
+!      /)
+
+!    INTEGER, PARAMETER :: num_ion_velocities = 3
+!    CHARACTER(LEN=*), DIMENSION(num_ion_velocities), PARAMETER :: ion_velocities = &
+!      (/ &
+!        "o_plus_velocity ", &
+!        "h_plus_velocity ", &
+!        "he_plus_velocity"  &
+!      /)
+
+!    INTEGER, PARAMETER :: num_plasma_datasets = 2
+!    CHARACTER(LEN=*), DIMENSION(num_plasma_datasets), PARAMETER :: plasma_datasets = &
+!      (/ &
+!        "ion_temperature     ", &
+!        "electron_temperature"  &
+!      /)
+
+!    INTEGER, PARAMETER :: num_apex_velocities = 3
+!    CHARACTER(LEN=*), DIMENSION(num_apex_velocities), PARAMETER :: apex_velocities = &
+!      (/ &
+!        "neutral_apex1_velocity", &
+!        "neutral_apex2_velocity", &
+!        "neutral_apex3_velocity"  &
+!      /)
+
+
+!    INTEGER, PARAMETER :: num_geo_datasets = 3
+!    CHARACTER(LEN=*), DIMENSION(num_geo_datasets), PARAMETER :: geo_datasets = &
+!      (/ &
+!        "neutral_geographic_velocity1", &
+!        "neutral_geographic_velocity2", &
+!        "neutral_geographic_velocity3"  &
+!      /)
+
     ! Local
-    INTEGER, PARAMETER :: num_ion_densities = 9
-    CHARACTER(LEN=*), DIMENSION(num_ion_densities), PARAMETER :: ion_densities = &
-      (/ &
-        "o_plus_density   ", &
-        "h_plus_density   ", &
-        "he_plus_density  ", &
-        "n_plus_density   ", &
-        "no_plus_density  ", &
-        "o2_plus_density  ", &
-        "n2_plus_density  ", &
-        "o_plus_2D_density", &
-        "o_plus_2P_density"  &
-      /)
-
-    INTEGER, PARAMETER :: num_ion_velocities = 3
-    CHARACTER(LEN=*), DIMENSION(num_ion_velocities), PARAMETER :: ion_velocities = &
-      (/ &
-        "o_plus_velocity ", &
-        "h_plus_velocity ", &
-        "he_plus_velocity"  &
-      /)
-
-    INTEGER, PARAMETER :: num_plasma_datasets = 2
-    CHARACTER(LEN=*), DIMENSION(num_plasma_datasets), PARAMETER :: plasma_datasets = &
-      (/ &
-        "ion_temperature     ", &
-        "electron_temperature"  &
-      /)
-
-    INTEGER, PARAMETER :: num_apex_velocities = 3
-    CHARACTER(LEN=*), DIMENSION(num_apex_velocities), PARAMETER :: apex_velocities = &
-      (/ &
-        "neutral_apex1_velocity", &
-        "neutral_apex2_velocity", &
-        "neutral_apex3_velocity"  &
-      /)
-
-
-    INTEGER, PARAMETER :: num_geo_datasets = 3
-    CHARACTER(LEN=*), DIMENSION(num_geo_datasets), PARAMETER :: geo_datasets = &
-      (/ &
-        "neutral_geographic_velocity1", &
-        "neutral_geographic_velocity2", &
-        "neutral_geographic_velocity3"  &
-      /)
-
     INTEGER :: item
 
     ! Begin
@@ -456,8 +678,8 @@ CONTAINS
       file=__FILE__, line=__LINE__)) RETURN
 
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
+   END SUBROUTINE Warm_Start_Initialize !(ipe, filename, rc)  
 
-  END SUBROUTINE Read_IPE_State
 
   SUBROUTINE Write_IPE_State( ipe, rc )
 
@@ -471,50 +693,50 @@ CONTAINS
     INTEGER, PARAMETER :: num_groups = 1
     CHARACTER(LEN=*), DIMENSION(num_groups),   PARAMETER :: groups = (/ "apex" /)
 
-    INTEGER, PARAMETER :: num_ion_densities = 9
-    CHARACTER(LEN=*), DIMENSION(num_ion_densities), PARAMETER :: ion_densities = &
-      (/ &
-        "o_plus_density   ", &
-        "h_plus_density   ", &
-        "he_plus_density  ", &
-        "n_plus_density   ", &
-        "no_plus_density  ", &
-        "o2_plus_density  ", &
-        "n2_plus_density  ", &
-        "o_plus_2D_density", &
-        "o_plus_2P_density"  &
-      /)
+    !INTEGER, PARAMETER :: num_ion_densities = 9
+    !CHARACTER(LEN=*), DIMENSION(num_ion_densities), PARAMETER :: ion_densities = &
+    !  (/ &
+    !    "o_plus_density   ", &
+    !    "h_plus_density   ", &
+    !    "he_plus_density  ", &
+    !    "n_plus_density   ", &
+    !    "no_plus_density  ", &
+    !    "o2_plus_density  ", &
+    !    "n2_plus_density  ", &
+    !    "o_plus_2D_density", &
+    !    "o_plus_2P_density"  &
+    !  /)
 
-    INTEGER, PARAMETER :: num_ion_velocities = 3
-    CHARACTER(LEN=*), DIMENSION(num_ion_velocities), PARAMETER :: ion_velocities = &
-      (/ &
-        "o_plus_velocity ", &
-        "h_plus_velocity ", &
-        "he_plus_velocity"  &
-      /)
+    !INTEGER, PARAMETER :: num_ion_velocities = 3
+    !CHARACTER(LEN=*), DIMENSION(num_ion_velocities), PARAMETER :: ion_velocities = &
+    !  (/ &
+    !    "o_plus_velocity ", &
+    !    "h_plus_velocity ", &
+    !    "he_plus_velocity"  &
+    !  /)
 
-    INTEGER, PARAMETER :: num_plasma_datasets = 2
-    CHARACTER(LEN=*), DIMENSION(num_plasma_datasets), PARAMETER :: plasma_datasets = &
-      (/ &
-        "ion_temperature     ", &
-        "electron_temperature"  &
-      /)
+    !INTEGER, PARAMETER :: num_plasma_datasets = 2
+    !CHARACTER(LEN=*), DIMENSION(num_plasma_datasets), PARAMETER :: plasma_datasets = &
+    !  (/ &
+    !    "ion_temperature     ", &
+    !    "electron_temperature"  &
+    !  /)
 
-    INTEGER, PARAMETER :: num_apex_velocities = 3
-    CHARACTER(LEN=*), DIMENSION(num_apex_velocities), PARAMETER :: apex_velocities = &
-      (/ &
-        "neutral_apex1_velocity", &
-        "neutral_apex2_velocity", &
-        "neutral_apex3_velocity"  &
-      /)
+    !INTEGER, PARAMETER :: num_apex_velocities = 3
+    !CHARACTER(LEN=*), DIMENSION(num_apex_velocities), PARAMETER :: apex_velocities = &
+    !  (/ &
+    !    "neutral_apex1_velocity", &
+    !    "neutral_apex2_velocity", &
+    !    "neutral_apex3_velocity"  &
+    !  /)
 
-    INTEGER, PARAMETER :: num_geo_datasets = 3
-    CHARACTER(LEN=*), DIMENSION(num_geo_datasets), PARAMETER :: geo_datasets = &
-      (/ &
-        "neutral_geographic_velocity1", &
-        "neutral_geographic_velocity2", &
-        "neutral_geographic_velocity3"  &
-      /)
+    !INTEGER, PARAMETER :: num_geo_datasets = 3
+    !CHARACTER(LEN=*), DIMENSION(num_geo_datasets), PARAMETER :: geo_datasets = &
+    !  (/ &
+    !    "neutral_geographic_velocity1", &
+    !    "neutral_geographic_velocity2", &
+    !    "neutral_geographic_velocity3"  &
+    !  /)
 
     INTEGER :: item
     CHARACTER(LEN=28) :: dset_name

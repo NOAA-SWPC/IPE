@@ -1,0 +1,75 @@
+#!/bin/bash
+#PBS -N coupled_march_2013
+#PBS -A NHAO0032
+#PBS -l walltime=00:10:00
+#PBS -o fcst.log
+#PBS -j oe
+#PBS -l select=1:ncpus=128:mpiprocs=40
+#PBS -q main
+#PBS -W umask=022
+
+set -ax
+
+# Define variables
+USER0="naomi"
+USER1="akubaryk"
+HOME0="/glade/derecho/scratch"
+PATH0=${HOME0}"/"${USER0}"/save/sword/test/IPE"
+DATA_DIR=${HOME0}"/"${USER1}"/IPE/test/data"
+RUN_DIR=${PATH0}"/test/run"
+EXECUTABLE=${PATH0}"/install/bin/ipe.x"
+OUTPUT_FILE="IPE_State.apex.201303160005.nc"
+REFERENCE_FILE=${HOME0}"/"${USER1}"/IPE/test/regression/"${OUTPUT_FILE}".derecho"
+COMPARE_SCRIPT=${PATH0}"/test/scripts/compare.py"
+
+# Clean and prepare run directory
+if [ -d "$RUN_DIR" ]; then
+    rm -rf "$RUN_DIR"
+fi
+
+if [ -d "$DATA_DIR" ]; then
+    cp -r "$DATA_DIR" "$RUN_DIR"
+else
+    echo "Data directory $DATA_DIR does not exist."
+    exit 1
+fi
+
+# Load necessary modules
+module use -a ../modulefiles/derecho.intel
+module load wam-ipe
+
+
+# Change to run directory
+cd "$RUN_DIR" || { echo "Failed to change directory to $RUN_DIR"; exit 1; }
+
+
+# Check if the executable exists before creating the symbolic link
+if [ -f "${EXECUTABLE}" ]; then
+# Link executable
+    ln -fs ${EXECUTABLE} .
+else
+    echo "Executable ${EXECUTABLE} does not exist."
+    exit 1
+fi
+
+# Run the executable with MPI
+mpiexec -n 40 ./ipe.x
+
+# Check for errors
+rc=$?
+if [ $rc -ne 0 ]; then
+    echo "Failure code $rc"
+    exit $rc
+fi
+
+# Check if output file was created
+if [ ! -f "$OUTPUT_FILE" ]; then
+    echo "Output file $OUTPUT_FILE not created."
+    exit 1
+fi
+
+# Run comparison script
+python "$COMPARE_SCRIPT" "$OUTPUT_FILE" "$REFERENCE_FILE"
+
+date
+echo "jobcard derecho completed successfully."
