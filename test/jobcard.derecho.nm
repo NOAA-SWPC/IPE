@@ -11,21 +11,21 @@
 set -ax
 
 # Define variables
-USER0="naomi"
-USER1="akubaryk"
-HOME0="/glade/derecho/scratch"
-PATH0=${HOME0}"/"${USER0}"/save/sword/test/IPE"
-DATA_DIR=${HOME0}"/"${USER1}"/IPE/test/data"
-RUN_DIR=${PATH0}"/test/run"
-EXECUTABLE=${PATH0}"/install/bin/ipe.x"
+# note you need to modify the following variables to reflect your environment: PATH0, DATA_DIR, REFERENCE_FILE.
+# path to the top-level directory of the code:
+PATH0="/glade/derecho/scratch/naomi/save/sword/test/IPE"
+# path to the data file required to run the test:
+DATA_DIR="/glade/derecho/scratch/akubaryk/IPE/test/data"
+# output file name:
 OUTPUT_FILE="IPE_State.apex.201303160005.nc"
-REFERENCE_FILE=${HOME0}"/"${USER1}"/IPE/test/regression/"${OUTPUT_FILE}".derecho"
-COMPARE_SCRIPT=${PATH0}"/test/scripts/compare.py"
+# path to the reference output file:
+REFERENCE_FILE="/glade/derecho/scratch/akubaryk/IPE/test/regression/"${OUTPUT_FILE}".derecho"
+# End of user-defined variables
 
 # Clean and prepare run directory
-if [ -d "$RUN_DIR" ]; then
-    rm -rf "$RUN_DIR"
-fi
+#if [ -d "$RUN_DIR" ]; then
+#    rm -rf "$RUN_DIR"
+#fi
 
 if [ -d "$DATA_DIR" ]; then
     cp -r "$DATA_DIR" "$RUN_DIR"
@@ -40,10 +40,13 @@ module load wam-ipe
 
 
 # Change to run directory
+RUN_DIR=${PATH0}"/test/run"
 cd "$RUN_DIR" || { echo "Failed to change directory to $RUN_DIR"; exit 1; }
 
 
 # Check if the executable exists before creating the symbolic link
+# path to the executable:
+EXECUTABLE=${PATH0}"/install/bin/ipe.x"
 if [ -f "${EXECUTABLE}" ]; then
 # Link executable
     ln -fs ${EXECUTABLE} .
@@ -53,7 +56,7 @@ else
 fi
 
 # Run the executable with MPI
-mpiexec -n 40 ./ipe.x
+mpiexec -n 40 ${EXECUTABLE}
 
 # Check for errors
 rc=$?
@@ -69,6 +72,7 @@ if [ ! -f "$OUTPUT_FILE" ]; then
 fi
 
 # Run comparison script
+COMPARE_SCRIPT=${PATH0}"/test/scripts/compare.py"
 python "$COMPARE_SCRIPT" "$OUTPUT_FILE" "$REFERENCE_FILE"
 
 date

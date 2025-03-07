@@ -13,8 +13,8 @@ cd test
 #./get_data.sh 
 
 # submit to queue, as mpiexec cannot be used on front-end node...
-# note you may need to adjust the "#PBS -A" directive on line 3
-# to reflect your charge group for the run
+# note1: you may need to adjust the "#PBS -A" directive on line 3 to reflect your charge group for the run
+# note2: you may need to modify variables on line 16 in the jobcard file to reflect your environment.
 qsub < jobcard.derecho.nm
 
 # job stdout/stderr will appear in test/fcst.log
