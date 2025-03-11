@@ -119,7 +119,11 @@ CONTAINS
 
     ! Initialize I/O
     IF ( ipe % mpi_layer % enabled ) THEN
+<<<<<<< HEAD
       call COMIO_Create(ipe % io, COMIO_FMT_PNETCDF, &
+=======
+      call COMIO_Create(ipe % io, COMIO_FMT_HDF5, &
+>>>>>>> develop
                         comm=ipe % mpi_layer % mpi_communicator, &
                         info=ipe % mpi_layer % mpi_info, &
                         rc=localrc)
@@ -127,7 +131,11 @@ CONTAINS
         msg="Failed to initialize I/O layer", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     ELSE
+<<<<<<< HEAD
       call COMIO_Create(ipe % io, COMIO_FMT_PNETCDF, &
+=======
+      call COMIO_Create(ipe % io, COMIO_FMT_HDF5, &
+>>>>>>> develop
                         rc=localrc)
       IF ( ipe_error_check( localrc, &
         msg="Failed to initialize I/O layer", &

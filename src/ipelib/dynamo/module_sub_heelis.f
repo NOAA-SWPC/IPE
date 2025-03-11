@@ -5,7 +5,7 @@
       PUBLIC :: heelis
       contains 
 !-----------------------------------------------------------------------
-      subroutine heelis
+      subroutine heelis(offset1_deg,offset2_deg)
       use heelis_module !,ONLY: what?
       use module_colath,ONLY:colath
       use module_potm,ONLY:potm
@@ -15,6 +15,7 @@
 !   (see argument descriptions below). 
 !
       implicit none
+      real,intent(in) :: offset1_deg,offset2_deg
 !
 ! Args:
 ! pfrac:  Fractional presence of dynamo equation given critical 
@@ -24,7 +25,7 @@
 ! Calculate pfrac fractional presence of dynamo equation using critical
 !  convection colatitudes crit(2).  (crit is in cons module)
 !
-      call colath
+      call colath(offset1_deg,offset2_deg)
 !
 ! Calculate  the heelis potential phihm in geomagnetic coordinates:
 ! (potm calls sub flwv32)

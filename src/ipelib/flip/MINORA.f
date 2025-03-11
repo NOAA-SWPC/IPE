@@ -3,7 +3,7 @@ C.... This function is the main sequencing control for the He+ and N+
 C.... routines. It is similar to subroutine LOOPS on RSLPSD.FOR. Look 
 C.... there for comments.
 C.... Cleaned up and commented by P. Richards in April 2000
-      SUBROUTINE XION(TI,    !.. O+,H+ & Ti,Te
+      SUBROUTINE heplus_and_nplus(TI,    !.. O+,H+ & Ti,Te
      >              DTIN,    !.. Time step in
      >             DTMIN,    !.. Minimum time step
      >            IHEPNP,    !.. He+ - N+ switch

@@ -18,6 +18,7 @@ IMPLICIT NONE
     REAL(prec), ALLOCATABLE :: time(:)
     REAL(prec)              :: current_time
     INTEGER                 :: current_index
+    INTEGER                 :: max_read_index
     !
     REAL(prec), ALLOCATABLE :: f107(:)
     INTEGER, ALLOCATABLE    :: f107_flag(:)
@@ -144,6 +145,8 @@ CONTAINS
       CALL forcing % Read_F107KP_IPE_Forcing( params % f107_kp_file,          &
                                               params % f107_kp_data_size,     &
                                               params % f107_kp_read_in_start+1, &
+                                              0,                              &
+                                              params % f107_kp_realtime_interval < 0, &
                                               localrc )
       IF( ipe_error_check( localrc, msg="call to Read_F107KP_IPE_Forcing failed", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
@@ -246,20 +249,40 @@ CONTAINS
   END FUNCTION GetKP
 
 
-  SUBROUTINE Update_Current_Index( forcing, params, deltime )
+  SUBROUTINE Update_Current_Index( forcing, params, deltime, rc )
 
     IMPLICIT NONE
 
     CLASS( IPE_Forcing ),          INTENT(inout) :: forcing
     CLASS( IPE_Model_Parameters ), INTENT(in)    :: params
     REAL(prec),                    INTENT(in)    :: deltime
+    INTEGER,                       INTENT(out)   :: rc
+
+    ! Local
+    INTEGER :: localrc
+
+    rc = IPE_SUCCESS
 
     forcing % current_index = INT( deltime / real(params % f107_kp_interval) ) + &
                                       1 + params % f107_kp_skip_size
+
+    if ( params % use_f107_kp_file .and. forcing % current_index > forcing % max_read_index &
+             .and. params % f107_kp_realtime_interval > 0 ) then
+      call forcing % read_f107kp_ipe_forcing( params % f107_kp_file,   &
+                                              params % f107_kp_realtime_interval, &
+                                              forcing % current_index, &
+                                              forcing % max_read_index, &
+                                              params % f107_kp_realtime_interval < 0, &
+                                              localrc )
+      IF( ipe_error_check( localrc, msg="call to Read_F107KP_IPE_Forcing failed", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    end if
+    CALL forcing % Estimate_AP_from_KP( forcing % current_index )
+
   END SUBROUTINE Update_Current_index
 
 
-  SUBROUTINE Read_F107KP_IPE_Forcing( forcing, filename, data_size, read_in_start, rc )
+  SUBROUTINE Read_F107KP_IPE_Forcing( forcing, filename, data_size, read_in_start, read_in_skip, fill, rc )
 
     IMPLICIT NONE
 
@@ -267,6 +290,8 @@ CONTAINS
     CHARACTER(*),         INTENT(in)    :: filename
     INTEGER,              INTENT(in)    :: data_size
     INTEGER,              INTENT(in)    :: read_in_start
+    INTEGER,              INTENT(in)    :: read_in_skip
+    LOGICAL,              INTENT(in)    :: fill
     INTEGER,              INTENT(out)   :: rc
 
     ! Local
@@ -294,9 +319,17 @@ CONTAINS
 
     END DO
 
+    DO i = 1, read_in_skip
+
+      READ(fUnit, *, IOSTAT = iostat)
+      IF ( ipe_iostatus_check( iostat, msg="Error advancing forcing file "//filename, &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+
+    END DO
+
     read_in_size = MIN(forcing % n_time_levels, data_size)
     DO i = read_in_start, read_in_size + read_in_start - 1
-
+!      write(6,*) "reading",i
       READ(fUnit, *, IOSTAT = iostat) date_work, &
                                      forcing % f107(i), &
                                      forcing % kp(i), &
@@ -322,7 +355,9 @@ CONTAINS
     IF ( ipe_iostatus_check( iostat, msg="Error closing forcing file "//filename, &
       line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
-    DO i = read_in_start + read_in_size, forcing % n_time_levels
+    forcing % max_read_index = read_in_size + read_in_start - 1
+    if ( fill ) then
+      DO i = read_in_start + read_in_size, forcing % n_time_levels
         forcing % f107(i)               = forcing % f107(read_in_size)
         forcing % f107_81day_avg(i)     = forcing % f107_81day_avg(read_in_size)
         forcing % kp(i)                 = forcing % kp(read_in_size)
@@ -337,7 +372,8 @@ CONTAINS
         forcing % solarwind_Bz(i)       = forcing % solarwind_Bz(read_in_size)
         forcing % solarwind_density(i)  = forcing % solarwind_density(read_in_size)
 
-    END DO
+      END DO
+    end if
 
   END SUBROUTINE Read_F107KP_IPE_Forcing
 

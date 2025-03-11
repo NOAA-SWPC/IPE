@@ -138,7 +138,7 @@ COMIO support is being disabled (equivalent to --with-comio=no).
     COMIO_FFLAGS=$(eval $COMIO_CONFIG --fflags)
     for arg in $(eval $COMIO_CONFIG --flibs); do
       case "$arg" in
-        -L*) COMIO_LDFLAGS="$COMIO_LDFLAGS $arg"
+        -L*|?-L*) COMIO_LDFLAGS="$COMIO_LDFLAGS $arg"
              ;;
           *) COMIO_FLIBS="$COMIO_FLIBS $arg"
              ;;

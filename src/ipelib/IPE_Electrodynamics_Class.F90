@@ -188,7 +188,8 @@ CONTAINS
 
 
 
-  SUBROUTINE Update_IPE_Electrodynamics( eldyn, grid, forcing, time_tracker, plasma, mpi_layer, rc )
+  SUBROUTINE Update_IPE_Electrodynamics( eldyn, grid, forcing, time_tracker, plasma, &
+                                         offset1_deg,offset2_deg,potential_model, mpi_layer, rc )
     IMPLICIT NONE
     CLASS( IPE_Electrodynamics ), INTENT(inout) :: eldyn
     TYPE( IPE_Grid ),             INTENT(in)    :: grid
@@ -196,6 +197,8 @@ CONTAINS
     TYPE( IPE_Time ),             INTENT(in)    :: time_tracker
     TYPE( IPE_Plasma ),           INTENT(in)    :: plasma
     TYPE( IPE_MPI_Layer ),        INTENT(in)    :: mpi_layer
+    REAL(prec),                   INTENT(in)    :: offset1_deg,offset2_deg
+    INTEGER,                      INTENT(in)    :: potential_model
     INTEGER, OPTIONAL,            INTENT(out)   :: rc
     ! Local
     INTEGER :: lp, mp, localrc
@@ -209,7 +212,8 @@ CONTAINS
 
     IF( dynamo_efield ) THEN
 
-      CALL eldyn % Dynamo_Wrapper(grid, forcing, time_tracker, plasma, mpi_layer, rc=localrc )
+      CALL eldyn % Dynamo_Wrapper(grid, forcing, time_tracker, plasma, &
+                                  offset1_deg,offset2_deg, potential_model, mpi_layer, rc=localrc )
       IF ( ipe_error_check(localrc, msg="call to Dynamo_Wrapper failed", &
         line=__LINE__, file=__FILE__, rc=rc) ) RETURN
       IF( mpi_layer % rank_id == 0 )THEN
@@ -307,12 +311,13 @@ CONTAINS
 
 !   write(1000 + mpi_layer % rank_id, *) 'TIME'
 
+
     DO mp = grid % mp_low, grid % mp_high
       DO lp = 1, grid % NLP
+         eldyn % v_ExB_apex(1,lp,mp) = eldyn % electric_field(2,lp,mp)/grid % apex_be3(lp,mp)
+         eldyn % v_ExB_apex(2,lp,mp) = -eldyn % electric_field(1,lp,mp)/grid % apex_be3(lp,mp)
          DO i_90km = 1, grid % flux_tube_max(lp)
 
-        eldyn % v_ExB_apex(1,lp,mp) = eldyn % electric_field(2,lp,mp)/grid % apex_be3(lp,mp)
-        eldyn % v_ExB_apex(2,lp,mp) = -eldyn % electric_field(1,lp,mp)/grid % apex_be3(lp,mp)
 !         eldyn % v_ExB_apex(1,lp,mp) = v_boost_factor * (eldyn % electric_field(2,lp,mp)/grid % apex_be3(lp,mp))
 !         eldyn % v_ExB_apex(2,lp,mp) = v_boost_factor * (-eldyn % electric_field(1,lp,mp)/grid % apex_be3(lp,mp))
 
@@ -709,7 +714,8 @@ CONTAINS
   END SUBROUTINE sunloc
 
 
-  SUBROUTINE Dynamo_Wrapper(eldyn,grid,forcing,time_tracker, plasma, mpi_layer, rc)
+  SUBROUTINE Dynamo_Wrapper(eldyn,grid,forcing,time_tracker, plasma, &
+                            offset1_deg,offset2_deg,potential_model, mpi_layer, rc)
 
     use module_init_cons!,only:init_cons
     use module_init_heelis!,only:init_heelis
@@ -721,7 +727,6 @@ CONTAINS
     use heelis_module, only:ctpoten
     use module_magfield
     use ipe_error_module
-!!     use module_update_fli,ONLY:update_fli
 
     CLASS( IPE_Electrodynamics ), INTENT(inout) :: eldyn
     TYPE( IPE_Forcing ),          INTENT(in)    :: forcing
@@ -729,6 +734,8 @@ CONTAINS
     TYPE( IPE_Grid ),             INTENT(in)    :: grid
     TYPE( IPE_Plasma ),           INTENT(in)    :: plasma
     TYPE( IPE_MPI_Layer ),        INTENT(in)    :: mpi_layer
+    REAL(prec),                   INTENT(in)    :: offset1_deg,offset2_deg
+    INTEGER,                      INTENT(in)    :: potential_model
     INTEGER, OPTIONAL,            INTENT(out)   :: rc
 
     INTEGER, PARAMETER :: dyn_midpoint=48 
@@ -740,9 +747,8 @@ CONTAINS
     INTEGER    :: tube_need(dyn_midpoint),ihem,lp_dyn
     INTEGER    :: localrc
     REAL(prec) :: mlat_plas,mlat_dyn
-    REAL(prec) :: fkp
+    REAL(prec) :: fkp,fkpa
     REAL(prec) :: ed_dyn(170,80,2)
-    REAL(prec) :: theta0(kmlat)
     REAL(prec) :: xlonm_deg_map(82)
     REAL(prec) :: ylatm_deg_map(kmlat)
     REAL(prec) :: ed1dy_map(82,kmlat)
@@ -759,10 +765,8 @@ CONTAINS
     swvel= forcing % solarwind_velocity (forcing % current_index )
     swden= forcing % solarwind_density (forcing % current_index )
     stilt= get_tilt(time_tracker%year,time_tracker%month,time_tracker%day,time_tracker%utime)
-
     fkp= forcing % kp ( forcing % current_index )
     ctpoten= 15.+15.*fkp+0.8*fkp**2
-    CALL init_heelis
 
     year=2000
 
@@ -867,7 +871,7 @@ CONTAINS
 ! Can we push the dynamo grid to match the IPE grid (NMP,2*NLP)?
 ! ************************ !
 
-    call highlat( rc=localrc )
+    call highlat( offset1_deg,offset2_deg, potential_model, rc=localrc )
     if (ipe_error_check(localrc,msg="call to highlat failed", &
       line=__LINE__, file=__FILE__, rc=rc)) return
 
