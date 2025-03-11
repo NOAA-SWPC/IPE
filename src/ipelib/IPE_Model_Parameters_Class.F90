@@ -28,6 +28,7 @@ MODULE IPE_Model_Parameters_Class
     INTEGER        :: f107_kp_skip_size
     INTEGER        :: f107_kp_data_size
     INTEGER        :: f107_kp_read_in_start
+    INTEGER        :: f107_kp_realtime_interval
     LOGICAL        :: use_f107_kp_file
     CHARACTER(200) :: f107_kp_file
 
@@ -59,18 +60,30 @@ MODULE IPE_Model_Parameters_Class
     REAL(prec) :: solarwind_density
 
     !FileIO
-    LOGICAL :: read_apex_neutrals
-    LOGICAL :: read_geographic_neutrals
-    LOGICAL :: write_apex_neutrals
-    LOGICAL :: write_geographic_neutrals
-    LOGICAL :: write_geographic_eldyn
-    LOGICAL :: write_apex_eldyn
-    REAL(prec) :: file_output_frequency
+    LOGICAL        :: read_apex_neutrals
+    LOGICAL        :: read_geographic_neutrals
+    LOGICAL        :: write_apex_neutrals
+    LOGICAL        :: write_geographic_neutrals
+    LOGICAL        :: write_geographic_eldyn
+    LOGICAL        :: write_apex_eldyn
+    REAL(prec)     :: file_output_frequency
+    CHARACTER(200) :: file_prefix
+    CHARACTER(3)   :: file_extension
 
     !ElDyn
     LOGICAL :: dynamo_efield
 
     INTEGER :: n_model_updates
+
+    ! >> Operations
+    REAL(prec) :: colfac
+    REAL(prec) :: offset1_deg
+    REAL(prec) :: offset2_deg
+    INTEGER    :: potential_model
+    REAL(prec) :: hpeq
+    INTEGER    :: transport_highlat_lp
+    INTEGER    :: perp_transport_max_lp
+    REAL(prec) :: vertical_wind_limit
 
     CONTAINS
 
@@ -99,6 +112,7 @@ CONTAINS
     INTEGER        :: f107_kp_size
     INTEGER        :: f107_kp_interval
     INTEGER        :: f107_kp_skip_size
+    INTEGER        :: f107_kp_realtime_interval
     INTEGER        :: f107_kp_data_size
     INTEGER        :: f107_kp_read_in_start
     CHARACTER(200) :: f107_kp_file
@@ -108,13 +122,15 @@ CONTAINS
     LOGICAL        :: write_geographic_neutrals
     LOGICAL        :: write_geographic_eldyn
     LOGICAL        :: write_apex_eldyn
-    LOGICAL        :: dynamo_efield
     REAL(prec)     :: file_output_frequency
+    CHARACTER(200) :: file_prefix
+    CHARACTER(3)   :: file_extension
     REAL(prec)     :: mesh_height_min
     REAL(prec)     :: mesh_height_max
     INTEGER        :: mesh_fill
     INTEGER        :: mesh_write
     CHARACTER(200) :: mesh_write_file
+    LOGICAL        :: dynamo_efield
     ! >> Fixed parameters
     REAL(prec) :: f107
     REAL(prec) :: f107_81day_avg
@@ -134,24 +150,35 @@ CONTAINS
     REAL(prec) :: solarwind_velocity
     REAL(prec) :: solarwind_Bz
     REAL(prec) :: solarwind_density
+    ! >> Ops
+    REAL(prec) :: colfac
+    REAL(prec) :: offset1_deg
+    REAL(prec) :: offset2_deg
+    INTEGER    :: potential_model
+    REAL(prec) :: hpeq
+    INTEGER    :: transport_highlat_lp
+    INTEGER    :: perp_transport_max_lp
+    REAL(prec) :: vertical_wind_limit
 
     ! Communication buffers
-    CHARACTER(LEN=200), DIMENSION( 4) :: sbuf
-    INTEGER,            DIMENSION(20) :: ibuf
-    REAL(prec),         DIMENSION(21) :: rbuf
+    CHARACTER(LEN=200), DIMENSION( 6) :: sbuf
+    INTEGER,            DIMENSION(24) :: ibuf
+    REAL(prec),         DIMENSION(26) :: rbuf
 
 
     NAMELIST / SpaceManagement / grid_file
     NAMELIST / TimeStepping    / time_step, start_time, end_time, msis_time_step, initial_timestamp
-    NAMELIST / Forcing         / solar_forcing_time_step, f107_kp_size, f107_kp_interval, f107_kp_skip_size, &
+    NAMELIST / Forcing         / solar_forcing_time_step, f107_kp_size, f107_kp_interval, f107_kp_skip_size, f107_kp_realtime_interval, &
                                  f107_kp_data_size, f107_kp_read_in_start, f107_kp_file, f107, f107_flag, f107_81day_avg, &
                                  kp, kp_flag, kp_flag, kp_1day_avg, ap, ap_flag, ap_1day_avg, nhemi_power, &
                                  nhemi_power_index, shemi_power, shemi_power_index, solarwind_By, solarwind_angle, &
                                  solarwind_velocity, solarwind_Bz, solarwind_density
     NAMELIST / FileIO          / read_apex_neutrals, read_geographic_neutrals, write_apex_neutrals, write_geographic_neutrals, &
-                                 write_geographic_eldyn, write_apex_eldyn, file_output_frequency
+                                 write_geographic_eldyn, write_apex_eldyn, file_output_frequency, file_prefix, file_extension
     NAMELIST / IPECAP          / mesh_height_min, mesh_height_max, mesh_fill, mesh_write, mesh_write_file
     NAMELIST / ElDyn           / dynamo_efield
+    NAMELIST / OPERATIONAL     / colfac, offset1_deg, offset2_deg, potential_model, hpeq, &
+                                 transport_highlat_lp, perp_transport_max_lp, vertical_wind_limit
 
     ! Begin
     IF (PRESENT(rc)) rc = IPE_SUCCESS
@@ -159,7 +186,7 @@ CONTAINS
     ! Default Parameters !
 
     ! SpaceManagement
-    grid_file = './IPE_Grid.h5'
+    grid_file = 'IPE_Grid.nc'
 
     ! TimeStepping !
     time_step   = 180.0_prec
@@ -175,6 +202,7 @@ CONTAINS
     f107_kp_skip_size = 0
     f107_kp_data_size = 1
     f107_kp_read_in_start = 0
+    f107_kp_realtime_interval = -1
     f107_kp_file      = ''
 
     ! Default settings
@@ -205,6 +233,8 @@ CONTAINS
     write_geographic_eldyn    = .TRUE.
     write_apex_eldyn          = .TRUE.
     file_output_frequency     = 180.0_prec
+    file_prefix               = "IPE_State.apex."
+    file_extension            = ".nc"
 
     ! IPECAP !
     mesh_height_min =   0.
@@ -214,7 +244,17 @@ CONTAINS
     mesh_write_file = 'ipemesh'
 
     ! ElDyn !
-    dynamo_efield          = .TRUE.
+    dynamo_efield       = .TRUE.
+
+    ! Operational
+    colfac                = 1.3_prec
+    offset1_deg           = 5.0_prec
+    offset2_deg           = 20.0_prec
+    potential_model       = 2
+    hpeq                  = 0.0_prec
+    transport_highlat_lp  = 30
+    perp_transport_max_lp = 151
+    vertical_wind_limit   = 100.0_prec
 
     ! Initialize buffers
     sbuf = ""
@@ -255,6 +295,9 @@ CONTAINS
       READ( UNIT = fUnit, NML = ElDyn,           IOSTAT = iostatus )
       IF ( ipe_iostatus_check( iostatus, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
+      READ( UNIT = fUnit, NML = Operational,     IOSTAT = iostatus )
+      IF ( ipe_iostatus_check( iostatus, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+
       CLOSE( fUnit, IOSTAT = iostatus )
       IF ( ipe_iostatus_check( iostatus, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
@@ -266,26 +309,31 @@ CONTAINS
 
       ! prepare buffers
       ! -- strings
-      sbuf = (/ grid_file, initial_timestamp, f107_kp_file, mesh_write_file /)
+      sbuf = (/ grid_file, initial_timestamp, f107_kp_file, mesh_write_file, file_prefix, file_extension /)
       ! -- integers
-      ibuf(1:12) = (/ f107_kp_size, f107_kp_interval, f107_kp_skip_size, &
+      ibuf(1:13) = (/ f107_kp_size, f107_kp_interval, f107_kp_skip_size, f107_kp_realtime_interval, &
                       f107_kp_data_size, f107_kp_read_in_start, mesh_fill, mesh_write, &
                       f107_flag, kp_flag, ap_flag, nhemi_power_index, shemi_power_index /)
       ! -- logicals
-      IF ( read_apex_neutrals        ) ibuf(13) = 1
-      IF ( read_geographic_neutrals  ) ibuf(14) = 1
-      IF ( write_apex_neutrals       ) ibuf(15) = 1
-      IF ( write_geographic_neutrals ) ibuf(16) = 1
-      IF ( write_geographic_eldyn    ) ibuf(17) = 1
-      IF ( write_apex_eldyn          ) ibuf(18) = 1
-      IF ( params % use_f107_kp_file ) ibuf(19) = 1
-      IF ( dynamo_efield             ) ibuf(20) = 1
+      IF ( read_apex_neutrals        ) ibuf(14) = 1
+      IF ( read_geographic_neutrals  ) ibuf(15) = 1
+      IF ( write_apex_neutrals       ) ibuf(16) = 1
+      IF ( write_geographic_neutrals ) ibuf(17) = 1
+      IF ( write_geographic_eldyn    ) ibuf(18) = 1
+      IF ( write_apex_eldyn          ) ibuf(19) = 1
+      IF ( params % use_f107_kp_file ) ibuf(20) = 1
+      IF ( dynamo_efield             ) ibuf(21) = 1
+      ! -- integers for operations
+      ibuf(22) = potential_model
+      ibuf(23) = transport_highlat_lp
+      ibuf(24) = perp_transport_max_lp
 
       ! -- reals
       rbuf = (/ time_step, start_time, end_time, msis_time_step, solar_forcing_time_step, &
                 mesh_height_min, mesh_height_max, f107, f107_81day_avg, kp, kp_1day_avg, ap,   &
                 ap_1day_avg, nhemi_power, shemi_power, solarwind_By, solarwind_angle,          &
-                solarwind_velocity, solarwind_Bz, solarwind_density, file_output_frequency /)
+                solarwind_velocity, solarwind_Bz, solarwind_density, file_output_frequency, &
+                colfac, offset1_deg, offset2_deg, hpeq, vertical_wind_limit /)
 
     ENDIF
 
@@ -298,32 +346,38 @@ CONTAINS
     params % initial_timestamp = sbuf(2)
     params % f107_kp_file      = sbuf(3)
     params % mesh_write_file   = sbuf(4)
+    params % file_prefix       = sbuf(5)
+    params % file_extension    = sbuf(6)
 
 #ifdef HAVE_MPI
     CALL MPI_BCAST( ibuf, size(ibuf), MPI_INTEGER, 0, mpi_layer % mpi_communicator, ierr )
     IF ( ipe_status_check( ierr == 0, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 #endif
 
-    params % f107_kp_size          = ibuf(1)
-    params % f107_kp_interval      = ibuf(2)
-    params % f107_kp_skip_size     = ibuf(3)
-    params % f107_kp_data_size     = ibuf(4)
-    params % f107_kp_read_in_start = ibuf(5)
-    params % mesh_fill             = ibuf(6)
-    params % mesh_write            = ibuf(7)
-    params % f107_flag             = ibuf(8)
-    params % kp_flag               = ibuf(9)
-    params % ap_flag               = ibuf(10)
-    params % nhemi_power_index     = ibuf(11)
-    params % shemi_power_index     = ibuf(12)
-    params % read_apex_neutrals        = ( ibuf(13) == 1 )
-    params % read_geographic_neutrals  = ( ibuf(14) == 1 )
-    params % write_apex_neutrals       = ( ibuf(15) == 1 )
-    params % write_geographic_neutrals = ( ibuf(16) == 1 )
-    params % write_geographic_eldyn    = ( ibuf(17) == 1 )
-    params % write_apex_eldyn          = ( ibuf(18) == 1 )
-    params % use_f107_kp_file          = ( ibuf(19) == 1 )
-    params % dynamo_efield             = ( ibuf(20) == 1 )
+    params % f107_kp_size              = ibuf(1)
+    params % f107_kp_interval          = ibuf(2)
+    params % f107_kp_skip_size         = ibuf(3)
+    params % f107_kp_realtime_interval = ibuf(4)
+    params % f107_kp_data_size         = ibuf(5)
+    params % f107_kp_read_in_start     = ibuf(6)
+    params % mesh_fill                 = ibuf(7)
+    params % mesh_write                = ibuf(8)
+    params % f107_flag                 = ibuf(9)
+    params % kp_flag                   = ibuf(10)
+    params % ap_flag                   = ibuf(11)
+    params % nhemi_power_index         = ibuf(12)
+    params % shemi_power_index         = ibuf(13)
+    params % read_apex_neutrals        = ( ibuf(14) == 1 )
+    params % read_geographic_neutrals  = ( ibuf(15) == 1 )
+    params % write_apex_neutrals       = ( ibuf(16) == 1 )
+    params % write_geographic_neutrals = ( ibuf(17) == 1 )
+    params % write_geographic_eldyn    = ( ibuf(18) == 1 )
+    params % write_apex_eldyn          = ( ibuf(19) == 1 )
+    params % use_f107_kp_file          = ( ibuf(20) == 1 )
+    params % dynamo_efield             = ( ibuf(21) == 1 )
+    params % potential_model           = ibuf(22)
+    params % transport_highlat_lp      = ibuf(23)
+    params % perp_transport_max_lp     = ibuf(24)
 
 #ifdef HAVE_MPI
     CALL MPI_BCAST( rbuf, size(rbuf), mpi_layer % mpi_prec, 0, mpi_layer % mpi_communicator, ierr )
@@ -351,6 +405,11 @@ CONTAINS
     params % solarwind_Bz            = rbuf(19)
     params % solarwind_density       = rbuf(20)
     params % file_output_frequency   = rbuf(21)
+    params % colfac                  = rbuf(22)
+    params % offset1_deg             = rbuf(23)
+    params % offset2_deg             = rbuf(24)
+    params % hpeq                    = rbuf(25)
+    params % vertical_wind_limit     = rbuf(26)
 
     params % n_model_updates = INT( ( params % end_time - params % start_time ) / params % file_output_frequency )
 

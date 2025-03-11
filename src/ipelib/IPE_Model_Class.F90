@@ -1,3 +1,6 @@
+!nm20240918 version 4 of IPE_Model_Class
+!with separate subroutines for cold vs warm start
+
 MODULE IPE_Model_Class
 
   USE IPE_Precision
@@ -24,15 +27,15 @@ MODULE IPE_Model_Class
 
   TYPE IPE_Model
 
-    TYPE( IPE_Time )             :: time_tracker
-    TYPE( IPE_Model_Parameters ) :: parameters
-    TYPE( IPE_Grid )             :: grid
-    TYPE( IPE_Forcing )          :: forcing
-    TYPE( IPE_Neutrals )         :: neutrals
-    TYPE( IPE_Plasma )           :: plasma
-    TYPE( IPE_Electrodynamics )  :: eldyn
-    TYPE( IPE_MPI_Layer )        :: mpi_layer
-    CLASS( COMIO_T ), POINTER    :: io => NULL()
+    TYPE( IPE_Time )              :: time_tracker
+    TYPE( IPE_Model_Parameters )  :: parameters
+    TYPE( IPE_Grid )              :: grid
+    TYPE( IPE_Forcing )           :: forcing
+    TYPE( IPE_Neutrals )          :: neutrals
+    TYPE( IPE_Plasma )            :: plasma
+    TYPE( IPE_Electrodynamics )   :: eldyn
+    TYPE( IPE_MPI_Layer )         :: mpi_layer
+    CLASS( COMIO_T ), ALLOCATABLE :: io
 
     CONTAINS
 
@@ -46,14 +49,62 @@ MODULE IPE_Model_Class
 
   END TYPE IPE_Model
 
+
+  INTEGER, PARAMETER :: num_ion_densities = 9
+  CHARACTER(LEN=*), DIMENSION(num_ion_densities), PARAMETER :: ion_densities = &
+      (/ &
+        "o_plus_density   ", &
+        "h_plus_density   ", &
+        "he_plus_density  ", &
+        "n_plus_density   ", &
+        "no_plus_density  ", &
+        "o2_plus_density  ", &
+        "n2_plus_density  ", &
+        "o_plus_2D_density", &
+        "o_plus_2P_density"  &
+      /)
+
+  INTEGER, PARAMETER :: num_ion_velocities = 3
+  CHARACTER(LEN=*), DIMENSION(num_ion_velocities), PARAMETER :: ion_velocities = &
+      (/ &
+        "o_plus_velocity ", &
+        "h_plus_velocity ", &
+        "he_plus_velocity"  &
+      /)
+
+  INTEGER, PARAMETER :: num_plasma_datasets = 2
+  CHARACTER(LEN=*), DIMENSION(num_plasma_datasets), PARAMETER :: plasma_datasets = &
+      (/ &
+        "ion_temperature     ", &
+        "electron_temperature"  &
+      /)
+
+  INTEGER, PARAMETER :: num_apex_velocities = 3
+  CHARACTER(LEN=*), DIMENSION(num_apex_velocities), PARAMETER :: apex_velocities = &
+      (/ &
+        "neutral_apex1_velocity", &
+        "neutral_apex2_velocity", &
+        "neutral_apex3_velocity"  &
+      /)
+
+
+  INTEGER, PARAMETER :: num_geo_datasets = 3
+  CHARACTER(LEN=*), DIMENSION(num_geo_datasets), PARAMETER :: geo_datasets = &
+      (/ &
+        "neutral_geographic_velocity1", &
+        "neutral_geographic_velocity2", &
+        "neutral_geographic_velocity3"  &
+      /)
+
+
 CONTAINS
 
-  SUBROUTINE Build_IPE_Model( ipe, mpi_comm, rc )
+  SUBROUTINE Build_IPE_Model( ipe, comm, rc )
 
     IMPLICIT NONE
 
     CLASS( IPE_Model ), INTENT(inout) :: ipe
-    INTEGER, OPTIONAL,  INTENT(in)    :: mpi_comm
+    integer, OPTIONAL,  INTENT(in)    :: comm
     INTEGER, OPTIONAL,  INTENT(out)   :: rc
 
     ! Local
@@ -61,22 +112,24 @@ CONTAINS
 
     IF (PRESENT(rc)) rc = IPE_SUCCESS
 
-    CALL ipe % mpi_layer % Initialize( comm = mpi_comm )
+    CALL ipe % mpi_layer % Initialize( comm = comm )
 
     CALL ipe % parameters % Build( ipe % mpi_layer, rc=localrc )
     IF ( ipe_error_check( localrc, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     ! Initialize I/O
     IF ( ipe % mpi_layer % enabled ) THEN
-      ipe % io => COMIO_T(fmt=COMIO_FMT_HDF5, &
-                          comm=ipe % mpi_layer % mpi_communicator, &
-                          info=ipe % mpi_layer % mpi_info)
-      IF ( ipe_status_check( .not.ipe % io % err % check(), &
+      call COMIO_Create(ipe % io, COMIO_FMT_PNETCDF, &
+                        comm=ipe % mpi_layer % mpi_communicator, &
+                        info=ipe % mpi_layer % mpi_info, &
+                        rc=localrc)
+      IF ( ipe_error_check( localrc, &
         msg="Failed to initialize I/O layer", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     ELSE
-      ipe % io => COMIO_T(fmt=COMIO_FMT_HDF5)
-      IF ( ipe_status_check( .not.ipe % io % err % check(), &
+      call COMIO_Create(ipe % io, COMIO_FMT_PNETCDF, &
+                        rc=localrc)
+      IF ( ipe_error_check( localrc, &
         msg="Failed to initialize I/O layer", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     END IF
@@ -92,7 +145,7 @@ CONTAINS
 
     ! ////// grid ////// !
 
-    CALL ipe % grid % Build( ipe % io, ipe % mpi_layer, ipe % parameters, "IPE_Grid.h5", rc=localrc )
+    CALL ipe % grid % Build( ipe % io, ipe % mpi_layer, ipe % parameters, rc=localrc )
     IF ( ipe_error_check( localrc, msg="Failed to initialize model grid", &
       line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
@@ -195,13 +248,18 @@ CONTAINS
 
     DO i = 1, nSteps
 
-      call ipe % forcing % Update_Current_Index( ipe % parameters, ipe % time_tracker % elapsed_sec )
+      call ipe % forcing % Update_Current_Index( ipe % parameters, &
+                                                 ipe % time_tracker % elapsed_sec, &
+                                                 rc = localrc )
+      IF ( ipe_error_check( localrc, msg="Failed to update driver index", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
       CALL ipe % neutrals % Update( ipe % parameters, &
                                     ipe % grid, &
                                     ipe % time_tracker, &
                                     ipe % forcing, &
                                     ipe % mpi_layer, &
+                                    ipe % parameters % vertical_wind_limit, &
                                     rc = localrc )
       IF ( ipe_error_check( localrc, msg="Failed to update neutrals", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
@@ -210,6 +268,9 @@ CONTAINS
                                  ipe % forcing, &
                                  ipe % time_tracker, &
                                  ipe % plasma, &
+                                 ipe % parameters % offset1_deg, &
+                                 ipe % parameters % offset2_deg, &
+                                 ipe % parameters % potential_model, &
                                  ipe % mpi_layer, &
                                  rc = localrc )
       IF ( ipe_error_check( localrc, msg="Failed to update electrodynamics", &
@@ -222,6 +283,10 @@ CONTAINS
                                   ipe % mpi_layer, &
                                   ipe % eldyn % v_ExB_apex, &
                                   ipe % parameters % time_step, &
+                                  ipe % parameters % colfac, &
+                                  ipe % parameters % hpeq, &
+                                  ipe % parameters % transport_highlat_lp, &
+                                  ipe % parameters % perp_transport_max_lp, &
                                   rc = localrc )
       IF ( ipe_error_check( localrc, msg="Failed to update plasma", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
@@ -251,7 +316,7 @@ CONTAINS
     IF ( ipe_error_check( localrc, msg="Failed to read file "//filename, &
       line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
-    CALL ipe % plasma % Calculate_Field_Line_Integrals( ipe % grid, ipe % neutrals, ipe % mpi_layer )
+    CALL ipe % plasma % Calculate_Field_Line_Integrals( ipe % grid, ipe % neutrals, ipe % parameters % colfac, ipe % mpi_layer )
 
   END SUBROUTINE Initialize_IPE_Model
 
@@ -264,53 +329,224 @@ CONTAINS
     CHARACTER(*),       INTENT(in)    :: filename
     INTEGER, OPTIONAL,  INTENT(out)   :: rc
 
+    ! Local variables
+    logical :: is_cold_start
+    integer :: localrc
+
+    IF ( PRESENT( rc ) ) rc = IPE_FAILURE
+
+    ! Determine initialization type from parameters
+    is_cold_start = .true.
+        
+    if (is_cold_start) then
+      call Cold_Start_Initialize(ipe, localrc)
+    else
+      call Warm_Start_Initialize(ipe, filename, localrc)
+    endif !is_cold_start
+        
+    if (present(rc)) rc = localrc
+  END SUBROUTINE Read_IPE_State
+
+  SUBROUTINE Cold_Start_Initialize(ipe, rc)
+
+    IMPLICIT NONE
+
+    CLASS( IPE_Model ), INTENT(inout) :: ipe
+    INTEGER, OPTIONAL,  INTENT(out)   :: rc
+
+    ! Local variables
+    INTEGER :: item
+
+    IF ( PRESENT( rc ) ) rc = IPE_FAILURE
+
+    IF ( ipe % mpi_layer % rank_id == 0 ) THEN
+      PRINT*, '  initializing ipe profiles for cold start'
+    ENDIF
+
+    !!! Setup common data decomposition for datasets
+    !CALL ipe % io % domain( (/ ipe % grid % nFluxtube, ipe % grid % NLP, ipe % grid % NMP /), &
+    !  (/ 1, 1, ipe % mpi_layer % mp_low /), &
+    !  (/ ipe % grid % nFluxtube, ipe % grid % NLP, ipe % mpi_layer % mp_high - ipe % mpi_layer % mp_low + 1 /) )
+    !IF (ipe % io % err % check(msg="Failed to setup I/O data decomposition", &
+    !  file=__FILE__, line=__LINE__)) RETURN
+
+
+    ! --  set up neutral datasets if requested
+    !IF ( ipe % mpi_layer % rank_id == 0 ) 
+    !print*, ' neutral properties'
+    IF( ipe % parameters % read_apex_neutrals )THEN
+      call Initialize_Neutral_Properties(ipe)
+    END IF !( ipe % parameters % read_apex_neutrals )THEN
+
+    ! (1) Set up individual datasets: plasma
+    !IF ( ipe % mpi_layer % rank_id == 0 ) 
+    !print*, 'plasma temperatures'
+    call Initialize_Plasma_Temperatures(ipe)
+
+
+    ! -- Ion densities
+     !IF ( ipe % mpi_layer % rank_id == 0 ) 
+    !print*, ' ion densities'
+    itemLoop1: DO item = 1, num_ion_densities
+      ipe % plasma % ion_densities(item,:,:,:) = 1.0E6
+    END DO itemLoop1
+
+    ! -- Ion velocities
+    !IF ( ipe % mpi_layer % rank_id == 0 ) 
+    !print*, ' ion velocity'
+    ! Initialize ion velocities
+    call Initialize_Ion_Velocities(ipe)
+
+
+    ! -- (2)Compute plasma electron density from ion densities
+    !IF ( ipe % mpi_layer % rank_id == 0 ) 
+    !print*, ' calculate Ne'
+    ipe % plasma % electron_density2(:,:,:) = &
+      SUM(ipe % plasma % ion_densities(1:9, :, :, :), dim=1)
+
+
+
+    ! set up neutral velocities on geographic grid, if requested
+    !IF ( ipe % mpi_layer % rank_id == 0 ) 
+    !print*, ' neutral wind geo'
+    IF( ipe % parameters % read_geographic_neutrals )THEN
+      itemLoop2: DO item = 1, num_geo_datasets
+        ipe % neutrals % velocity_geographic(item,:,:,:) = 10.0
+      END DO itemLoop2
+    END IF
+
+    ! set up initial profiles finished succesfully
+    IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
+
+    IF ( ipe % mpi_layer % rank_id == 0 ) &
+         print*, 'sub-ipe_initialization for cold start finished'    
+  END SUBROUTINE Cold_Start_Initialize
+
+  subroutine Initialize_Ion_Velocities(ipe)
+  
+    IMPLICIT NONE
+  
+    class(IPE_Model), intent(inout) :: ipe
+    !local
+    integer :: item
+        
+        do item = 1, NUM_ION_VELOCITIES
+            ipe%plasma%ion_velocities(item,:,:,:) = 10.0
+        end do
+  end subroutine Initialize_Ion_Velocities
+
+
+  subroutine Initialize_Plasma_Temperatures(ipe)
+  
+    IMPLICIT NONE
+  
+    class(IPE_Model), intent(inout) :: ipe
+    !local
+
+!    PRINT*, 'Initializing plasma temperatures'
+
+    ipe % plasma % ion_temperature(:,:,:) = 1800.0
+    ipe % plasma % electron_temperature(:,:,:) = 3000.0
+
+!    PRINT*, 'Plasma temperatures initialized successfully'
+  end subroutine Initialize_Plasma_Temperatures
+
+  subroutine Initialize_Neutral_Properties(ipe)
+     IMPLICIT NONE
+  
+    class(IPE_Model), intent(inout) :: ipe
+    !local
+    integer :: item
+
+    !o_density
+    ipe % neutrals % oxygen(:,:,:) = 1.0E+11
+
+    !h_density
+    ipe % neutrals % hydrogen(:,:,:) = 1.0E+5
+
+    !he_density
+    ipe % neutrals % helium(:,:,:) = 1.0E+5
+      
+    !n_density
+    ipe % neutrals % nitrogen(:,:,:) = 1.0E+5
+    
+    !o2_density
+    ipe % neutrals % molecular_oxygen(:,:,:) = 1.0E+10
+     
+    !n2_density
+    ipe % neutrals % molecular_nitrogen(:,:,:) = 1.0E+11
+      
+
+    !neutral_temperature
+    !IF ( ipe % mpi_layer % rank_id == 0 ) 
+    !print*, ' neutral temperature'
+    ipe % neutrals % temperature(:,:,:) = 600.0
+
+    ! set up neutral velocities on apex grid
+    !IF ( ipe % mpi_layer % rank_id == 0 ) 
+    !print*, ' neutral wind apex'
+    itemLoop: DO item = 1, num_apex_velocities
+      ipe % neutrals % velocity_apex(item,:,:,:) = 10.0
+    END DO itemLoop
+ 
+  END subroutine Initialize_Neutral_Properties !(ipe)
+
+  SUBROUTINE Warm_Start_Initialize(ipe, filename, rc)  
+
+    IMPLICIT NONE
+
+    CLASS( IPE_Model ), INTENT(inout) :: ipe
+    CHARACTER(*),       INTENT(in)    :: filename
+    INTEGER, OPTIONAL,  INTENT(out)   :: rc
+
+ 
+!    INTEGER, PARAMETER :: num_ion_densities = 9
+!    CHARACTER(LEN=*), DIMENSION(num_ion_densities), PARAMETER :: ion_densities = &
+!      (/ &
+!        "o_plus_density   ", &
+!        "h_plus_density   ", &
+!        "he_plus_density  ", &
+!        "n_plus_density   ", &
+!        "no_plus_density  ", &
+!        "o2_plus_density  ", &
+!        "n2_plus_density  ", &
+!        "o_plus_2D_density", &
+!        "o_plus_2P_density"  &
+!      /)
+
+!    INTEGER, PARAMETER :: num_ion_velocities = 3
+!    CHARACTER(LEN=*), DIMENSION(num_ion_velocities), PARAMETER :: ion_velocities = &
+!      (/ &
+!        "o_plus_velocity ", &
+!        "h_plus_velocity ", &
+!        "he_plus_velocity"  &
+!      /)
+
+!    INTEGER, PARAMETER :: num_plasma_datasets = 2
+!    CHARACTER(LEN=*), DIMENSION(num_plasma_datasets), PARAMETER :: plasma_datasets = &
+!      (/ &
+!        "ion_temperature     ", &
+!        "electron_temperature"  &
+!      /)
+
+!    INTEGER, PARAMETER :: num_apex_velocities = 3
+!    CHARACTER(LEN=*), DIMENSION(num_apex_velocities), PARAMETER :: apex_velocities = &
+!      (/ &
+!        "neutral_apex1_velocity", &
+!        "neutral_apex2_velocity", &
+!        "neutral_apex3_velocity"  &
+!      /)
+
+
+!    INTEGER, PARAMETER :: num_geo_datasets = 3
+!    CHARACTER(LEN=*), DIMENSION(num_geo_datasets), PARAMETER :: geo_datasets = &
+!      (/ &
+!        "neutral_geographic_velocity1", &
+!        "neutral_geographic_velocity2", &
+!        "neutral_geographic_velocity3"  &
+!      /)
+
     ! Local
-    INTEGER, PARAMETER :: num_ion_densities = 9
-    CHARACTER(LEN=*), DIMENSION(num_ion_densities), PARAMETER :: ion_densities = &
-      (/ &
-        "/apex/o_plus_density   ", &
-        "/apex/h_plus_density   ", &
-        "/apex/he_plus_density  ", &
-        "/apex/n_plus_density   ", &
-        "/apex/no_plus_density  ", &
-        "/apex/o2_plus_density  ", &
-        "/apex/n2_plus_density  ", &
-        "/apex/o_plus_2D_density", &
-        "/apex/o_plus_2P_density"  &
-      /)
-
-    INTEGER, PARAMETER :: num_ion_velocities = 3
-    CHARACTER(LEN=*), DIMENSION(num_ion_velocities), PARAMETER :: ion_velocities = &
-      (/ &
-        "/apex/o_plus_velocity ", &
-        "/apex/h_plus_velocity ", &
-        "/apex/he_plus_velocity"  &
-      /)
-
-    INTEGER, PARAMETER :: num_plasma_datasets = 2
-    CHARACTER(LEN=*), DIMENSION(num_plasma_datasets), PARAMETER :: plasma_datasets = &
-      (/ &
-        "/apex/ion_temperature     ", &
-        "/apex/electron_temperature"  &
-      /)
-
-    INTEGER, PARAMETER :: num_apex_velocities = 3
-    CHARACTER(LEN=*), DIMENSION(num_apex_velocities), PARAMETER :: apex_velocities = &
-      (/ &
-        "/apex/neutral_apex1_velocity", &
-        "/apex/neutral_apex2_velocity", &
-        "/apex/neutral_apex3_velocity"  &
-      /)
-
-
-    INTEGER, PARAMETER :: num_geo_datasets = 3
-    CHARACTER(LEN=*), DIMENSION(num_geo_datasets), PARAMETER :: geo_datasets = &
-      (/ &
-        "/apex/neutral_geographic_velocity1", &
-        "/apex/neutral_geographic_velocity2", &
-        "/apex/neutral_geographic_velocity3"  &
-      /)
-
     INTEGER :: item
 
     ! Begin
@@ -373,46 +609,46 @@ CONTAINS
 
     ! -- Read neutral datasets if requested
     IF( ipe % parameters % read_apex_neutrals )THEN
-      CALL ipe % io % read("/apex/o_density", &
+      CALL ipe % io % read("o_density", &
         ipe % neutrals % oxygen(:,:,                &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-      IF (ipe % io % err % check(msg="Failed to read dataset /apex/o_density", &
+      IF (ipe % io % err % check(msg="Failed to read dataset o_density", &
         file=__FILE__, line=__LINE__)) RETURN
 
-      CALL ipe % io % read("/apex/h_density", &
+      CALL ipe % io % read("h_density", &
         ipe % neutrals % hydrogen(:,:,              &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-      IF (ipe % io % err % check(msg="Failed to read dataset /apex/h_density", &
+      IF (ipe % io % err % check(msg="Failed to read dataset h_density", &
         file=__FILE__, line=__LINE__)) RETURN
 
-      CALL ipe % io % read("/apex/he_density", &
+      CALL ipe % io % read("he_density", &
         ipe % neutrals % helium(:,:,                 &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-      IF (ipe % io % err % check(msg="Failed to read dataset /apex/he_density", &
+      IF (ipe % io % err % check(msg="Failed to read dataset he_density", &
         file=__FILE__, line=__LINE__)) RETURN
 
-      CALL ipe % io % read("/apex/n_density", &
+      CALL ipe % io % read("n_density", &
         ipe % neutrals % nitrogen(:,:,              &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-      IF (ipe % io % err % check(msg="Failed to read dataset /apex/n_density", &
+      IF (ipe % io % err % check(msg="Failed to read dataset n_density", &
         file=__FILE__, line=__LINE__)) RETURN
 
-      CALL ipe % io % read("/apex/o2_density", &
+      CALL ipe % io % read("o2_density", &
         ipe % neutrals % molecular_oxygen(:,:,       &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-      IF (ipe % io % err % check(msg="Failed to read dataset /apex/o2_density", &
+      IF (ipe % io % err % check(msg="Failed to read dataset o2_density", &
         file=__FILE__, line=__LINE__)) RETURN
 
-      CALL ipe % io % read("/apex/n2_density", &
+      CALL ipe % io % read("n2_density", &
         ipe % neutrals % molecular_nitrogen(:,:,       &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-      IF (ipe % io % err % check(msg="Failed to read dataset /apex/n2_density", &
+      IF (ipe % io % err % check(msg="Failed to read dataset n2_density", &
         file=__FILE__, line=__LINE__)) RETURN
 
-      CALL ipe % io % read("/apex/neutral_temperature", &
+      CALL ipe % io % read("neutral_temperature", &
         ipe % neutrals % temperature(:,:,                     &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-      IF (ipe % io % err % check(msg="Failed to read dataset /apex/neutral_temperature", &
+      IF (ipe % io % err % check(msg="Failed to read dataset neutral_temperature", &
         file=__FILE__, line=__LINE__)) RETURN
 
       ! Read neutral velocities on apex grid
@@ -442,65 +678,65 @@ CONTAINS
       file=__FILE__, line=__LINE__)) RETURN
 
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
+   END SUBROUTINE Warm_Start_Initialize !(ipe, filename, rc)  
 
-  END SUBROUTINE Read_IPE_State
 
-  SUBROUTINE Write_IPE_State( ipe, filename, rc )
+  SUBROUTINE Write_IPE_State( ipe, rc )
 
     IMPLICIT NONE
 
     CLASS( IPE_Model ), INTENT(inout) :: ipe
-    CHARACTER(*),       INTENT(in)    :: filename
     INTEGER, OPTIONAL,  INTENT(out)   :: rc
 
     ! Local
+    CHARACTER(215)  :: filename
     INTEGER, PARAMETER :: num_groups = 1
     CHARACTER(LEN=*), DIMENSION(num_groups),   PARAMETER :: groups = (/ "apex" /)
 
-    INTEGER, PARAMETER :: num_ion_densities = 9
-    CHARACTER(LEN=*), DIMENSION(num_ion_densities), PARAMETER :: ion_densities = &
-      (/ &
-        "/apex/o_plus_density   ", &
-        "/apex/h_plus_density   ", &
-        "/apex/he_plus_density  ", &
-        "/apex/n_plus_density   ", &
-        "/apex/no_plus_density  ", &
-        "/apex/o2_plus_density  ", &
-        "/apex/n2_plus_density  ", &
-        "/apex/o_plus_2D_density", &
-        "/apex/o_plus_2P_density"  &
-      /)
+    !INTEGER, PARAMETER :: num_ion_densities = 9
+    !CHARACTER(LEN=*), DIMENSION(num_ion_densities), PARAMETER :: ion_densities = &
+    !  (/ &
+    !    "o_plus_density   ", &
+    !    "h_plus_density   ", &
+    !    "he_plus_density  ", &
+    !    "n_plus_density   ", &
+    !    "no_plus_density  ", &
+    !    "o2_plus_density  ", &
+    !    "n2_plus_density  ", &
+    !    "o_plus_2D_density", &
+    !    "o_plus_2P_density"  &
+    !  /)
 
-    INTEGER, PARAMETER :: num_ion_velocities = 3
-    CHARACTER(LEN=*), DIMENSION(num_ion_velocities), PARAMETER :: ion_velocities = &
-      (/ &
-        "/apex/o_plus_velocity ", &
-        "/apex/h_plus_velocity ", &
-        "/apex/he_plus_velocity"  &
-      /)
+    !INTEGER, PARAMETER :: num_ion_velocities = 3
+    !CHARACTER(LEN=*), DIMENSION(num_ion_velocities), PARAMETER :: ion_velocities = &
+    !  (/ &
+    !    "o_plus_velocity ", &
+    !    "h_plus_velocity ", &
+    !    "he_plus_velocity"  &
+    !  /)
 
-    INTEGER, PARAMETER :: num_plasma_datasets = 2
-    CHARACTER(LEN=*), DIMENSION(num_plasma_datasets), PARAMETER :: plasma_datasets = &
-      (/ &
-        "/apex/ion_temperature     ", &
-        "/apex/electron_temperature"  &
-      /)
+    !INTEGER, PARAMETER :: num_plasma_datasets = 2
+    !CHARACTER(LEN=*), DIMENSION(num_plasma_datasets), PARAMETER :: plasma_datasets = &
+    !  (/ &
+    !    "ion_temperature     ", &
+    !    "electron_temperature"  &
+    !  /)
 
-    INTEGER, PARAMETER :: num_apex_velocities = 3
-    CHARACTER(LEN=*), DIMENSION(num_apex_velocities), PARAMETER :: apex_velocities = &
-      (/ &
-        "/apex/neutral_apex1_velocity", &
-        "/apex/neutral_apex2_velocity", &
-        "/apex/neutral_apex3_velocity"  &
-      /)
+    !INTEGER, PARAMETER :: num_apex_velocities = 3
+    !CHARACTER(LEN=*), DIMENSION(num_apex_velocities), PARAMETER :: apex_velocities = &
+    !  (/ &
+    !    "neutral_apex1_velocity", &
+    !    "neutral_apex2_velocity", &
+    !    "neutral_apex3_velocity"  &
+    !  /)
 
-    INTEGER, PARAMETER :: num_geo_datasets = 3
-    CHARACTER(LEN=*), DIMENSION(num_geo_datasets), PARAMETER :: geo_datasets = &
-      (/ &
-        "/apex/neutral_geographic_velocity1", &
-        "/apex/neutral_geographic_velocity2", &
-        "/apex/neutral_geographic_velocity3"  &
-      /)
+    !INTEGER, PARAMETER :: num_geo_datasets = 3
+    !CHARACTER(LEN=*), DIMENSION(num_geo_datasets), PARAMETER :: geo_datasets = &
+    !  (/ &
+    !    "neutral_geographic_velocity1", &
+    !    "neutral_geographic_velocity2", &
+    !    "neutral_geographic_velocity3"  &
+    !  /)
 
     INTEGER :: item
     CHARACTER(LEN=28) :: dset_name
@@ -508,6 +744,10 @@ CONTAINS
     ! Begin
 
     IF ( PRESENT( rc ) ) rc = IPE_FAILURE
+
+    filename = TRIM(ipe % parameters % file_prefix) // &
+               ipe % time_tracker % DateStamp ( ) // &
+               ipe % parameters % file_extension
 
     IF( ipe % mpi_layer % rank_id == 0 )THEN
       PRINT *, '  Writing output file : '//TRIM(filename)
@@ -563,49 +803,49 @@ CONTAINS
     ! -- Read neutral datasets if requested
     IF( ipe % parameters % write_apex_neutrals )THEN
 
-      dset_name = "/apex/o_density"
+      dset_name = "o_density"
       CALL ipe % io % write(dset_name, &
         ipe % neutrals % oxygen(:,:,        &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
       IF (ipe % io % err % check(msg="Unable to write dataset "//dset_name, &
         file=__FILE__, line=__LINE__)) RETURN
 
-      dset_name = "/apex/h_density"
+      dset_name = "h_density"
       CALL ipe % io % write(dset_name, &
         ipe % neutrals % hydrogen(:,:,      &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
       IF (ipe % io % err % check(msg="Unable to write dataset "//dset_name, &
         file=__FILE__, line=__LINE__)) RETURN
 
-      dset_name = "/apex/he_density"
+      dset_name = "he_density"
       CALL ipe % io % write(dset_name, &
         ipe % neutrals % helium(:,:,        &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
       IF (ipe % io % err % check(msg="Unable to write dataset "//dset_name, &
         file=__FILE__, line=__LINE__)) RETURN
 
-      dset_name = "/apex/n_density"
+      dset_name = "n_density"
       CALL ipe % io % write(dset_name, &
         ipe % neutrals % nitrogen(:,:,      &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
       IF (ipe % io % err % check(msg="Unable to write dataset "//dset_name, &
         file=__FILE__, line=__LINE__)) RETURN
 
-      dset_name = "/apex/o2_density"
+      dset_name = "o2_density"
       CALL ipe % io % write(dset_name,    &
         ipe % neutrals % molecular_oxygen(:,:, &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
       IF (ipe % io % err % check(msg="Unable to write dataset "//dset_name, &
         file=__FILE__, line=__LINE__)) RETURN
 
-      dset_name = "/apex/n2_density"
+      dset_name = "n2_density"
       CALL ipe % io % write(dset_name,      &
         ipe % neutrals % molecular_nitrogen(:,:, &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
       IF (ipe % io % err % check(msg="Unable to write dataset "//dset_name, &
         file=__FILE__, line=__LINE__)) RETURN
 
-      dset_name = "/apex/neutral_temperature"
+      dset_name = "neutral_temperature"
       CALL ipe % io % write(dset_name, &
         ipe % neutrals % temperature(:,:,   &
         ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
