@@ -30,12 +30,13 @@ module ipeMethods
 
   public :: IPEFieldDiagnostics
   public :: IPEIsStateConnected
-  public :: IPEMeshCreate
+  public :: IPEGridCreate2D
+  public :: IPEMeshCreate3D
 
 contains
 
   !---------------------------------------------------------------------------
-  ! SUBROUTINE: IPEMeshCreate
+  ! SUBROUTINE: IPEMeshCreate3D
   !
   ! DESCRIPTION:
   !> \brief
@@ -66,7 +67,7 @@ contains
   !! 0 (Northern hemisphere) or 1 (Southern hemisphere).
   !---------------------------------------------------------------------------
 
-  subroutine IPEMeshCreate(gcomp, mesh, fill, rc)
+  subroutine IPEMeshCreate3D(gcomp, mesh, fill, rc)
 
     ! --- input/output variables
     type(ESMF_GridComp)            :: gcomp
@@ -205,7 +206,7 @@ contains
     ! -- debug
     if (btest(verbosity,1)) then
       if (localPet == 0) then
-        write(6,'("====== IPEMeshCreate: tile bounds ======"/&
+        write(6,'("====== IPEMeshCreate3D: tile bounds ======"/&
                  &"localPET     mps     mpe     lps     lpe"/&
                  &40("-"))')
         do i = 1, size(globalBounds), 4
@@ -992,7 +993,109 @@ contains
   
     end function IPEGetOwnerPet
 
-  end subroutine IPEMeshCreate
+  end subroutine IPEMeshCreate3D
+
+  !-----------------------------------------------------------------------------
+
+  subroutine IPEGridCreate2D(gcomp, grid, rc)
+
+    ! --- input/output variables
+    type(ESMF_GridComp)            :: gcomp
+    integer, optional, intent(out) :: rc
+
+    ! -- local variables
+    integer :: petCount
+    integer :: i, j, localrc
+    integer :: MinLon, MaxLon, MinLat, MaxLat
+    integer, parameter:: nLon=81, nLat=97
+    real(ESMF_KIND_R8), pointer:: Lon_I(:), Lat_I(:)
+    real, parameter:: LatIpe_I(nLat) = [ &
+       -90.0000, -88.1238, -86.2386, -84.3344, -82.4013, -80.4296, -78.4095, &
+       -76.3318, -74.1877, -71.9690, -69.6682, -67.2793, -64.7977, -62.2208, &
+       -59.5484, -56.7835, -53.9323, -51.0045, -48.0138, -44.9776, -41.9167, &
+       -38.8546, -35.8165, -32.8285, -29.9165, -27.1046, -24.4146, -21.8655, &
+       -19.4724, -17.2473, -15.1984, -13.3307, -11.6462, -10.1443,  -8.8219, &
+        -7.6733,  -6.6900,  -5.8603,  -5.1688,  -4.5959,  -4.1191,  -3.7133, &
+        -3.3532,  -3.0142,  -2.6728,  -2.3049,  -1.8786,  -1.3276,   0.0000, &
+         1.3276,   1.8786,   2.3049,   2.6728,   3.0142,   3.3532,   3.7133, &
+         4.1191,   4.5959,   5.1688,   5.8603,   6.6900,   7.6733,   8.8219, &
+        10.1443,  11.6462,  13.3307,  15.1984,  17.2473,  19.4724,  21.8655, &
+        24.4146,  27.1046,  29.9165,  32.8285,  35.8165,  38.8546,  41.9167, &
+        44.9776,  48.0138,  51.0045,  53.9323,  56.7835,  59.5484,  62.2208, &
+        64.7977,  67.2793,  69.6682,  71.9690,  74.1877,  76.3318,  78.4095, &
+        80.4296,  82.4013,  84.3344,  86.2386,  88.1238,  90.0000 ]
+    type(ESMF_VM) :: vm
+    type(ESMF_Grid) :: grid
+    character(ESMF_MAXSTR) :: msg
+
+    ! -- begin
+    if (present(rc)) rc = ESMF_SUCCESS
+
+    ! -- query vm
+    call ESMF_GridCompGet(gcomp, vm=vm, rc=localrc)
+    if (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__, &
+      rcToReturn=rc)) return
+
+    call ESMF_VMGet(vm, petCount=petCount, rc=localrc)
+    if (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__, &
+      rcToReturn=rc)) return
+
+    ! -- create Lon-Lat grid where -180<=Lon<=180-dLon, -90<=Lat<=90
+    grid = ESMF_GridCreateNoPeriDim(maxIndex=[nLon-1, nLat-1], &
+      regDecomp=[1, petCount], coordDep1=[1], coordDep2=[2], &
+      coordSys=ESMF_COORDSYS_CART, indexflag=ESMF_INDEX_GLOBAL, &
+      name="dynamo grid", rc=localrc)
+    if (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__, &
+      rcToReturn=rc)) return
+
+    ! -- add coordinates
+    call ESMF_GridAddCoord(grid, staggerloc=ESMF_STAGGERLOC_CORNER, rc=localrc)
+    if (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__, &
+      rcToReturn=rc)) return
+
+    nullify(Lon_I)
+    call ESMF_GridGetCoord(grid, coordDim=1, &
+         staggerLoc=ESMF_STAGGERLOC_CORNER, farrayPtr=Lon_I, rc=localrc)
+    if (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__, &
+      rcToReturn=rc)) return
+    write(msg, fmt='(a,i)') 'IPE size(Lon_I) = ', size(Lon_I)
+    call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
+
+    nullify(Lat_I)
+    call ESMF_GridGetCoord(Grid, coordDim=2, &
+         staggerLoc=ESMF_STAGGERLOC_CORNER, farrayPtr=Lat_I, rc=localrc)
+    if (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__, &
+      rcToReturn=rc)) return
+    write(msg, fmt='(a,i)') 'IPE size(Lat_I) = ', size(Lat_I)
+    call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
+
+    ! -- uniform longitude grid from -180 to 180
+    minLon = lbound(Lon_I, dim=1)
+    maxLon = ubound(Lon_I, dim=1)
+    do i = minLon, maxLon
+       Lon_I(i) = (i-1)*(360.0/(nLon-1))-180
+    end do
+
+    ! -- nonuniform latitude grid
+    minLat = lbound(Lat_I, dim=1)
+    maxLat = ubound(Lat_I, dim=1)
+    do j = minLat, maxLat
+       Lat_I(j) = LatIpe_I(j)
+    end do
+
+  end subroutine IPEGridCreate2D
 
   !-----------------------------------------------------------------------------
 
@@ -1239,7 +1342,9 @@ contains
     integer, optional, intent(out) :: rc
 
     ! local variables
-    integer :: localrc
+    integer :: i, localrc
+    character(len=ESMF_MAXSTR) :: msgString
+    character(len=ESMF_MAXSTR), pointer :: itemNameList(:)
     character(len=ESMF_MAXSTR), pointer :: connectedList(:)
 
     ! begin
@@ -1250,17 +1355,32 @@ contains
     ! determine how many fields are connected
     nullify(connectedList)
     call NUOPC_GetStateMemberLists(state, ConnectedList=connectedList, &
-      nestedFlag=.true., rc=localrc)
+      itemNameList=itemNameList, nestedFlag=.true., rc=localrc)
     if (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__,  &
       file=__FILE__,  &
       rcToReturn=rc)) &
       return  ! bail out
 
-
     if (associated(connectedList)) then
+      do i = 1, size(itemNameList, dim=1)
+         write(msgString,'(a)') "itemNameList = "//trim(itemNameList(i))//" "//trim(connectedList(i))
+         call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=localrc)
+         if (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+           line=__LINE__,  &
+           file=__FILE__,  &
+           rcToReturn=rc)) &
+           return  ! bail out
+      end do
+
       IPEIsStateConnected = any(connectedList == "true")
       deallocate(connectedList, stat=localrc)
+      if (ESMF_LogFoundDeallocError(statusToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+        line=__LINE__,  &
+        file=__FILE__,  &
+        rcToReturn=rc)) &
+        return  ! bail out
+      deallocate(itemNameList, stat=localrc)
       if (ESMF_LogFoundDeallocError(statusToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
         line=__LINE__,  &
         file=__FILE__,  &

@@ -28,48 +28,51 @@ module ipeCap
 
   use ipeMethods
   use IPE_Wrapper
-
+  use dynamo_module, only: zigm2, zigm11, zigm22
+  use params_module, only: kmlonp1, kmlat
 
   implicit none
 
   integer, parameter :: importFieldCount = 7
-  character(len=*), dimension(importFieldCount), parameter :: &
-    importFieldNames = (/ &
-      "temp_neutral          ", &
-      "eastward_wind_neutral ", &
-      "northward_wind_neutral", &
-      "upward_wind_neutral   ", &
-      "O_Density             ", &
-      "O2_Density            ", &
-      "N2_Density            "  &
-      /)
+  character(len=22), dimension(importFieldCount, 2), parameter :: &
+    importFieldNames = reshape ((/ &
+        "temp_neutral          ", "3d                    ", &
+        "eastward_wind_neutral ", "3d                    ", &
+        "northward_wind_neutral", "3d                    ", &
+        "upward_wind_neutral   ", "3d                    ", &
+        "O_Density             ", "3d                    ", &
+        "O2_Density            ", "3d                    ", &
+        "N2_Density            ", "3d                    "  &
+      /), shape(importFieldNames), order=(/2,1/))
   
-  integer, parameter :: exportFieldCount = 22
-  character(len=*), dimension(exportFieldCount), parameter :: &
-    exportFieldNames = (/ &
-      "temp_neutral          ", &
-      "eastward_wind_neutral ", &
-      "northward_wind_neutral", &
-      "upward_wind_neutral   ", &
-      "O_Density             ", &
-      "O2_Density            ", &
-      "N2_Density            ", &
-      "O_plus_density        ", &
-      "H_plus_density        ", &
-      "He_plus_density       ", &
-      "N_plus_density        ", &
-      "NO_plus_density       ", &
-      "O2_plus_density       ", &
-      "N2_plus_density       ", &
-      "O_plus_2D_density     ", &
-      "O_plus_2P_density     ", &
-      "ion_temperature       ", &
-      "electron_temperature  ", &
-      "electron_density      ", &
-      "eastward_exb_velocity ", &
-      "northward_exb_velocity", &
-      "upward_exb_velocity   "  &
-      /)
+  integer, parameter :: exportFieldCount = 24
+  character(len=22), dimension(exportFieldCount, 2), parameter :: &
+    exportFieldNames = reshape ((/ &
+        "temp_neutral          ", "3d                    ", &
+        "eastward_wind_neutral ", "3d                    ", &
+        "northward_wind_neutral", "3d                    ", &
+        "upward_wind_neutral   ", "3d                    ", &
+        "O_Density             ", "3d                    ", &
+        "O2_Density            ", "3d                    ", &
+        "N2_Density            ", "3d                    ", &
+        "O_plus_density        ", "3d                    ", &
+        "H_plus_density        ", "3d                    ", &
+        "He_plus_density       ", "3d                    ", &
+        "N_plus_density        ", "3d                    ", &
+        "NO_plus_density       ", "3d                    ", &
+        "O2_plus_density       ", "3d                    ", &
+        "N2_plus_density       ", "3d                    ", &
+        "O_plus_2D_density     ", "3d                    ", &
+        "O_plus_2P_density     ", "3d                    ", &
+        "ion_temperature       ", "3d                    ", &
+        "electron_temperature  ", "3d                    ", &
+        "electron_density      ", "3d                    ", &
+        "eastward_exb_velocity ", "3d                    ", &
+        "northward_exb_velocity", "3d                    ", &
+        "upward_exb_velocity   ", "3d                    ", &
+        "hall_conductance      ", "2d                    ", &
+        "pedersen_conductance  ", "2d                    "  &
+      /), shape(exportFieldNames), order=(/2,1/))
   
   private
 
@@ -222,14 +225,14 @@ module ipeCap
       return  ! bail out
 
     ! import fields from WAM
-    call NUOPC_Advertise(importState, StandardNames=importFieldNames, rc=rc)
+    call NUOPC_Advertise(importState, StandardNames=importFieldNames(:,1), rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__,  &
       file=__FILE__)) &
       return  ! bail out
 
     ! export fields from WAM
-    call NUOPC_Advertise(exportState, StandardNames=exportFieldNames, &
+    call NUOPC_Advertise(exportState, StandardNames=exportFieldNames(:,1), &
       SharePolicyField="share", TransferOfferGeomObject="will provide", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__,  &
@@ -255,7 +258,8 @@ module ipeCap
     
     ! local variables    
     type(ESMF_Field) :: field
-    type(ESMF_Mesh)  :: mesh
+    type(ESMF_Mesh)  :: mesh3d
+    type(ESMF_Grid)  :: grid2d
     type(ESMF_VM)    :: vm
 
     type(IPE_InternalState_Type) :: is
@@ -342,7 +346,7 @@ module ipeCap
 
     if (isImportConnected .or. isExportConnected) then
       ! create 3D IPE mesh
-      call IPEMeshCreate(gcomp, mesh, fill=(ipe % parameters % mesh_fill > 0), rc=rc)
+      call IPEMeshCreate3D(gcomp, mesh3d, fill=(ipe % parameters % mesh_fill > 0), rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
         line=__LINE__, &
         file=__FILE__)) &
@@ -350,34 +354,61 @@ module ipeCap
 
       ! write IPE mesh to VTK file if requested
       if (ipe % parameters % mesh_write > 0) then
-        call ESMF_MeshWrite(mesh, trim(ipe % parameters % mesh_write_file), rc=rc)
+        call ESMF_MeshWrite(mesh3d, trim(ipe % parameters % mesh_write_file)//"3d", rc=rc)
         if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
           line=__LINE__, &
           file=__FILE__)) &
           return  ! bail out
       end if
+
+      ! create 2D IPE grid
+      call IPEGridCreate2D(gcomp, grid2d, rc=rc)
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+        line=__LINE__, &
+        file=__FILE__)) &
+        return  ! bail out
     end if
 
     ! realize connected Fields in the importState
     do item = 1, importFieldCount
-      call NUOPC_Realize(importState, mesh, fieldName=trim(importFieldNames(item)), &
-        typekind=ESMF_TYPEKIND_R8, selection="realize_connected_remove_others", &
-        dataFillScheme="const", rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-        line=__LINE__, &
-        file=__FILE__)) &
-        return  ! bail out
+      if (trim(importFieldNames(item,2)) == "3d") then
+        call NUOPC_Realize(importState, mesh3d, fieldName=trim(importFieldNames(item,1)), &
+          typekind=ESMF_TYPEKIND_R8, selection="realize_connected_remove_others", &
+          dataFillScheme="const", rc=rc)
+        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+          line=__LINE__, &
+          file=__FILE__)) &
+          return  ! bail out
+      else
+        call NUOPC_Realize(importState, grid2d, fieldName=trim(importFieldNames(item,1)), &
+          typekind=ESMF_TYPEKIND_R8, selection="realize_connected_remove_others", &
+          dataFillScheme="const", staggerloc=ESMF_STAGGERLOC_CORNER, rc=rc)
+        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+          line=__LINE__, &
+          file=__FILE__)) &
+          return  ! bail out
+      end if
     end do
 
     ! realize connected Fields in the exportState
     do item = 1, exportFieldCount
-      call NUOPC_Realize(exportState, mesh, fieldName=trim(exportFieldNames(item)), &
-        typekind=ESMF_TYPEKIND_R8, selection="realize_connected_remove_others", &
-        dataFillScheme="const", rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-        line=__LINE__, &
-        file=__FILE__)) &
-        return  ! bail out
+      if (trim(exportFieldNames(item,2)) == "3d") then
+        call NUOPC_Realize(exportState, mesh3d, fieldName=trim(exportFieldNames(item,1)), &
+          typekind=ESMF_TYPEKIND_R8, selection="realize_connected_remove_others", &
+          dataFillScheme="const", rc=rc)
+        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+          line=__LINE__, &
+          file=__FILE__)) &
+          return  ! bail out
+      else
+        call NUOPC_Realize(exportState, grid2d, fieldName=trim(exportFieldNames(item,1)), &
+          typekind=ESMF_TYPEKIND_R8, selection="realize_connected_remove_others", &
+          dataFillScheme="const", staggerloc=ESMF_STAGGERLOC_CORNER, rc=rc)
+        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+          line=__LINE__, &
+          file=__FILE__)) &
+          return  ! bail out
+      end if
     end do
 
     ! extro
@@ -447,6 +478,7 @@ module ipeCap
     
     ! local variables
     type(ESMF_Clock)   :: clock
+    type(ESMF_Time)    :: currTime
     type(ESMF_State)   :: importState, exportState
     type(ESMF_Field), pointer :: fieldList(:)
 
@@ -454,6 +486,7 @@ module ipeCap
     type(IPE_Model_Type), pointer :: this
     type(IPE_Model),      pointer :: ipe
 
+    integer :: i, j, istr, iend, jstr, jend
     integer :: id, item, stat
     integer :: kps, kpe, lps, lpe, mph, mps, mpe
     integer :: kp, lp, mp
@@ -461,10 +494,13 @@ module ipeCap
     integer :: verbosity, diagnostic
     integer(ESMF_KIND_R8) :: advanceCount
     character(len=ESMF_MAXSTR) :: name
+    character(len=ESMF_MAXSTR) :: timeStr
     character(len=ESMF_MAXSTR), pointer :: standardNameList(:)
     character(len=ESMF_MAXSTR), pointer :: connectedList(:)
     real(ESMF_KIND_R8), dimension(:),     pointer :: fieldPtr
-    real(prec),         dimension(:,:,:), pointer :: modelPtr
+    real(ESMF_KIND_R8), dimension(:,:),   pointer :: fieldPtr2d
+    real,               dimension(:,:),   pointer :: modelPtr2d
+    real(prec),         dimension(:,:,:), pointer :: modelPtr3d
 
     ! local parameters
     character(len=*), parameter :: rName = "Run"
@@ -490,6 +526,19 @@ module ipeCap
     ! query the Component for its clock and importState
     call ESMF_GridCompGet(gcomp, clock=clock, importState=importState, &
       exportState=exportState, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
+
+    ! query time
+    call ESMF_ClockGet(clock, currTime=currTime, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
+
+    call ESMF_TimeGet(currTime, timeStringISOFrac=timeStr , rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__,  &
       file=__FILE__)) &
@@ -569,22 +618,22 @@ module ipeCap
           return  ! bail out
 
         ! -- identify IPE neutral array receiving imported field data
-        nullify(modelPtr)
+        nullify(modelPtr3d)
         select case (trim(standardNameList(item)))
           case ("temp_neutral")
-            modelPtr(kps:,lps:,mps:) => ipe % neutrals % temperature
+            modelPtr3d(kps:,lps:,mps:) => ipe % neutrals % temperature
           case ("eastward_wind_neutral")
-            modelPtr(kps:,lps:,mps:) => ipe % neutrals % velocity_geographic(1,:,:,:)
+            modelPtr3d(kps:,lps:,mps:) => ipe % neutrals % velocity_geographic(1,:,:,:)
           case ("northward_wind_neutral")
-            modelPtr(kps:,lps:,mps:) => ipe % neutrals % velocity_geographic(2,:,:,:)
+            modelPtr3d(kps:,lps:,mps:) => ipe % neutrals % velocity_geographic(2,:,:,:)
           case ("upward_wind_neutral")
-            modelPtr(kps:,lps:,mps:) => ipe % neutrals % velocity_geographic(3,:,:,:)
+            modelPtr3d(kps:,lps:,mps:) => ipe % neutrals % velocity_geographic(3,:,:,:)
           case ("O_Density")
-            modelPtr(kps:,lps:,mps:) => ipe % neutrals % oxygen
+            modelPtr3d(kps:,lps:,mps:) => ipe % neutrals % oxygen
           case ("O2_Density")
-            modelPtr(kps:,lps:,mps:) => ipe % neutrals % molecular_oxygen
+            modelPtr3d(kps:,lps:,mps:) => ipe % neutrals % molecular_oxygen
           case ("N2_Density")
-            modelPtr(kps:,lps:,mps:) => ipe % neutrals % molecular_nitrogen
+            modelPtr3d(kps:,lps:,mps:) => ipe % neutrals % molecular_nitrogen
           case default
             ! -- unavailable neutrals array, skip it
             cycle
@@ -594,8 +643,17 @@ module ipeCap
           kp = this % nodeToIndexMap(id, 1)
           lp = this % nodeToIndexMap(id, 2)
           mp = this % nodeToIndexMap(id, 3)
-          modelPtr(kp, lp, mp) = fieldPtr(id)
+          modelPtr3d(kp, lp, mp) = fieldPtr(id)
         end do
+
+        ! -- write import fields
+        if (ipe % parameters % import_write > 0) then
+          call ESMF_FieldWriteVTK(fieldList(item), "ipe_import_"//trim(timeStr), rc=rc)
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__,  &
+            file=__FILE__)) &
+            return  ! bail out
+        end if
 
       end do
 
@@ -636,11 +694,11 @@ module ipeCap
     end if
 
     ! -- advance IPE model
-    call Update_IPE(ipe, clock, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__,  &
-      file=__FILE__)) &
-      return  ! bail out
+    !call Update_IPE(ipe, clock, rc=rc)
+    !if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+    !  line=__LINE__,  &
+    !  file=__FILE__)) &
+    !  return  ! bail out
 
     ! -- export data
     nullify(fieldList, connectedList, standardNameList)
@@ -666,72 +724,118 @@ module ipeCap
       numLocalNodes = size(this % nodeToIndexMap, 1)
 
       do item = 1, size(fieldList)
-        ! --- get field data
-        nullify(fieldPtr)
-        call ESMF_FieldGet(fieldList(item), farrayPtr=fieldPtr, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-          line=__LINE__,  &
-          file=__FILE__)) &
-          return  ! bail out
-
         ! -- identify IPE neutral array receiving imported field data
-        nullify(modelPtr)
+        nullify(modelPtr2d)
+        nullify(modelPtr3d)
         select case (trim(standardNameList(item)))
           case ("temp_neutral")
-            modelPtr(kps:,lps:,mps:) => ipe % neutrals % temperature
+            modelPtr3d(kps:,lps:,mps:) => ipe % neutrals % temperature
           case ("eastward_wind_neutral")
-            modelPtr(kps:,lps:,mps:) => ipe % neutrals % velocity_geographic(1,:,:,:)
+            modelPtr3d(kps:,lps:,mps:) => ipe % neutrals % velocity_geographic(1,:,:,:)
           case ("northward_wind_neutral")
-            modelPtr(kps:,lps:,mps:) => ipe % neutrals % velocity_geographic(2,:,:,:)
+            modelPtr3d(kps:,lps:,mps:) => ipe % neutrals % velocity_geographic(2,:,:,:)
           case ("upward_wind_neutral")
-            modelPtr(kps:,lps:,mps:) => ipe % neutrals % velocity_geographic(3,:,:,:)
+            modelPtr3d(kps:,lps:,mps:) => ipe % neutrals % velocity_geographic(3,:,:,:)
           case ("O_Density")
-            modelPtr(kps:,lps:,mps:) => ipe % neutrals % oxygen
+            modelPtr3d(kps:,lps:,mps:) => ipe % neutrals % oxygen
           case ("O2_Density")
-            modelPtr(kps:,lps:,mps:) => ipe % neutrals % molecular_oxygen
+            modelPtr3d(kps:,lps:,mps:) => ipe % neutrals % molecular_oxygen
           case ("N2_Density")
-            modelPtr(kps:,lps:,mps:) => ipe % neutrals % molecular_nitrogen
+            modelPtr3d(kps:,lps:,mps:) => ipe % neutrals % molecular_nitrogen
           case ("ion_temperature")
-            modelPtr(kps:,lps:,mph:) => ipe % plasma % ion_temperature
+            modelPtr3d(kps:,lps:,mph:) => ipe % plasma % ion_temperature
           case ("electron_temperature")
-            modelPtr(kps:,lps:,mph:) => ipe % plasma % electron_temperature
+            modelPtr3d(kps:,lps:,mph:) => ipe % plasma % electron_temperature
           case ("electron_density")
-            modelPtr(kps:,lps:,mph:) => ipe % plasma % electron_density
+            modelPtr3d(kps:,lps:,mph:) => ipe % plasma % electron_density
           case ("O_plus_density")
-            modelPtr(kps:,lps:,mph:) => ipe % plasma % ion_densities(1,:,:,:)
+            modelPtr3d(kps:,lps:,mph:) => ipe % plasma % ion_densities(1,:,:,:)
           case ("H_plus_density")
-            modelPtr(kps:,lps:,mph:) => ipe % plasma % ion_densities(2,:,:,:)
+            modelPtr3d(kps:,lps:,mph:) => ipe % plasma % ion_densities(2,:,:,:)
           case ("He_plus_density")
-            modelPtr(kps:,lps:,mph:) => ipe % plasma % ion_densities(3,:,:,:)
+            modelPtr3d(kps:,lps:,mph:) => ipe % plasma % ion_densities(3,:,:,:)
           case ("N_plus_density")
-            modelPtr(kps:,lps:,mph:) => ipe % plasma % ion_densities(4,:,:,:)
+            modelPtr3d(kps:,lps:,mph:) => ipe % plasma % ion_densities(4,:,:,:)
           case ("NO_plus_density")
-            modelPtr(kps:,lps:,mph:) => ipe % plasma % ion_densities(5,:,:,:)
+            modelPtr3d(kps:,lps:,mph:) => ipe % plasma % ion_densities(5,:,:,:)
           case ("O2_plus_density")
-            modelPtr(kps:,lps:,mph:) => ipe % plasma % ion_densities(6,:,:,:)
+            modelPtr3d(kps:,lps:,mph:) => ipe % plasma % ion_densities(6,:,:,:)
           case ("N2_plus_density")
-            modelPtr(kps:,lps:,mph:) => ipe % plasma % ion_densities(7,:,:,:)
+            modelPtr3d(kps:,lps:,mph:) => ipe % plasma % ion_densities(7,:,:,:)
           case ("O_plus_2D_density")
-            modelPtr(kps:,lps:,mph:) => ipe % plasma % ion_densities(8,:,:,:)
+            modelPtr3d(kps:,lps:,mph:) => ipe % plasma % ion_densities(8,:,:,:)
           case ("O_plus_2P_density")
-            modelPtr(kps:,lps:,mph:) => ipe % plasma % ion_densities(9,:,:,:)
+            modelPtr3d(kps:,lps:,mph:) => ipe % plasma % ion_densities(9,:,:,:)
           case ("eastward_exb_velocity")
-            modelPtr(kps:,lps:,mps:) => ipe % eldyn % v_exb_geographic(1,:,:,:)
+            modelPtr3d(kps:,lps:,mps:) => ipe % eldyn % v_exb_geographic(1,:,:,:)
           case ("northward_exb_velocity")
-            modelPtr(kps:,lps:,mps:) => ipe % eldyn % v_exb_geographic(2,:,:,:)
+            modelPtr3d(kps:,lps:,mps:) => ipe % eldyn % v_exb_geographic(2,:,:,:)
           case ("upward_exb_velocity")
-            modelPtr(kps:,lps:,mps:) => ipe % eldyn % v_exb_geographic(3,:,:,:)
+            modelPtr3d(kps:,lps:,mps:) => ipe % eldyn % v_exb_geographic(3,:,:,:)
+          case ("hall_conductance")
+            modelPtr2d(1:kmlonp1,1:kmlat) => zigm2(:,:)
+          case ("pedersen_conductance")
+            modelPtr2d(1:kmlonp1,1:kmlat) => sqrt(zigm11(:,:)*zigm22(:,:))
           case default
             ! -- unavailable neutrals array, skip it
             cycle
         end select
 
-        do id = 1, numLocalNodes
-          kp = this % nodeToIndexMap(id, 1)
-          lp = this % nodeToIndexMap(id, 2)
-          mp = this % nodeToIndexMap(id, 3)
-          fieldPtr(id) = modelPtr(kp, lp, mp)
-        end do
+        if (associated(modelPtr3d)) then
+          ! --- get field data
+          nullify(fieldPtr)
+          call ESMF_FieldGet(fieldList(item), farrayPtr=fieldPtr, rc=rc)
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__,  &
+            file=__FILE__)) &
+            return  ! bail out
+
+          ! --- fill field data
+          do id = 1, numLocalNodes
+            kp = this % nodeToIndexMap(id, 1)
+            lp = this % nodeToIndexMap(id, 2)
+            mp = this % nodeToIndexMap(id, 3)
+            fieldPtr(id) = modelPtr3d(kp, lp, mp)
+          end do
+
+          ! -- write export fields
+          if (ipe % parameters % export_write > 0) then
+            call ESMF_FieldWriteVTK(fieldList(item), "ipe_export_"//trim(timeStr), rc=rc)
+            if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+              line=__LINE__,  &
+              file=__FILE__)) &
+              return  ! bail out
+          end if
+        end if
+        if (associated(modelPtr2d)) then
+          ! --- get field data
+          nullify(fieldPtr2d)
+          call ESMF_FieldGet(fieldList(item), farrayPtr=fieldPtr2d, rc=rc)
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__,  &
+            file=__FILE__)) &
+            return  ! bail out
+
+          ! --- fill field data
+          istr = lbound(fieldPtr2d, dim=1)
+          iend = ubound(fieldPtr2d, dim=1)
+          jstr = lbound(fieldPtr2d, dim=2)
+          jend = ubound(fieldPtr2d, dim=2)
+          do j = jstr, jend
+            do i = istr, iend
+              fieldPtr2d(i,j) = modelPtr2d(i,j)
+            end do
+          end do
+
+          ! -- write export fields
+          if (ipe % parameters % export_write > 0) then
+            call ESMF_FieldWrite(fieldList(item), "ipe_export_"//trim(timeStr), overwrite=.true., rc=rc)
+            if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+              line=__LINE__,  &
+              file=__FILE__)) &
+              return  ! bail out
+          end if
+        end if
       end do
 
     end if

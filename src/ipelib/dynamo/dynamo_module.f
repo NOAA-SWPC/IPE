@@ -114,7 +114,7 @@
 ! Coefficients and RHS terms for PDE on geomagnetic grid:
 ! (formerly in coefm.h)
 !
-      real,dimension(kmlonp1,kmlat) ::                                  &
+      real,dimension(kmlonp1,kmlat), target ::                          &
      &  zigm11,                                                         &! sigma11*cos(theta0)
      &  zigmc,                                                          &! sigmac
      &  zigm2,                                                          &! sigma2
