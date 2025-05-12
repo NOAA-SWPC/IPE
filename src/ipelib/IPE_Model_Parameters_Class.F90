@@ -234,11 +234,11 @@ CONTAINS
     write_apex_eldyn          = .TRUE.
     file_output_frequency     = 180.0_prec
     file_prefix               = "IPE_State.apex."
-<<<<<<< HEAD
+! <<<<<<< HEAD
     file_extension            = ".nc"
-=======
-    file_extension            = ".h5"
->>>>>>> develop
+! =======
+!    file_extension            = ".h5"
+! >>>>>>> develop
 
     ! IPECAP !
     mesh_height_min =   0.
