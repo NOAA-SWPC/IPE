@@ -6,9 +6,9 @@ IPE_INPUT_DIRECTORY=/scratch1/NCEPDEV/stmp2/Zhuxiao.Li/IPE_weimer2005_20130316
 # where you want the IPE_Params.geo.*.nc4 files
 IPE_OUTPUT_DIRECTORY=$IPE_INPUT_DIRECTORY/netcdf
 ###### USUALLY NO NEED TO CHANGE ANYTHING BELOW THIS LINE ######
-if [[ -e /scratch1 ]] ; then
+if [[ -e /scratch3 ]] ; then
   ## HERA GRID LOCATION
-  IPE_GRID=/scratch1/NCEPDEV/swpc/WAM-IPE_DATA/IPE_FIX/IPE_Grid.h5
+  IPE_GRID=/scratch3/NCEPDEV/swpc/WAM-IPE_DATA_all/IPE_FIX/IPE_Grid.h5
   ## MODULEFILE LOAD
   module use -a /contrib/modulefiles
   module load anaconda
