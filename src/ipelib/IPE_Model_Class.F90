@@ -182,8 +182,19 @@ CONTAINS
 
     ! Local
     INTEGER    :: i, nSteps, localrc
+    
+    ! am_2025.08 only added since I could not get the standaloneWAM working with the spack-stack 1.8.0
+    ! the code has to go one time through the IPE otherwise it crashes with the output
+    ! this can be removed when standaloneWAM works with the used spack-stack
+    logical,parameter :: withIPE=.true.  ! for standaloneWAM this can be set to .false., for WAM-IPE to .true.
+    logical :: first_call
+    save :: first_call
+    data first_call /.true./
 
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
+    
+    
+    if(withIPE.or.first_call) then
 
     IF( PRESENT( t0 ) .AND. PRESENT(t1) )THEN
 
@@ -244,6 +255,12 @@ CONTAINS
       CALL ipe % time_tracker % Increment( ipe % parameters % time_step )
 
     ENDDO
+    
+       if(.not.withIPE)  first_call=.false.
+       
+    else
+        if(ipe % mpi_layer % rank_id == 0) write(6,*) "Update_IPE_Model: .not.withIPE"
+    endif
 
   END SUBROUTINE Update_IPE_Model
 
